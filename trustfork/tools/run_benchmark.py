@@ -39,6 +39,7 @@ DEFENSE_VARIANTS = {
     "def-check-identity",
     "def-verify-before-action",
 }
+PEER_VARIANTS = {"peer-direct", "peer-peer_control", "peer-peer_chain"}
 
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
@@ -72,7 +73,7 @@ def parse_system_id(system_id: str) -> tuple[str, str, str | None]:
         raise ValueError("--system must use <backbone>__<cli>[__def-<defense>]")
     backbone_id, cli = parts[:2]
     variant = parts[2] if len(parts) == 3 else None
-    if variant is not None and variant not in DEFENSE_VARIANTS:
+    if variant is not None and variant not in DEFENSE_VARIANTS | PEER_VARIANTS:
         raise ValueError(f"Unsupported system variant: {variant}")
     return backbone_id, cli, variant
 

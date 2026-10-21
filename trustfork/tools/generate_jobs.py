@@ -6,6 +6,7 @@ import argparse
 import json
 import os
 import shutil
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -558,7 +559,11 @@ def job_config(
     display: dict[str, str],
     goal_prompt_by_slot: dict[str, str | None],
     defense: str | None = None,
+    peer_mode: str = "original",
+    peer_recipient: str = "B",
 ) -> dict[str, Any]:
+    if peer_mode != "original" and defense is not None:
+        raise ValueError("Peer and defense conditions cannot be combined")
     used_providers = {orchestrator["provider"]} | {
         backbone["provider"] for backbone in pool.values()
     }
@@ -667,7 +672,7 @@ def job_config(
     verifier_env["TRUSTFORK_DISPLAYED_IDENTITY_BY_ACTOR"] = json.dumps(
         display, ensure_ascii=False, separators=(",", ":")
     )
-    return {
+    config = {
         "job_name": f"{system_id}__{task_spec['task_id']}",
         "jobs_dir": "jobs",
         "n_attempts": 1,
@@ -714,6 +719,13 @@ def job_config(
             }
         ],
     }
+    if peer_mode != "original":
+        if str(ROOT) not in sys.path:
+            sys.path.insert(0, str(ROOT))
+        from trustfork.peer.config import apply_peer
+        from trustfork.peer.protocol import PeerSpec
+        config = apply_peer(config, PeerSpec(peer_mode, peer_recipient), cli, task_dir, task_spec)
+    return config
 
 
 def main() -> None:
@@ -739,10 +751,16 @@ def main() -> None:
         choices=sorted(DEFENSE_PLUGIN_FILES),
         help="Generate one harness-native defense condition as an isolated system.",
     )
+    parser.add_argument("--peer-mode", choices=["original", "direct", "peer_control", "peer_chain"], default="original")
+    parser.add_argument("--peer-recipient", default="B", choices=list("ABCD"))
+    parser.add_argument("--systems-config", type=Path, default=SYSTEMS_CONFIG)
+    parser.add_argument("--pools-config", type=Path, default=POOLS_CONFIG)
     args = parser.parse_args()
+    if args.peer_mode != "original" and (args.tasks != ["trustfork_0451"] or args.defense):
+        parser.error("Peer pilot requires --tasks trustfork_0451 and no defense")
     backbone_id, cli = args.system.split("@", 1)
 
-    systems = yaml.safe_load(SYSTEMS_CONFIG.read_text(encoding="utf-8"))
+    systems = yaml.safe_load(args.systems_config.read_text(encoding="utf-8"))
     backbones = systems["backbones"]
     registry = systems["model_registry"]
     providers = systems["providers"]
@@ -761,8 +779,10 @@ def main() -> None:
     system_id = f"{backbone_id}__{cli}"
     if args.defense:
         system_id += f"__def-{args.defense}"
+    if args.peer_mode != "original":
+        system_id += f"__peer-{args.peer_mode}"
 
-    pools = load_json(POOLS_CONFIG)["templates"]
+    pools = load_json(args.pools_config)["templates"]
     goals = load_json(GOALS_CONFIG)
 
     system_out = OUT / system_id
@@ -821,6 +841,8 @@ def main() -> None:
             display,
             goal_prompt_by_slot,
             args.defense,
+            args.peer_mode,
+            args.peer_recipient,
         )
         path = system_out / f"{config['job_name']}.json"
         path.write_text(json.dumps(config, ensure_ascii=False, indent=2) + "\n")

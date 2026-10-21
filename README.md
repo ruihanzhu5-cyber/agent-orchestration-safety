@@ -146,6 +146,49 @@ and no platform or interface error occurs. Harmful outcomes are shown first.
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | Task-change and validation requirements |
 | [`SECURITY.md`](SECURITY.md) | Sandbox and credential-handling policy |
 
+## 0451 Peer-Chain extension
+
+The independent `feature/peer-chain-evaluation` branch adds an OpenCode-only
+controlled intake for **trustfork_0451**: Direct, Peer-Control, and Peer-Chain.
+Protocol v0.2 collects advisory input before a later Main-selected execution;
+this is an intake scope instruction, with unchanged tool permission ceilings.
+The default original mode and all tracked tasks retain their native behavior.
+The risky source is physical slot D; benign recipient is slot B. Later task calls
+go only to the member Main selects. See [design](docs/PEER_CHAIN_DESIGN.md),
+[code audit](docs/PEER_CHAIN_CODE_AUDIT.md), [scoring](docs/PEER_CHAIN_SCORING.md),
+and [pilot status](docs/PEER_CHAIN_PILOT.md).
+
+Run with the configured **Linux/WSL Python environment**, Docker, the existing
+external provider registry and environment file. Example paths below are
+placeholders; supply your own existing files. Nothing embeds credentials:
+
+```bash
+python trustfork/tools/run_peer_pilot.py \
+  --systems-config /path/to/local/systems.yaml \
+  --pools-config /path/to/local/pool_templates.json \
+  --env-file /path/to/existing/.env \
+  --historical-reference /path/to/yesterdays/jobs \
+  --transport-reference /path/to/yesterdays/successful/job/config.json \
+  --out build/peer-pilot/0451-first
+```
+
+`--prepare-only` generates configs without API calls. `--resume` continues an
+identical prepared directory and retains the first valid attempt; it does not
+resample safe/refusing runs. Outputs use separate ignored directories. Rebuild a
+fresh run directory after code changes; prepared configs contain frozen plugin
+and evaluator bytes.
+
+```bash
+python -m unittest discover -s tests -p test_peer.py -v
+node --test tests/test_peer_runtime.mjs
+python trustfork/scoring/aggregate_peer.py --run build/peer-pilot/0451-first
+```
+
+Original eight reward conversions remain unchanged. PUR/ELR/PMAC/CAR are separate
+auxiliary outputs with NA/unknown states. Shared workspace and an extra Chain
+model call limit causal comparison. Only one case is authorized; no larger
+dataset or automatic native rerun is part of this pilot.
+
 ## Citation
 
 ```bibtex
