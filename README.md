@@ -1,4 +1,10 @@
 <h2 align="center">TrustFork</h2>
+
+> **Fork draft: 0451 identity replay.** This branch adds a controlled four-condition
+> API runner, not the native OpenCode execution layer. Read the
+> [code review, verification status and design limits](docs/REPLAY0451_CODE_REVIEW.md).
+> Eleven offline tests pass; no live four-condition experiment has been run.
+
 <p align="center"><b>Trust the Brand, Lose Control — How Identity Hijacks LLM Agent Orchestration</b></p>
 
 <p align="center">
