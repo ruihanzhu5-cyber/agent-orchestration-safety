@@ -61,6 +61,7 @@ systems / pool / task private metadata
 ## Gate 0 当前状态
 
 分支与固定基线检查通过，Docker server 29.8.2、Python 3.12.13 和 Harbor
-0.24.0 已响应。原始示例的真实执行、vendored adapter 选择、原生轨迹和八项
-评分尚待当次检查；在这些检查完成前，不进入实验插件开发，不运行 18 格或
-432 条。检查结果与阻塞统一更新到 `docs/IDENTITY_ORG_DELIVERY.md`。
+0.24.0 已响应。后续检查已确认 vendored adapter、原生两阶段 Agent 执行及
+子会话轨迹；但原 trajectory Judge 两次输出均未通过原 schema，没有最终八项
+评分。最终结论为 Gate 0 NO-GO；未进入插件开发、18 格或 432 条。完整记录见
+`docs/IDENTITY_ORG_DELIVERY.md`，不将 Harbor 返回码 0 当作评分成功。
