@@ -5,6 +5,8 @@
 > [code review, verification status and design limits](docs/REPLAY0451_CODE_REVIEW.md).
 > Eleven offline tests pass; no live four-condition experiment has been run.
 
+> See also the [plain-language change explanation and OpenCode corrections](docs/REPLAY0451_CHANGES_EXPLAINED.md).
+
 <p align="center"><b>Trust the Brand, Lose Control — How Identity Hijacks LLM Agent Orchestration</b></p>
 
 <p align="center">
