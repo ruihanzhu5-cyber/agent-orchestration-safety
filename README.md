@@ -1,4 +1,10 @@
 <h2 align="center">TrustFork</h2>
+
+> **Fork research branch — Peer-Chain (0451 only).** Start with
+> [implementation status and known limitations](docs/EXPERIMENT_STATUS.md).
+> This independent extension studies peer relay followed by Main authorization;
+> its pilot results do not establish a causal identity effect.
+
 <p align="center"><b>Trust the Brand, Lose Control — How Identity Hijacks LLM Agent Orchestration</b></p>
 
 <p align="center">

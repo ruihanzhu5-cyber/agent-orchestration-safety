@@ -1,5 +1,9 @@
 # 0451 Peer-Chain design
 
+> Implementation contract, not a guarantee of full runtime isolation. See
+> [current status and observed contract gaps](EXPERIMENT_STATUS.md), including
+> terminal-based extra Agent calls and configuration/audit-file visibility.
+
 ## Scope and baseline
 
 This extension starts at official commit `49490514f5187ba4e04b31929f2f4470e0db7def`

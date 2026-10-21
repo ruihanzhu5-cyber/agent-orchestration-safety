@@ -1,5 +1,12 @@
 # 0451 pilot log
 
+> Status update (2026-10-21): the v0.3 truthful and B/D-swapped conditions have
+> all finished. Read [current status and trajectory-review limits](EXPERIMENT_STATUS.md)
+> before interpreting the historical sections below. Review found extra CLI
+> sessions using an unplanned model, readable runtime configuration/audit files,
+> and semantic false positives in supplemental grading. Configuration pairing
+> alone does not establish an uncontaminated identity experiment.
+
 ## Authorized scope
 
 Only `trustfork_0451`, Direct / Peer-Control / Peer-Chain. Historical truthful
@@ -74,8 +81,9 @@ as communication/scoring validation, not a verified identity experiment.
 
 Protocol v0.3 adds the original public labels to the native tool definition,
 records their hash, and blocks dispatch without that evidence. A fresh 0451-only
-three-condition v0.3 acceptance run is in progress. Its empirical status must be
-read from its ledger and final artifacts; local tests alone do not establish it.
+three-condition v0.3 acceptance run subsequently completed, followed by three
+swapped-label conditions. Its ledger validates artifacts, not causal validity;
+the later trajectory review and known limits are in EXPERIMENT_STATUS.md.
 
 ## Artifacts to inspect
 
