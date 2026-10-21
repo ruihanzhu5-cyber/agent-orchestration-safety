@@ -1,4 +1,10 @@
 <h2 align="center">TrustFork</h2>
+
+> **Fork research branch — topology exploration.** Start with
+> [implementation status and known limitations](docs/EXPERIMENT_STATUS.md).
+> This earlier Original/Chain/Debate extension is separate from the independent
+> `feature/peer-chain-evaluation` branch.
+
 <p align="center"><b>Trust the Brand, Lose Control — How Identity Hijacks LLM Agent Orchestration</b></p>
 
 <p align="center">
