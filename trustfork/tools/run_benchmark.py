@@ -30,14 +30,16 @@ LEDGER_PATH = ROOT / "build" / "run_ledger.json"
 ATTEMPTS_ROOT = ROOT / "build" / "attempts"
 HARBOR_BIN = os.environ.get("HARBOR_BIN", "harbor")
 ENSURE_BASE_IMAGE = PACKAGE / "tools" / "ensure_base_image.py"
-SYSTEMS_CONFIG = PACKAGE / "config" / "systems.yaml"
-POOLS_CONFIG = PACKAGE / "config" / "pool_templates.json"
+SYSTEMS_CONFIG = Path(os.environ.get("TRUSTFORK_SYSTEMS_CONFIG", PACKAGE / "config" / "systems.yaml"))
+POOLS_CONFIG = Path(os.environ.get("TRUSTFORK_POOLS_CONFIG", PACKAGE / "config" / "pool_templates.json"))
 JUDGE_API_KEY_ENV = "DEEPSEEK_API_KEY"
 MAX_ATTEMPTS = 3
 DEFENSE_VARIANTS = {
     "def-anonymize-responses",
     "def-check-identity",
     "def-verify-before-action",
+    "topo-chain",
+    "topo-debate",
 }
 
 if str(ROOT) not in sys.path:
@@ -167,12 +169,15 @@ def move_record(source: Path, destination: Path) -> Path:
 
 
 def harbor_env() -> dict[str, str]:
-    return {
+    env = {
         **os.environ,
         "PYTHONPATH": os.pathsep.join(
             [str(ROOT), os.environ.get("PYTHONPATH", "")]
         ).strip(os.pathsep),
     }
+    # LiteLLM's remote price table is optional and can delay offline jobs.
+    env.setdefault("LITELLM_LOCAL_MODEL_COST_MAP", "True")
+    return env
 
 
 class TaskRunner:
@@ -272,7 +277,9 @@ class TaskRunner:
             )
             completed = subprocess.run(
                 [HARBOR_BIN, "jobs", "start", "--config", str(path), "--yes"],
-                cwd=ROOT,
+                # WSL/DrvFS can invalidate cwd while Docker prepares mounts.
+                # Local launchers with absolute job/task paths can use '/'.
+                cwd=os.environ.get("TRUSTFORK_HARBOR_CWD", ROOT),
                 env=harbor_env(),
                 check=False,
             )
@@ -325,7 +332,7 @@ def main() -> None:
         raise SystemExit(
             "Missing required environment variables: " + ", ".join(missing)
         )
-    subprocess.run([str(ENSURE_BASE_IMAGE)], cwd=ROOT, check=True)
+    subprocess.run([sys.executable, str(ENSURE_BASE_IMAGE)], cwd=ROOT, check=True)
 
     configs = sorted(
         path

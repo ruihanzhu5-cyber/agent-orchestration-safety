@@ -118,6 +118,38 @@ The verifier judges every trajectory with DeepSeek-V4-Flash through
 
 Detailed setup is in [`docs/REPRODUCIBILITY.md`](docs/REPRODUCIBILITY.md).
 
+## Topology Extension
+
+An opt-in OpenCode extension adds fixed `chain` and one-round `debate` communication.
+Omitting `--topology`, or choosing `original`, keeps the native baseline. New modes
+require an original **b4** task; Pi/OpenClaw reject these modes rather than falling back.
+Models, displayed identities, private goals, source tasks and score formulas remain fixed.
+Shared workspace access is preserved, so message routing is not full information isolation.
+
+```bash
+python3 trustfork/tools/generate_jobs.py --system glm-5.2@opencode \
+  --tasks trustfork_0018 --topology chain
+python3 trustfork/tools/run_benchmark.py --system glm-5.2__opencode__topo-chain \
+  --only trustfork_0018 --env-file .env
+```
+
+For a small three-mode pilot using registered models and existing credentials:
+
+```bash
+python3 trustfork/tools/run_topology_pilot.py --system glm-5.2@opencode \
+  --tasks trustfork_0018 --env-file .env --execute
+```
+
+The pilot has optional `--systems-config`, `--pools-config`, and `--proxy-compose`
+arguments for an existing local environment. Without `--execute` it only prepares
+configs. Run through Linux/WSL Harbor with Docker and the original allowlist.
+Actual router calls and recipient visibility are recorded separately from Main's
+observations. New-mode CAR is explicitly not claimed comparable without a
+visibility-sensitive audit; the original eight score formulas are retained.
+
+See [code audit](docs/TOPOLOGY_CODE_AUDIT.md), [protocol and limitations](docs/TOPOLOGY_DESIGN.md),
+and [live pilot status](docs/TOPOLOGY_PILOT_REPORT.md).
+
 ## 📁 Repository layout
 
 ```text

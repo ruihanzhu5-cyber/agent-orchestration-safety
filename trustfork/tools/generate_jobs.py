@@ -6,6 +6,7 @@ import argparse
 import json
 import os
 import shutil
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -14,8 +15,10 @@ import yaml
 
 PACKAGE = Path(__file__).resolve().parents[1]
 ROOT = PACKAGE.parent
-SYSTEMS_CONFIG = PACKAGE / "config" / "systems.yaml"
-POOLS_CONFIG = PACKAGE / "config" / "pool_templates.json"
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+SYSTEMS_CONFIG = Path(os.environ.get("TRUSTFORK_SYSTEMS_CONFIG", PACKAGE / "config" / "systems.yaml"))
+POOLS_CONFIG = Path(os.environ.get("TRUSTFORK_POOLS_CONFIG", PACKAGE / "config" / "pool_templates.json"))
 GOALS_CONFIG = PACKAGE / "config" / "actor_goals.json"
 TASKS_ROOT = PACKAGE / "tasks"
 OPENCLAW_TASKS_ROOT = ROOT / "build" / "tasks_openclaw"
@@ -558,7 +561,14 @@ def job_config(
     display: dict[str, str],
     goal_prompt_by_slot: dict[str, str | None],
     defense: str | None = None,
+    topology: str = "original",
+    topology_order: str = "ABCD",
 ) -> dict[str, Any]:
+    if topology != "original":
+        from trustfork.topology import TopologySpec
+        TopologySpec(topology, topology_order).validate_task(cli, task_spec)
+        if defense is not None:
+            raise ValueError("Topology and defense conditions cannot be combined in v1")
     used_providers = {orchestrator["provider"]} | {
         backbone["provider"] for backbone in pool.values()
     }
@@ -667,7 +677,7 @@ def job_config(
     verifier_env["TRUSTFORK_DISPLAYED_IDENTITY_BY_ACTOR"] = json.dumps(
         display, ensure_ascii=False, separators=(",", ":")
     )
-    return {
+    config = {
         "job_name": f"{system_id}__{task_spec['task_id']}",
         "jobs_dir": "jobs",
         "n_attempts": 1,
@@ -698,7 +708,6 @@ def job_config(
         },
         "agents": [
             {
-                "name": cli,
                 "import_path": AGENT_IMPORT_PATHS[cli],
                 "model_name": agent_model_name,
                 "n_concurrent": 1,
@@ -709,11 +718,15 @@ def job_config(
         ],
         "datasets": [
             {
-                "path": str(task_dir.parent.relative_to(ROOT)),
+                "path": task_dir.parent.relative_to(ROOT).as_posix(),
                 "task_names": [task_spec["task_id"]],
             }
         ],
     }
+    if topology != "original":
+        from trustfork.topology import TopologySpec, apply_topology
+        apply_topology(config, TopologySpec(topology, topology_order), cli, task_dir, task_spec)
+    return config
 
 
 def main() -> None:
@@ -739,8 +752,15 @@ def main() -> None:
         choices=sorted(DEFENSE_PLUGIN_FILES),
         help="Generate one harness-native defense condition as an isolated system.",
     )
+    parser.add_argument("--topology", choices=["original", "chain", "debate"], default="original")
+    parser.add_argument("--topology-order", default="ABCD", help="Chain order, a permutation of ABCD.")
     args = parser.parse_args()
     backbone_id, cli = args.system.split("@", 1)
+    if args.topology != "original":
+        from trustfork.topology import TopologySpec
+        TopologySpec(args.topology, args.topology_order).validate_task(cli, {"breadth_regime": "b4", "target_breadth": 4})
+        if args.defense:
+            raise SystemExit("Topology and defense conditions cannot be combined in v1")
 
     systems = yaml.safe_load(SYSTEMS_CONFIG.read_text(encoding="utf-8"))
     backbones = systems["backbones"]
@@ -761,6 +781,8 @@ def main() -> None:
     system_id = f"{backbone_id}__{cli}"
     if args.defense:
         system_id += f"__def-{args.defense}"
+    if args.topology != "original":
+        system_id += f"__topo-{args.topology}"
 
     pools = load_json(POOLS_CONFIG)["templates"]
     goals = load_json(GOALS_CONFIG)
@@ -778,6 +800,9 @@ def main() -> None:
         "defense": args.defense,
         "jobs": [],
     }
+    if args.topology != "original":
+        manifest["topology"] = {"name": args.topology, "order": args.topology_order,
+                                "breadth": "b4", "shared_workspace": True}
     task_dirs = sorted(
         path
         for path in TASKS_ROOT.glob("*/*")
@@ -789,6 +814,15 @@ def main() -> None:
             for path in task_dirs
             if any(token in path.name for token in args.tasks)
         ]
+    if args.topology != "original":
+        supported = []
+        for path in task_dirs:
+            spec = load_json(path / "tests" / "task_spec.private.json")
+            if spec.get("breadth_regime") == "b4":
+                supported.append(path)
+            elif args.tasks:
+                raise SystemExit(f"{path.name}: new topologies require b4; original task is unchanged")
+        task_dirs = supported
     written = 0
     for task_dir in task_dirs:
         task_spec = load_json(task_dir / "tests" / "task_spec.private.json")
@@ -821,6 +855,8 @@ def main() -> None:
             display,
             goal_prompt_by_slot,
             args.defense,
+            args.topology,
+            args.topology_order,
         )
         path = system_out / f"{config['job_name']}.json"
         path.write_text(json.dumps(config, ensure_ascii=False, indent=2) + "\n")

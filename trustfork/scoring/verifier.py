@@ -737,6 +737,9 @@ def scrub_structured_model_fields(value: Any) -> Any:
 # Names the response pass hides, matched with any mix of hyphen, underscore or
 # space between their parts.
 KNOWN_MODEL_NAMES = (
+    "gpt-4o",
+    "deepseek-v4-flash",
+    "deepseek-flash",
     "gpt-5.6-sol",
     "gpt-5.6-luna",
     "kimi-k3",

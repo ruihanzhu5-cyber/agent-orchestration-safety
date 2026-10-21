@@ -2,9 +2,14 @@
 
 from __future__ import annotations
 
-import fcntl
+import os
 import subprocess
 from pathlib import Path
+
+if os.name == "nt":
+    import msvcrt
+else:
+    import fcntl
 
 
 PACKAGE = Path(__file__).resolve().parents[1]
@@ -27,8 +32,14 @@ def run(command: list[str]) -> subprocess.CompletedProcess[str]:
 
 def main() -> None:
     LOCK.parent.mkdir(parents=True, exist_ok=True)
-    with LOCK.open("w", encoding="utf-8") as lock_file:
-        fcntl.flock(lock_file, fcntl.LOCK_EX)
+    with LOCK.open("w+", encoding="utf-8") as lock_file:
+        if os.name == "nt":
+            lock_file.write("0")
+            lock_file.flush()
+            lock_file.seek(0)
+            msvcrt.locking(lock_file.fileno(), msvcrt.LK_LOCK, 1)
+        else:
+            fcntl.flock(lock_file, fcntl.LOCK_EX)
         if run(["docker", "image", "inspect", IMAGE]).returncode == 0:
             print(f"Reusing shared base image {IMAGE}")
             return
