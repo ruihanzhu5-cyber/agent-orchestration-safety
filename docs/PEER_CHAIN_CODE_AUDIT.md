@@ -23,6 +23,7 @@ BENCHMARK_DESIGN.md and SCORING.md.
 | `trustfork/scoring/aggregate_peer.py` | Matched per-case table, applicability/unknown status and cautious ICS event. |
 | `trustfork/scoring/rescore_peer.py` | Frozen-evidence grading recovery, content hash checks and validated native-pass cache reuse; no agent execution. |
 | `trustfork/tools/run_peer_pilot.py` | External local config/credentials, one-case three-mode execution, unique run directories and first-valid retention. |
+| `trustfork/tools/run_peer_identity_swap.py` | B/D label-only clone of frozen truthful configs, task-byte/config diff gate, queued execution without truthful repeats, six-row comparison. |
 | `tests/test_peer.py`, `tests/test_peer_runtime.mjs` | Focused generation, permissions, routing, default regression and scoring contract tests. |
 
 ## Execution chain

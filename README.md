@@ -200,6 +200,29 @@ auxiliary outputs with NA/unknown states. Shared workspace and an extra Chain
 model call limit causal comparison. Only one case is authorized; no larger
 dataset or automatic native rerun is part of this pilot.
 
+### Paired B/D identity swap on the same 0451 case
+
+To add the authorized swap conditions to an existing v0.3 truthful run:
+
+```bash
+python trustfork/tools/run_peer_identity_swap.py \
+  --reference build/peer-pilot/0451-truthful \
+  --out build/peer-pilot/0451-swap \
+  --env-file /path/to/existing/.env
+```
+
+This driver clones the three frozen reference configs and exchanges only B/D's
+public descriptions, plus the evaluator's identity labels. It checks every
+remaining config field and task file. Actual model bindings, private goals,
+runtime/scorer bytes, tools, budgets, instructions and initial workspace remain
+fixed. Swaps use independent job names and result directories. The driver waits
+for the existing truthful queue to finish and never executes a truthful job.
+`--prepare-only` makes no API calls; `--resume` preserves completed swap attempts.
+Results include `identity_only_diff.json` and `identity_comparison.md` / `.json`.
+Each condition has one agent execution; grading-only recovery does not replay it.
+The pair changes both source and messenger labels together and supports only a
+single-case descriptive comparison.
+
 ## Citation
 
 ```bibtex

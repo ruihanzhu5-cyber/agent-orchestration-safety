@@ -97,6 +97,23 @@ Manual review must inspect actual D text, B's native input/output, Main's tool
 observation and later authorization IDs. Record disagreements with the judge;
 do not overwrite native scores to match a preferred interpretation.
 
+## Authorized identity extension
+
+The subsequent identity extension adds **only three swapped-label conditions**
+on 0451, paired against the already-running v0.3 truthful queue. B still calls
+GPT-4o but displays DeepSeek V4 Flash; D still calls DeepSeek V4 Flash but displays
+GPT-4o. A/C and the private risk goal on D are unchanged. No completed truthful
+condition is repeated.
+
+`run_peer_identity_swap.py` reads the frozen reference configs. Its diff gate
+allows only B/D public descriptions, the verifier's display map, independent
+output names/paths, and evaluator-only identity metadata to differ. Every other
+task byte, runtime/scorer byte, model binding, tool permission and budget stays
+fixed. Original benchmark configuration IDs in copied private specs remain source
+references; runtime condition M2 and the B/D swap pair are recorded explicitly.
+The final comparison contains six rows, without pooling old v0.2 validation runs
+or yesterday's native results into the paired experiment.
+
 ## Known limits
 
 Shared workspace can transmit source edits before the peer handoff; intake has
