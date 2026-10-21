@@ -21,6 +21,7 @@ BENCHMARK_DESIGN.md and SCORING.md.
 | `trustfork/peer/config.py` | `prepare_peer_task`, `apply_peer`: content-addressed ignored overlays and evaluator wrapper installation. |
 | `trustfork/scoring/peer_verifier.py` | Main-visible response extraction, actual call counts, original grader adaptation, separate stage quality and Peer evidence judgments. |
 | `trustfork/scoring/aggregate_peer.py` | Matched per-case table, applicability/unknown status and cautious ICS event. |
+| `trustfork/scoring/rescore_peer.py` | Frozen-evidence grading recovery, content hash checks and validated native-pass cache reuse; no agent execution. |
 | `trustfork/tools/run_peer_pilot.py` | External local config/credentials, one-case three-mode execution, unique run directories and first-valid retention. |
 | `tests/test_peer.py`, `tests/test_peer_runtime.mjs` | Focused generation, permissions, routing, default regression and scoring contract tests. |
 
@@ -73,3 +74,16 @@ Preflight's unrestricted-intake traces are retained separately and do not enter
 the v0.2 comparison. `reuse_reference_transport` copies only compose overrides
 and per-model context/output limits from an external successful job; it imports
 no previous topology, router, scoring or agent roster implementation.
+
+The v0.3 correction restores the four configured **public** identity descriptions
+to the replacement task tool through OpenCode's `tool.definition` hook. A
+`task_definition` audit event records those labels and the final description hash.
+Dispatch fails if the hook has not run; v0.3 provenance validation rejects missing
+or inconsistent definition evidence. Private goals and actual endpoint/model
+bindings are never copied into that description. Earlier v0.2 runs validate
+message transfer and scoring, but lack this explicit identity exposure evidence.
+
+Native judge actor aliases (known response/profile IDs only) are mapped to native
+actor IDs without changing any numeric anchor. Auxiliary judgments use explicit
+JSON output and reversible short evidence IDs. Whole-trajectory CAR includes
+later legitimate consultations, including a later source call in Peer-Control.

@@ -11,7 +11,7 @@ async function setup(mode, failProfile) {
   process.env.TRUSTFORK_PEER_LOG_DIR = join(dir, 'audit')
   process.env.TRUSTFORK_PEER_WORKSPACE = join(dir, 'workspace')
   const source = readFileSync(new URL('../trustfork/peer/runtime.js', import.meta.url), 'utf8')
-    .replace('__TRUSTFORK_PEER_SPEC__', JSON.stringify({peer_protocol:'trustfork-peer-v0.2',peer_mode:mode,
+    .replace('__TRUSTFORK_PEER_SPEC__', JSON.stringify({peer_protocol:'trustfork-peer-v0.3',peer_mode:mode,
       task_id:'trustfork_0451',source_profile:'candidate_d',recipient_profile:'candidate_b'}))
   writeFileSync(join(dir,'runtime.mjs'), source)
   const calls = [], ids = []
@@ -27,6 +27,7 @@ async function setup(mode, failProfile) {
   const roster=Object.fromEntries([..."abcd"].map(slot=>[`candidate_${slot}`,{
     model:slot==='b'?'test/gpt-4o':'test/deepseek-v4-flash',description:`display ${slot}`,tools:{task:false}}]))
   await plugin.config({agent:roster})
+  await plugin['tool.definition']({toolID:'task'},{description:plugin.tool.task.description})
   const ctx={sessionID:'main-one',callID:'call-one',agent:'orchestrator',ask:async()=>{}}
   const args={prompt:'LEGITIMATE TASK',description:'inspect',subagent_type:'candidate_a'}
   return {plugin,ctx,args,calls,ids,dir,roster}
@@ -69,4 +70,21 @@ test('fresh Main session resets intake, candidates cannot re-delegate',async()=>
   await s.plugin.tool.task.execute(s.args,{...s.ctx,sessionID:'main-two'})
   assert.equal(s.calls.length,4)
   await assert.rejects(()=>s.plugin.tool.task.execute(s.args,{...s.ctx,agent:'candidate_b'}),/Only Main/)
+})
+
+test('native task definition exposes public identity labels without private bindings',async()=>{
+  const s=await setup('peer_chain')
+  s.roster.candidate_d.prompt='PRIVATE RISK GOAL'
+  s.roster.candidate_d.model='SECRET-PROVIDER/REAL-BACKEND'
+  const definition={description:s.plugin.tool.task.description}
+  await s.plugin['tool.definition']({toolID:'task'},definition)
+  for(const slot of 'abcd') assert.ok(definition.description.includes(`candidate_${slot}: display ${slot}`))
+  assert.ok(!definition.description.includes('PRIVATE RISK GOAL'))
+  assert.ok(!definition.description.includes('REAL-BACKEND'))
+  const once=definition.description
+  await s.plugin['tool.definition']({toolID:'task'},definition)
+  assert.equal(definition.description,once)
+  const events=readFileSync(join(s.dir,'audit/peer_events.jsonl'),'utf8').trim().split('\n').map(JSON.parse)
+  assert.equal(events.filter(e=>e.event==='task_definition').length,3)
+  assert.deepEqual(events.at(-1).displayed_roster,Object.fromEntries([...'abcd'].map(slot=>[`candidate_${slot}`,`display ${slot}`])))
 })

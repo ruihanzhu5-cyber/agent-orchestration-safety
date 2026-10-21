@@ -126,7 +126,7 @@ def main():
                'agent_config':config['agents'][0]['kwargs']['opencode_config'],
                'assets':task_assets(),'budget':config['timeout_multiplier'],
                'transport':config['environment'],
-               'protocol':'trustfork-peer-v0.2','native_verifier_sha256':hashlib.sha256((task/'steps/trigger_deletion/tests/verifier.py').read_bytes()).hexdigest()}
+               'protocol':'trustfork-peer-v0.3','native_verifier_sha256':hashlib.sha256((task/'steps/trigger_deletion/tests/verifier.py').read_bytes()).hexdigest()}
         signature=hashlib.sha256(json.dumps(fixed,sort_keys=True).encode()).hexdigest()
         path=out/'configs'/f'{mode}.json'
         # Resume must use identical generated code and conditions, not silently replace an ongoing experiment.
@@ -134,7 +134,7 @@ def main():
         write(path,config)
         conditions.append({'mode':mode,'config':str(path),'job_name':config['job_name'],
                            'job_dir':str(out/'jobs'/config['job_name']),'match_signature':signature})
-    manifest={'protocol':'trustfork-peer-v0.2','official_base':'49490514f5187ba4e04b31929f2f4470e0db7def',
+    manifest={'protocol':'trustfork-peer-v0.3','official_base':'49490514f5187ba4e04b31929f2f4470e0db7def',
         'task_id':spec['task_id'],'condition':spec['identity_display_id'],'goal':spec['actor_goal_id'],
         'breadth':spec['breadth_regime'],'source_slot':spec['focal_actor_slot'],'recipient_slot':'B',
         'actual_models':{s:v['api_model'] for s,v in pool.items()},'display':display,'conditions':conditions,
@@ -157,6 +157,7 @@ def main():
     os.environ['LITELLM_LOCAL_MODEL_COST_MAP']='True'
     subprocess.run([sys.executable,str(ROOT/'trustfork/tools/ensure_base_image.py')],cwd=ROOT,check=True)
     runner.ATTEMPTS_ROOT=out/'attempts'
+    runner.MAX_ATTEMPTS=1  # preserve one actual execution; recover grading on frozen observations
     ledger_path=out/'run_ledger.json'
     ledger=runner.load_ledger(ledger_path)
     worker=runner.TaskRunner(ledger,ledger_path)
@@ -165,6 +166,27 @@ def main():
             print(f"Skipping exhausted {item['mode']}; inspect infrastructure logs",flush=True)
             continue
         _,result=worker.run(Path(item['config']),item['job_name'],False)
+        auxiliaries=list(Path(item['job_dir']).glob('*/steps/trigger_deletion/verifier/peer_metrics.json'))
+        auxiliary_valid=(len(auxiliaries)==1 and json.loads(auxiliaries[0].read_text(encoding='utf8')).get('status')=='valid')
+        if result['status']!='valid' or not auxiliary_valid:
+            captures=list(Path(item['job_dir']).glob('*/steps/trigger_deletion/verifier/peer_audit_view.json'))
+            if len(captures)==1:
+                from trustfork.scoring.rescore_peer import rescore
+                trial=captures[0].parents[3]
+                evaluation=out/'score-recovery'/item['mode']
+                try:
+                    rescore(trial,evaluation,resume=evaluation.exists(),reuse_cache_from=captures[0].parent)
+                    recovered=json.loads((evaluation/'annotations.json').read_text(encoding='utf8'))
+                    if not recovered.get('breadth_validation',{}).get('compliant'):
+                        raise ValueError('Recovered native breadth gate failed')
+                    result['status']='valid_recovered'
+                    result['evaluation_path']=str(evaluation)
+                    item['evaluation_path']=str(evaluation)
+                except Exception as exc:
+                    result['recovery_error']=str(exc)
+                    result['status']='grading_failed'
+                worker.persist(item['job_name'],result)
+                write(out/'peer_run_manifest.json',manifest)
         print(f"{item['mode']}: {result['status']}",flush=True)
     aggregate(out)
     print(f'Report: {out / "peer_summary.md"}',flush=True)

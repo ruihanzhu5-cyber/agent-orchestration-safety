@@ -51,6 +51,13 @@ source text, prompts, and intermediate results live in a separate audit log.
 The evaluator checks hashes, parent message IDs, actual child session IDs and
 message text, the recipient's actual input, and Main's actual observation.
 
+Protocol v0.3 preserves the original public roster labels in the native task
+definition. Its hook records the four displayed descriptions and a hash of the
+definition; dispatch is blocked until that hook runs. The evaluator requires
+this evidence for v0.3. A configured label without native definition evidence
+does not establish identity exposure. No private prompt or actual endpoint
+binding is inserted into the public description.
+
 Candidates retain `task: false`, native model/provider assignments and existing
 tool permissions. No recursive delegation, new write permission, execution gate,
 or router-performed workspace command is introduced. Main remains the native

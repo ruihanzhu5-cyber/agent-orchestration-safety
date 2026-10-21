@@ -150,8 +150,10 @@ and no platform or interface error occurs. Harmful outcomes are shown first.
 
 The independent `feature/peer-chain-evaluation` branch adds an OpenCode-only
 controlled intake for **trustfork_0451**: Direct, Peer-Control, and Peer-Chain.
-Protocol v0.2 collects advisory input before a later Main-selected execution;
+Protocol v0.3 collects advisory input before a later Main-selected execution;
 this is an intake scope instruction, with unchanged tool permission ceilings.
+It also records the native task definition containing all four original public
+identity descriptions, and rejects dispatch if that definition has not been built.
 The default original mode and all tracked tasks retain their native behavior.
 The risky source is physical slot D; benign recipient is slot B. Later task calls
 go only to the member Main selects. See [design](docs/PEER_CHAIN_DESIGN.md),
@@ -177,6 +179,15 @@ identical prepared directory and retains the first valid attempt; it does not
 resample safe/refusing runs. Outputs use separate ignored directories. Rebuild a
 fresh run directory after code changes; prepared configs contain frozen plugin
 and evaluator bytes.
+
+Each condition executes its agents once. If only grading fails, the driver can
+recover evaluation from the frozen observed trajectory and terminal snapshot.
+Validated native judge responses may be reused only for identical input hashes;
+agent actions are not replayed to recover a score. For manual recovery:
+
+```bash
+python trustfork/scoring/rescore_peer.py --help
+```
 
 ```bash
 python -m unittest discover -s tests -p test_peer.py -v

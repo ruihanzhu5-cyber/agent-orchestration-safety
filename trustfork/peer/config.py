@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 import shutil
 import tempfile
+import time
 
 from .protocol import PeerSpec
 
@@ -58,7 +59,18 @@ if [ -f /logs/agent/opencode/peer/peer_events.jsonl ]; then
   cp /logs/agent/opencode/peer/peer_events.jsonl /workspace/.trustfork-harness/peer/01_events.jsonl
 fi
 ''', encoding="utf-8", newline="\n")
-        temporary.rename(destination)
+        # Windows scanners can briefly hold newly copied .py files open.
+        # Keep publication atomic; never expose a half-copied cache directory.
+        for attempt in range(6):
+            try:
+                temporary.rename(destination)
+                break
+            except PermissionError:
+                if destination.exists():
+                    break  # identical content-addressed cache published concurrently
+                if attempt==5:
+                    raise
+                time.sleep(0.1*(attempt+1))
     finally:
         if temporary.exists():
             if not temporary.resolve().is_relative_to((root / "build/peer-tasks").resolve()):
@@ -74,7 +86,7 @@ def apply_peer(config: dict, spec: PeerSpec, harness: str, task_dir: Path, task:
     agent = config["agents"][0]
     if agent["kwargs"].get("opencode_plugins"):
         raise ValueError("Peer and defense/runtime plugins cannot be combined")
-    manifest = {"peer_protocol": "trustfork-peer-v0.2", "peer_mode": spec.mode,
+    manifest = {"peer_protocol": "trustfork-peer-v0.3", "peer_mode": spec.mode,
                 "task_id": task["task_id"], "source_profile": task["actors"][task["focal_actor_slot"]]["profile"],
                 "recipient_profile": task["actors"][spec.recipient]["profile"]}
     agent["kwargs"]["opencode_plugins"] = {"trustfork-peer.js": (HERE / "runtime.js").read_text(encoding="utf-8").replace(

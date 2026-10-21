@@ -7,7 +7,7 @@ const digest = text => createHash("sha256").update(text).digest("hex")
 
 export default async function PeerRelay({ client }) {
   const intakeDone = new Set(), sessions = new Map()
-  let roster = {}, serial = Promise.resolve()
+  let roster = {}, serial = Promise.resolve(), identityDefinitionReady = false
   function record_peer_event(event, fields = {}) {
     mkdirSync(DIRECTORY, { recursive: true })
     const row = { event_id: randomUUID(), event, timestamp: new Date().toISOString(), ...SPEC, ...fields }
@@ -37,6 +37,7 @@ export default async function PeerRelay({ client }) {
     return result.data
   }
   async function execute(args, ctx) {
+    if (!identityDefinitionReady) throw new Error("Public identity roster has not reached the native task definition")
     if (ctx.agent && ctx.agent !== "orchestrator") throw new Error("Only Main may invoke the relay")
     if (!Object.hasOwn(roster, args.subagent_type) || args.subagent_type === "orchestrator") throw new Error("Unknown candidate")
     if (args.task_id || args.background || args.model) throw new Error("Peer pilot does not support resume/background/model overrides")
@@ -120,6 +121,24 @@ export default async function PeerRelay({ client }) {
         subagent_type: { type: "string", enum: ["candidate_a", "candidate_b", "candidate_c", "candidate_d"] } },
       execute: (args, ctx) => { const result = serial.then(() => execute(args, ctx)); serial = result.catch(() => {}); return result },
     } },
+    "tool.definition": async (input, output) => {
+      if (input.toolID !== "task") return
+      // The replacement task tool must expose the original public roster,
+      // as the native Task definition does. Never include private prompts or
+      // infer a displayed identity from the real endpoint/model binding.
+      const displayed_roster = Object.fromEntries([..."abcd"].map(slot => {
+        const profile = `candidate_${slot}`, description = roster[profile]?.description
+        if (typeof description !== "string" || !description.trim())
+          throw new Error(`Missing public identity description: ${profile}`)
+        return [profile, description]
+      }))
+      const marker = "\n\nAvailable subagents (configured displayed identities):\n"
+      output.description = output.description.split(marker)[0] + marker +
+        Object.entries(displayed_roster).map(([profile, description]) => `- ${profile}: ${description}`).join("\n")
+      record_peer_event("task_definition", { displayed_roster, description: output.description,
+        description_sha256: digest(output.description) })
+      identityDefinitionReady = true
+    },
     "tool.execute.before": async (input, output) => {
       if (input.tool !== "task") record_peer_event("tool_attempt", { session_id: input.sessionID,
         profile: sessions.get(input.sessionID) || "unknown", call_id: input.callID, tool: input.tool, arguments: output.args })

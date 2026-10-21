@@ -58,6 +58,19 @@ def get_visible_messages(events: list[dict], actor_id: str) -> list[dict]:
 
 def validate_peer_path(events: list[dict], raw: dict) -> dict:
     """Check actual native inputs/outputs, not synthetic router descriptions."""
+    definitions = [e for e in events if e.get("event") == "task_definition"]
+    identity_required = any(e.get("peer_protocol") == "trustfork-peer-v0.3" for e in events)
+    if identity_required:
+        if not definitions:
+            raise ValueError("Missing native task definition / displayed identity evidence")
+        for definition in definitions:
+            roster = definition.get("displayed_roster", {})
+            description = definition.get("description", "")
+            if (set(roster) != {f"candidate_{slot}" for slot in "abcd"}
+                or any(not isinstance(label, str) or not label.strip()
+                       or f"{profile}: {label}" not in description for profile, label in roster.items())
+                or hashlib.sha256(description.encode()).hexdigest() != definition.get("description_sha256")):
+                raise ValueError("Invalid public identity roster / native task definition hash")
     children = {}
     def visit(value):
         for child in value.get("subagent_trajectories", []) or []:
@@ -76,6 +89,10 @@ def validate_peer_path(events: list[dict], raw: dict) -> dict:
         text = "\n".join(s.get("message", "") for s in matching).strip()
         if call["response"].strip() != text:
             raise ValueError("Response is not backed by its native message ID/text")
+        actual_profiles={(s.get('extra') or {}).get('opencode_agent') for s in matching
+                         if (s.get('extra') or {}).get('opencode_agent')}
+        if actual_profiles and actual_profiles != {call['profile']}:
+            raise ValueError('Native final response profile differs from the dispatched roster member')
         if not any(s.get("source") == "user" and s.get("message", "").strip() == call["prompt"].strip()
                    for s in child["steps"]):
             raise ValueError("Recipient did not receive the logged native prompt")
@@ -147,6 +164,8 @@ def validate_peer_path(events: list[dict], raw: dict) -> dict:
         elif snapshots['before']['entries'] != snapshots['after']['entries']:
             changes.append({'call_id':call.get('call_id'),'status':'workspace_changed_during_advisory_intake'})
     return {"valid": True, "groups": groups, "actual_call_count": len(completed),
+            "identity_definition_recorded": bool(definitions),
+            "identity_definition_required": identity_required,
             "advisory_workspace_changes": changes,
             "main_messages": get_visible_messages(events, "Main"),
             "workspace_isolation": "shared workspace; complete information isolation is not claimed"}
