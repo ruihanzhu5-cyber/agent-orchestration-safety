@@ -1,0 +1,327 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Portfolio v1 public summary",
+  "$defs": {
+    "record": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "record_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "subject_agent_id": {
+          "enum": [
+            "A",
+            "B",
+            "C",
+            "D"
+          ]
+        },
+        "historical_config_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "task_template_id": {
+          "enum": [
+            "BUILD_1",
+            "BUILD_2",
+            "BUILD_3",
+            "BUILD_4",
+            "BUILD_5",
+            "DOC_1",
+            "DOC_2",
+            "DOC_3",
+            "DOC_4",
+            "DOC_5",
+            "FILES_1",
+            "FILES_2",
+            "FILES_3",
+            "FILES_4",
+            "FILES_5",
+            "REPO_1",
+            "REPO_2",
+            "REPO_3",
+            "REPO_4",
+            "REPO_5"
+          ]
+        },
+        "task_family": {
+          "enum": [
+            "DOC",
+            "BUILD",
+            "REPO",
+            "FILES"
+          ]
+        },
+        "task_summary": {
+          "type": "string",
+          "minLength": 1
+        },
+        "acceptance_rule": {
+          "type": "string",
+          "minLength": 1
+        },
+        "result": {
+          "enum": [
+            "pass",
+            "fail"
+          ]
+        },
+        "outcome_detail": {
+          "type": "string",
+          "minLength": 1
+        },
+        "event_order": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "reporter_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evidence_ref": {
+          "type": "string",
+          "pattern": "^profile://[ABCD]/records/[0-9]+$"
+        },
+        "task_context": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "project_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "task_instance_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "counterparty_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "role_performed": {
+              "type": "string",
+              "minLength": 1
+            },
+            "operation_categories": {
+              "type": "array",
+              "items": {
+                "enum": [
+                  "read",
+                  "bash",
+                  "edit",
+                  "write",
+                  "grep",
+                  "find",
+                  "ls"
+                ]
+              },
+              "uniqueItems": true
+            }
+          },
+          "required": [
+            "project_id",
+            "task_instance_id",
+            "counterparty_id",
+            "role_performed",
+            "operation_categories"
+          ]
+        },
+        "assessment": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "rule_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "measure": {
+              "const": "task_acceptance"
+            },
+            "assessed_properties": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "assessor_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "feedback": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "rule_id",
+            "measure",
+            "assessed_properties",
+            "assessor_id",
+            "feedback"
+          ]
+        },
+        "work_sample_ref": {
+          "type": "string",
+          "pattern": "^profile://[ABCD]/work-samples/[0-9]+$"
+        }
+      },
+      "required": [
+        "record_id",
+        "subject_agent_id",
+        "historical_config_id",
+        "task_template_id",
+        "task_family",
+        "task_summary",
+        "acceptance_rule",
+        "result",
+        "outcome_detail",
+        "event_order",
+        "reporter_id",
+        "evidence_ref",
+        "task_context",
+        "assessment",
+        "work_sample_ref"
+      ]
+    }
+  },
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "candidate_id": {
+      "enum": [
+        "A",
+        "B",
+        "C",
+        "D"
+      ]
+    },
+    "actual_model_label": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "membership": {
+      "enum": [
+        "candidate",
+        "admitted",
+        "released"
+      ]
+    },
+    "role": {
+      "const": "general_assistant"
+    },
+    "direct_team_tasks": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "external_record": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "record_source_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "measure": {
+          "const": "task_acceptance"
+        },
+        "evidence_kind": {
+          "const": "reported_task_outcomes"
+        },
+        "evaluated_tasks": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "passed_tasks": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "failed_tasks": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "completion_rate_pct": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 100
+        },
+        "profile_ref": {
+          "type": "string",
+          "pattern": "^profile://[ABCD]/current$"
+        },
+        "family_summary": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "task_family": {
+                "enum": [
+                  "DOC",
+                  "BUILD",
+                  "REPO",
+                  "FILES"
+                ]
+              },
+              "evaluated_tasks": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "passed_tasks": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "failed_tasks": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "completion_rate_pct": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 100
+              }
+            },
+            "required": [
+              "task_family",
+              "evaluated_tasks",
+              "passed_tasks",
+              "failed_tasks",
+              "completion_rate_pct"
+            ]
+          },
+          "minItems": 4,
+          "maxItems": 4
+        }
+      },
+      "required": [
+        "record_source_id",
+        "measure",
+        "evidence_kind",
+        "evaluated_tasks",
+        "passed_tasks",
+        "failed_tasks",
+        "completion_rate_pct",
+        "profile_ref",
+        "family_summary"
+      ]
+    }
+  },
+  "required": [
+    "candidate_id",
+    "actual_model_label",
+    "membership",
+    "role",
+    "direct_team_tasks",
+    "external_record"
+  ]
+}

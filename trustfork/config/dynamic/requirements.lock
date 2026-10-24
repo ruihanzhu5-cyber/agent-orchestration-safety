@@ -1,0 +1,5 @@
+# Direct requirements for the retained Python 3.12.13 environment.
+jsonschema==4.26.0
+PyYAML==6.0.3
+pytest==9.1.1
+pytest-asyncio==1.4.0

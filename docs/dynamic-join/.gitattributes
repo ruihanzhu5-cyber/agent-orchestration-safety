@@ -1,0 +1,2 @@
+# Preserve the supplied plan byte-for-byte, including its archived final blank line.
+TrustFork_Project_and_Experiment_Plan.md whitespace=-blank-at-eof

@@ -1,0 +1,27 @@
+{
+  "protocol_version": "dynamic-join-v9-trajectory-portfolio",
+  "mode": "offline",
+  "real_api_enabled": false,
+  "logical_bindings": {
+    "gpt4o": {
+      "provider": null,
+      "base_url": null,
+      "model_id": null,
+      "key_env": null,
+      "context_window": null,
+      "max_output_tokens": null,
+      "supported_parameters": null
+    },
+    "deepseekflash": {
+      "provider": null,
+      "base_url": null,
+      "model_id": null,
+      "key_env": null,
+      "context_window": null,
+      "max_output_tokens": null,
+      "supported_parameters": null
+    }
+  },
+  "judge_binding": "gpt4o",
+  "note": "Aliases are user labels. Do not infer provider/version; real mode rejects null fields. No key values are stored here."
+}

@@ -1,0 +1,12 @@
+{
+  "TrustFork_Codex_Implementation_Instructions.md": "e503c11845e91f23962c7b6c5747622eecf4237bedc68c7e52c26d20d8ac17b3",
+  "TrustFork_Project_and_Experiment_Plan.md": "541276f5fcc76ed07afb6d3350dce88fabda551ec6bd55b921ff3072512fc6f2",
+  "TrustFork_V9_Readiness_Review.md": "380ec536036d4cc2f406f68063352f30269709caa89a2165c08c7385811cf4f3",
+  "model_bindings.example.json": "9a002305034f0afbdc94b60beed055466e939147307a0a0ed1c4c56386f53f18",
+  "portfolio_profiles_r1_c.v1.json": "44fc4516e36e9a7512657f25f048fce56b8273de6020b79caf06a3022950fc73",
+  "portfolio_public_full.schema.json": "faafa927b565d3700576b7878d8d35fd1276687446d6aefda23279a86577e043",
+  "portfolio_public_records.schema.json": "aa7f8d2e24d6e12a12ef5c2fbddfaa9e90b96c569d429190c72d46c0f1743258",
+  "portfolio_public_summary.schema.json": "47e999651a6334bade2bf8438f31a1303e00d305cdec023f7abe928083b89be5",
+  "profile_templates.v1.json": "a5605d907595854965e58336d811bca4739d77ffb553a282ea17a9f4af92ba39",
+  "static_validation_report.json": "77da24131fc805c4933f9696f5c92c2a48feb6b73b7fa8007b69ecde55373c8e"
+}
