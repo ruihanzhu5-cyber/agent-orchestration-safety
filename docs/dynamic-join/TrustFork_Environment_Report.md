@@ -1,6 +1,8 @@
 # TrustFork 动态入队研究：环境检查报告
 
-检查日期：2026-10-24，Asia/Shanghai（UTC+8）。宿主资源主快照：16:24:28。资源值随运行状态变化。
+检查日期：2026-10-24，Asia/Shanghai（UTC+8）。宿主资源主快照：16:24:28。Docker 启动续查：同日 16:54–17:09；原始资源快照和续查结果分别注明。资源值随运行状态变化。
+
+**最新续查结论：已按用户授权启动安装好的 Docker Desktop，但后台在初始化本地 sailor-ingest.sock 时以 WinError 1920 失败，Linux daemon 仍不可达；实际 WSL 集成可用性未通过，daemon CPU / 内存、当前数据 VHDX 映射和镜像清单均为 UNKNOWN。配置路径与历史文件大小不能替代运行证据。详见第 11 节。本次仍未进入 Part2。**
 
 本报告依据 Part1 新版要求和用户随后明确允许“启动现有 Ubuntu，只读检查”的补充授权。PASS 表示该项实查成功；FAIL 表示当前明确缺失或不满足该项；UNKNOWN 表示证据不足；NOT_RUN 表示未执行。版本查询成功不代表集成验收通过。
 
@@ -17,7 +19,7 @@
 | Ubuntu-26.04 | PASS | 实际进入已有 Ubuntu 26.04 LTS；内核 6.18.54.1-microsoft-standard-WSL2，x86_64。使用 bash --noprofile --norc，未执行用户启动脚本。 |
 | Ubuntu-22.04 | PASS | 实际进入已有 Ubuntu 22.04.5 LTS，同一 WSL2 内核；只读查询资源、版本和安装元数据。 |
 | WSL 状态 | PASS | 初次和末次 wsl --list --verbose 均为 Ubuntu-26.04、Ubuntu-22.04、docker-desktop：Stopped，版本 2；检查期间按用户授权短暂启动两套 Ubuntu，未执行 shutdown/terminate。 |
-| Docker daemon / 容器内部 | UNKNOWN | Docker Desktop 当前未运行，Linux engine 管道不存在；未进入 docker-desktop，未启动容器，无法观察 daemon 内部资源或任务环境。 |
+| Docker daemon / 容器内部 | UNKNOWN | 初查 Desktop 未运行；续查按授权启动 Desktop 后发生本地 socket 初始化失败，Linux engine 管道仍不存在。未进入 docker-desktop 或启动容器，无法观察 daemon 内部资源或任务环境。 |
 | 安装权限 | UNKNOWN | 初始执行令牌的管理员角色检查为 false；获准执行沙箱外只读查询不等于拥有管理员或安装权限。未用安装或修改设置试探权限。 |
 
 仅在当前工作区浅层定位 TrustFork 仓库，并核对已知 worktree 的虚拟环境元数据；没有遍历整台机器寻找仓库，没有读取旧 pilot 业务实现。公开报告以 {OLD_REPO}、{REPORT_WORKTREE}、{USER}、{WSL_HOME} 代替个人路径和用户名。公开的 GitHub 仓库身份保留用于交接定位。
@@ -88,7 +90,7 @@
 | Ubuntu-22.04 默认 Python | FAIL | Python 3.10.12 不满足 >=3.12；Git 2.34.1。没有更改系统 Python。 |
 | Ubuntu-22.04 Node / Pi / Harbor | FAIL | 默认 PATH 与所查标准安装位置未找到；未拿 Windows npm 转接脚本替代。 |
 | Windows Docker / Compose | PASS | Client 29.8.2、API 1.56、windows/amd64；Compose v5.6.0；CLI 位于用户 Docker Desktop 安装目录，context=desktop-linux。 |
-| Windows Docker daemon | FAIL | docker version / info / image ls 均退出 1：dockerDesktopLinuxEngine 管道不存在；未见 Desktop/backend 进程，docker-desktop 停止。当前是 daemon 未运行 / 不可达，非 Docker CLI 未安装。 |
+| Windows Docker daemon | FAIL | 初查未启动；续查 docker desktop start --detach --timeout 30 退出 0，并出现 Desktop/backend 进程，但恢复旧更新提示后在 sailor-ingest.sock 初始化失败。最终 docker version / info / image ls 仍退出 1，dockerDesktopLinuxEngine 管道不存在；启动命令成功不代表 engine 可用。 |
 | WSL Docker 运行时集成 | FAIL | 两套 Ubuntu 的 docker 都落到 Windows Desktop 转接脚本，退出 1，提示当前 WSL 集成不可用；无 /var/run/docker.sock。Ubuntu-26.04 的原生服务 is-active / is-enabled 均退出 4；Ubuntu-22.04 为 3/1，没有可用原生 docker.service。 |
 | 已有镜像 / 镜像内 Pi | UNKNOWN | daemon 不可达，镜像枚举失败，不能声称目标镜像存在或缺失；未运行镜像检查内部版本。 |
 
@@ -158,7 +160,7 @@ Windows 宿主使用 curl.exe --disable --head --connect-timeout 5 --max-time 12
 
 | 问题 | 状态 | 影响 | 后续建议 / 用户操作 |
 |---|---|---|---|
-| Docker Desktop / daemon 未运行，WSL 转接不可用 | FAIL | 阻塞 Docker / Harbor 集成，不阻塞无 Docker 的单测准备 | 已有安装，无须据此重装；后续获准后启动 Desktop，核对 Ubuntu-26.04 集成、Linux daemon 类型、资源和镜像。交互或系统提示可能需用户操作，目前无证据证明必须重启。 |
+| Desktop 本地 socket 初始化失败，daemon / WSL 转接不可用 | FAIL | 阻塞 Docker / Harbor 集成，不阻塞无 Docker 的单测准备 | 本轮已授权并尝试启动，实际失败在 Windows 运行时 socket，详见第 11 节。后续环境准备需先解决该障碍再核实 daemon；本轮不清理、重置或重装，也没有证据证明重启一定解决。 |
 | 多份 D 盘 Docker VHDX，映射未确认 | UNKNOWN | 数据保留、镜像可见性及磁盘容量 | daemon 恢复后确认实际数据路径；不按名字或文件大小判断可删文件，不迁移或清理。 |
 | 新实现的 Linux 环境选择与依赖固定 | UNKNOWN | 影响后续测试的可重复性 | 已有 /mnt/d/envs/trustfork-linux 可运行 Python 3.12.13、Harbor 0.24.0、PyYAML 6.0.3，不能再报告为缺 Linux Harbor。后续明确复用还是建立独立环境、记录版本和配置 PATH；pytest 等按实际测试要求补齐，不因它来自旧工作而认定实现正确。 |
 | Linux Node / Pi 未找到；宿主 Node 不等于原精确版本 | FAIL | 阻塞 Pi SDK 契约测试 | 后续确定 Node 使用范围及 Pi 0.84.1 位置、来源，不把 Windows npm 当 Linux Node。 |
@@ -177,7 +179,7 @@ Windows 宿主使用 curl.exe --disable --head --connect-timeout 5 --max-time 12
 |---|---|---|
 | 纯 Python 测试 | UNKNOWN | 已有可用 Linux Python 3.12 / PyYAML / Harbor 环境，也有 Windows Python；新实现的具体测试依赖尚未确定，Linux venv 未装 pytest。基本运行前提有基础，测试本身 NOT_RUN。 |
 | Pi SDK 契约测试 | FAIL | 所查范围没有可用 Pi 0.84.1 SDK，Linux Node 未准备；完整 turn 调度交还、持久会话和中断语义均 NOT_RUN。 |
-| Docker / Harbor 集成 | FAIL | Windows 与已有 Linux venv 的 Harbor 版本 / 有限导入已核对，但 daemon 不可达，仍阻塞集成。容器、镜像内 Pi、mock 服务、七工具、冻结恢复均 NOT_RUN。 |
+| Docker / Harbor 集成 | FAIL | Windows 与已有 Linux venv 的 Harbor 有限版本 / 导入已核对；本轮启动 Desktop 后仍因本地 socket 错误无法连到 daemon。容器、镜像内 Pi、mock 服务、七工具、冻结恢复均 NOT_RUN。 |
 | 真实 API 实验 | NOT_RUN | 本阶段不执行，完整集成前提也未验证；模型、judge、私有信息隔离均未验收，不能宣称正式实验可直接运行。 |
 
 ## 9. 本次操作边界与限制
@@ -185,11 +187,12 @@ Windows 宿主使用 curl.exe --disable --head --connect-timeout 5 --max-time 12
 | 操作 | 状态 | 实际情况 |
 |---|---|---|
 | 安装 / 升级软件或包，创建 venv，更新锁文件 | NOT_RUN | 全部未执行。 |
-| 拉 / 构建镜像，启动 / 停止 Docker，运行 / 修改容器 | NOT_RUN | 全部未执行；WSL 检查后 engine 仍不可达，docker-desktop 仍 Stopped。 |
+| 拉 / 构建镜像，运行 / 修改任务容器 | NOT_RUN | 全部未执行；没有 docker run、docker start、compose up、pull 或 build。 |
+| 启动已安装的 Docker Desktop | PASS | 续查按用户明确授权执行 start，未执行 update / installer / reset；GUI 与 backend 进程启动，但 Linux daemon 初始化失败，详见第 11 节。 |
 | 启动已有 Ubuntu | PASS | 用户补充授权后短暂进入两套已有 Ubuntu；未手动启动其中服务，末次均 Stopped。属于本次获准的状态变化。 |
 | 修改实验代码、配置、任务资产或旧 pilot | NOT_RUN | 全部未执行；新 worktree 只检出原基线，源文件内容未改。 |
 | 调用实验模型、judge、benchmark | NOT_RUN | 全部未执行。 |
-| Git 报告交付 | PASS | 独立报告分支 / worktree，只写本报告，按单文件提交与推送规则交付；不建代码开发分支、PR，不合并或强推，不切换原工作区。 |
+| Git 报告交付 | PASS | 第一轮建立独立报告 worktree；本轮沿用同一 research/trustfork-environment-audit 分支及同一报告文件，只追加报告提交、正常推送；不建代码开发分支、PR，不合并或强推，不切换原工作区。 |
 | 公开凭据或原始日志 | NOT_RUN | 未读 .env、未输出完整环境变量、token、代理密码；只提交脱敏总结，不提交探针或原始日志。 |
 
 uv tool list 曾尝试初始化既有缓存并因权限拒绝退出 2；未安装包，未把它当完整枚举成功。不能仅凭退出码证明没有任何缓存元数据尝试，在此如实记录。个别探针最初有输出编码或 PowerShell 参数构造错误，已纠正重试；这些错误不作为缺软件或资源不足的证据。没有执行仓库未知脚本。
@@ -198,12 +201,71 @@ uv tool list 曾尝试初始化既有缓存并因权限拒绝退出 2；未安�
 
 - **实际检查的是哪里？** 用户 Windows 宿主机及获准进入的两套 Ubuntu WSL2；不是只有 Codex 隔离容器。daemon 与容器内部仍不可见。
 - **CPU / 内存 / 磁盘是多少？** 宿主 14 核 / 20 线程、31.731 GiB 物理内存，主快照可用 10.597 GiB；D 盘可用 611.998 GiB，C 盘 5.596 GiB；WSL 约 15.484 GiB 内存和 4 GiB swap。均为观测值；Docker 配额 / 盘内余量 UNKNOWN，虚拟容量不等于物理容量。
-- **Docker 当前状态？** Client 29.8.2、Compose 5.6.0 已安装；Linux daemon 当前未运行 / 不可达，WSL 转接无法连接 Desktop，没有可用原生 Docker 服务；容器功能 NOT_RUN。
+- **Docker 当前状态？** Client 29.8.2、Compose 5.6.0 已安装；续查已启动 Desktop，但 Windows 本地 socket 初始化失败，Linux daemon 仍不可达，WSL 转接不可用；容器功能 NOT_RUN。资源和镜像内容仍无法取得，不能写成 0 或空清单。
 - **Pi / Harbor 及环境对应？** 所查范围未找到 Pi；Harbor 0.24.0 同时存在于旧 Windows venv 和 /mnt/d/envs/trustfork-linux，两边版本及有限依赖符号核对成功。默认系统解释器没有 Harbor，不代表 Linux 环境没安装；应使用对应 venv 的解释器与 CLI。
 - **当前分支 / 固定基线 / 后续分支？** 原分支 feature/trustfork-topology-benchmark @ ff1d6084d95b7a246c4c58f4da516c3f65a761ad 保留；固定 SHA 本地存在并经官方 main 核对；报告分支从 49490514f5187ba4e04b31929f2f4470e0db7def 独立建立，未来 research/trustfork-dynamic-join-offline 也须另从该 SHA 创建，本次未创建。
-- **下一阶段先做什么？** 用户审阅后明确环境准备授权；候选为 Ubuntu-26.04 及已有 /mnt/d/envs/trustfork-linux，先恢复已有 Desktop 的 WSL 集成，再核实环境复用、Node / Pi 与测试依赖；无须本轮提供密钥或重装已有 Docker / Harbor。
+- **下一阶段先做什么？** 用户审阅后明确环境准备授权；候选仍为 Ubuntu-26.04 及已有 /mnt/d/envs/trustfork-linux。首先处理 Desktop 的运行时 socket 启动障碍，再核实 WSL 集成、数据盘和镜像，随后准备 Node / Pi 与测试依赖；本轮不提供修复性删除、迁移或重装。
 - **还有什么没测？** 镜像实际内容、Pi SDK 调度和会话语义、Harbor 生命周期、七工具保真、peer 通信、私有信息隔离、mock 服务、冻结恢复、峰值稳定性、模型兼容性及 judge 容量均未测试。
 
 真实仓库、最终 commit SHA、push 验证和固定提交文件链接由最终回复给出。报告交付后停止，等待下一条明确指令；报告审阅通过不自动授权安装、建代码开发分支或改实验代码。受限及未执行项目已分别标注，不能宣称全部环境验收通过。
+
+## 11. Docker Desktop 启动后续查（2026-10-24）
+
+本节是本轮新增证据，范围为启动已安装的 Desktop、进入已有 Ubuntu-26.04、只读查询 Linux daemon / WSL 集成 / 资源 / 数据盘 / 镜像。沿用原报告分支，不进入 Part2。
+
+### 11.1 启动经过与两个错误
+
+| 时间（Asia/Shanghai） | 状态 | 实际事件与依据 |
+|---|---|---|
+| 16:55 | PASS | 启动前核对原报告分支远程 HEAD 与本地一致；Desktop status 退出 1、当前不可用。 |
+| 16:56:19 起 | PASS | docker desktop start --detach --timeout 30 退出 0，输出 Starting Docker Desktop；16:56:20–26 出现 Desktop 和 backend 进程。这只证明启动请求和进程存在。 |
+| 16:56:24 | FAIL | 本地 backend 日志：CheckForInstallerErr: previous update failed (Failed to apply delta update), showing recovery dialog。今天启动读取到旧更新失败状态，不是本轮执行更新命令。 |
+| 恢复弹窗处理 | PASS | 用户确认已点击 Continue，以恢复的现有版本继续启动。代理未执行安装器、update 或下载 / 安装新版。 |
+| 17:03:13–18 | FAIL | 后台在 starting services / initializing Ingest server 阶段失败：把 sailor-ingest.sock 重命名为 sailor-ingest.sock.stale 时，系统返回 The file cannot be accessed by the system；随后 backend crashed。 |
+| 17:07:50 | FAIL | 宿主沙箱外 os.lstat / os.stat 对该 socket 均报 WinError 1920；不是仅有沙箱内失败。父目录可读、归当前用户、未见 deny ACE；socket 自身 ACL 读取失败，具体文件状态 / 锁定 / 权限根因仍 UNKNOWN。 |
+| 17:09 收尾 | FAIL | docker version 和 image ls 仍退出 1，Linux engine 命名管道不存在。WSL 列表显示 Ubuntu-26.04、Ubuntu-22.04、docker-desktop 均为 Stopped；没有可用 daemon。 |
+
+旧更新问题的只读证据：10 月 22 日 updater 日志记录 4.95.0（242831）到 4.96.2（244353）的更新尝试、安装器失败退出；对应 installer 日志出现 No installation found。更早的成功安装记录是 per-user 安装。这个组合提示旧更新可能存在安装识别问题，但不足以把完整根因写成确定结论；本轮没有重新执行升级，也未将 C 盘余量或某个 VHDX 大小当作该错误的原因。运行日志仍标识 Docker Desktop 4.95.0。
+
+原始证据均只读查看：Docker 本地 host backend / updater 日志、install-log.0.txt / install-log.1.txt 等安装日志，以及用户提供的两次弹窗。只在报告保留脱敏摘录，不提交原始日志、截图、会话标识或诊断包。[Docker 官方 CLI 文档](https://docs.docker.com/desktop/features/desktop-cli/)也将 start 和 update 列为不同命令。
+
+### 11.2 用户要求的运行项目
+
+| 检查项 | 状态 | 结果、命令与退出码 |
+|---|---|---|
+| 已安装 Desktop 的启动请求 | PASS | start --detach --timeout 30：0；GUI / backend 进程存在。启动成功与 engine ready 分开判断。 |
+| Linux daemon 可达性 | FAIL | Windows docker version / info：1，Server=null，dockerDesktopLinuxEngine 管道不存在；恢复弹窗后 8 次版本就绪查询均为 1。后续已取得明确启动失败日志，没有把反复重试当修复。 |
+| 配置中的 Ubuntu-26.04 集成 | PASS | settings-store.json 的 IntegratedWslDistros 包含 Ubuntu-26.04，AutoStart=false，SettingsVersion=46；续查后这些字段与此前相同。 |
+| WSL 实际连接可用性 | FAIL | 已进入 Ubuntu-26.04：docker 仍是 Windows Desktop 转接脚本，版本 / info / context 均退出 1；/var/run/docker.sock 不存在。当前不能连接，不据此认定集成配置丢失或应在 Ubuntu 另装 daemon。 |
+| 正常 daemon 下的 WSL 集成是否生效 | UNKNOWN | Desktop 在本地服务初始化阶段失败，尚无正常运行的 engine / 挂载可供检验。没有取得 Windows 与 WSL 指向同一 daemon 的运行证据。 |
+| daemon 类型 / Server 版本 | UNKNOWN | 客户端 context=desktop-linux 仅为配置；Server 不可达，不能把客户端的 windows/amd64 当 Linux Server 的类型或版本。 |
+| daemon CPU / 内存额度 | UNKNOWN | info 失败；输出中的 NCPU=0、MemTotal=0 为失败响应，不是配额。不得用宿主 20 线程或 Ubuntu 约 15.5 GiB 替代 daemon 实测。 |
+| daemon DockerRootDir / 盘内余量 | UNKNOWN | 无法读取；没有用 D 盘物理余量、VHDX 文件长度或 1 TiB 虚拟上限代替 daemon 存储容量。 |
+| 现有镜像清单 | UNKNOWN | docker image ls --no-trunc --digests --format JSON：1，engine 管道不存在；不是“0 个镜像”或“没有目标镜像”。无可验证镜像条目可列。 |
+| 目标镜像 / 镜像内部 Pi | UNKNOWN | 无法读取镜像元数据，未运行镜像或容器来验收；不继承旧 pilot 的镜像假设。 |
+| 容器功能、mock、Harbor 生命周期、Pi 契约 | NOT_RUN | 本轮未运行容器、任务、已有实验脚本或模型 API；只读连接查询未代替集成测试。 |
+
+### 11.3 多份 D 盘 VHDX 的证据链
+
+用户要求根据运行状态确定实际数据盘。本轮采用 Desktop 配置、WSL 注册位置、Windows Get-DiskImage 附加状态和启动日志交叉核对，没有以文件名、长度或修改时间作选择依据。
+
+| 路径 | 查询状态 | Get-DiskImage 运行观测（约 16:58） | 可支持的结论 |
+|---|---|---|---|
+| D:\DockerData\DockerDesktopWSL\disk\docker_data.vhdx | PASS | Attached=false，退出 0 | 是 Desktop 配置目录下的现有文件，该时点未附加；不能宣称当前 daemon 正在使用。 |
+| D:\docker\wsl\disk\DockerDesktopWSL\disk\docker_data.vhdx | UNKNOWN | CIM 返回 Access denied，退出 1 | 无法取得附加状态；权限错误不等于“正在使用”，也不等于“可删除”。 |
+| D:\docker\wsl\disk\docker_data.vhdx | PASS | Attached=false，退出 0 | 该时点未附加；不根据大小认定是旧盘或应清理。 |
+| D:\docker\wsl\disk\DockerDesktopWSL\main\ext4.vhdx | PASS | Attached=false，退出 0 | 与此前 docker-desktop 注册目录一致，但不是 daemon 数据盘映射已核实的证据。 |
+| 实际使用的 daemon 数据 VHDX | UNKNOWN | Linux daemon 启动失败，没有运行时 mount / DockerRootDir 及宿主文件映射 | 当前无法确定使用哪份；保留 UNKNOWN，禁止选取配置值或文件大小“补齐”答案。 |
+
+配置仍为 CustomWslDistroDir = D:\DockerData\DockerDesktopWSL；此前注册的 docker-desktop 目录仍是 D:\docker\wsl\disk\DockerDesktopWSL\main。两者是不同种类的证据，不能直接视为同一数据目录。恢复 daemon 后才适合继续核对实际挂载与路径关系，本轮没有通过手动挂载 VHDX 来替代该验证。
+
+### 11.4 副作用、权限限制及交接
+
+- **Desktop 自身的运行时文件处理：** 17:03:13 日志记录它将旧运行时 socket 目录放到 C:\Users\{USER}\AppData\Local\Docker\run.stale\20261024-090313.550。只读目录检查确认该目录存在，含四个运行时条目，包括 sailor-ingest.sock；原路径处的 socket 仍不可访问。此为 Desktop 启动中发生的自动状态变化，不能声称启动没有文件系统副作用。代理没有手动删除、重命名、迁移或清理这些条目，更没有处理 D 盘 VHDX、镜像或任务数据。
+- **桌面控制：** 用户明确授权接管必要点击后，已读取并初始化 computer-use；窗口枚举成功，但绑定 / 读取 Docker Desktop 窗口被工具权限检查拒绝，返回 Computer Use was not approved to use Docker Desktop。实际没有代理 UI 点击；未绕过该限制使用其他 Windows UI 自动化。此前 Continue 由用户完成。
+- **操作边界：** 没有安装或升级、pull / build、docker run / start、compose up、任务容器、数据迁移 / 清理、factory reset、实验代码修改或模型 API 调用；没有点击诊断采集 / 上传。没有为绕过 socket 错误改权限、改安全设置或修改 Docker 配置。
+- **准备程度：** Docker / Harbor 集成仍为 FAIL；daemon 额度、镜像和当前数据盘为 UNKNOWN；Pi SDK、七工具、冻结恢复及真实 API 为 NOT_RUN。旧 Python / Harbor 有限导入证据保持有效，但不能据此宣称 Docker 集成就绪。
+- **后续建议：** 将本地 socket 启动障碍列为环境准备阶段的首个问题；具体修复方案需另行明确范围。本轮不因启动失败自动清理 socket、重置 Desktop、重装或升级。若恢复 daemon，再继续只读核实额度、当前数据盘、WSL 同一 daemon 身份和镜像清单。
+- **Git 交付：** 同一 docs/dynamic-join/TrustFork_Environment_Report.md、同一 research/trustfork-environment-audit 分支，仅提交报告，正常推送，不强推。旧工作区保持原分支 / HEAD 和原有 6 个 untracked 状态条目；未进入 Part2。
 
 环境检查已完成，未开始安装环境或修改实验代码；等待你核对报告后再继续。
