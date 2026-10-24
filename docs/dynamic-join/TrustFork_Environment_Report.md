@@ -1,12 +1,12 @@
 # TrustFork 动态入队研究：环境检查报告
 
-检查日期：2026-10-24，Asia/Shanghai（UTC+8）。宿主资源主快照：16:24:28；Desktop 启动续查：16:54–17:09；本轮 WSL 原生 Engine 安装与验收：17:42–18:08。各轮结果分别注明，资源值随运行状态变化。
+检查日期：2026-10-24，Asia/Shanghai（UTC+8）。16:24 为原始资源快照，16:54–17:09 为 Desktop 续查，17:42–18:08 为原生 Docker 安装验收；本轮 Node/Pi 与离线联通验收自 18:27 开始，磁盘收尾快照为 18:56:40。各轮结果分别保留。
 
-**当前结论：Ubuntu-26.04 内的原生 Docker Engine / CLI 29.9.2 已通过基础容器验收，Desktop 停止时仍可使用本发行版的 Unix socket。Docker、containerd、构建缓存和 apt 数据均位于 D 盘 Ubuntu ext4 VHDX；4 GiB WSL swap 已明确配置并验证在 D 盘。Desktop 保留且集成关闭，四份旧 VHDX 未执行写入或清理；旧 Desktop 数据盘映射仍为 UNKNOWN。Node / Pi、完整实验镜像及 Harbor / Pi 生命周期尚未验收。详见第 12 节。**
+**当前结论：Linux Node 24.15.0 / Pi 0.84.1、指定 Python 3.12.13 测试环境、固定原版共享镜像及 Python→真实 Docker CLI 基础调用均已实测可用；最终 6 项 Node SDK 测试、2 项 Python 基础测试和 4 项 Python→Docker 测试全部通过，无跳过。新安装、缓存、镜像与证据位于 D 盘。实验明确不使用 Harbor，其历史未验收不再构成阻塞。已具备开始离线代码开发的基础环境；Pi 完整调度契约和动态实验仍未实现。Pi CLI 自动生成隔离空 auth.json 的文件副作用见 13.4，不能宣称严格零 auth.json 访问。**
 
-本报告保留 Part1 只读检查及随后 Desktop 启动续查的历史。用户本轮在会话中明确选择“按文档执行原生 Docker 方案”，授权在现有 Ubuntu-26.04 安装原生 Engine、调整 D 盘 swap、拉取小型公共镜像并运行基础测试容器；不修改实验代码、不续跑旧 pilot、不调用模型 API。PASS 表示该项实查成功；FAIL 表示该次检查明确失败；UNKNOWN 表示证据不足；NOT_RUN 表示未执行。
+本报告保留此前 Part1、Desktop 故障及原生 Engine 安装的历史。用户本轮通过“继续”采用 Node/Pi 环境准备文档，授权固定版本安装、必要测试依赖、固定原版镜像构建及无模型环境验收；不使用 Harbor，不修改实验业务代码、不运行旧 pilot、不读取或复制用户模型密钥、不登录模型、不调用模型 API。PASS / FAIL / UNKNOWN / NOT_RUN 均按具体检查项和时点解释，不把版本、镜像标签或预期错误当作完整实验验收。
 
-**阅读历史的边界：第 1–11 节的版本、FAIL / UNKNOWN、只读范围及“未安装”描述均对应此前检查时点，不能覆盖本轮新授权或原生 Engine 的当前结果。Desktop 的故障与旧镜像清单 UNKNOWN 仍保留，不与新建原生引擎的镜像清单混合。**
+**阅读历史的边界：第 1–12 节为此前各轮事实，其中的只读范围、未安装、Harbor 待验收与后续建议属于当时状态；当前范围和准备程度以第 13 节为准。历史 Desktop 故障、旧盘映射 UNKNOWN 保留，不与新原生引擎状态混合。**
 
 ## 1. 项目理解
 
@@ -440,3 +440,247 @@ docker system df 收尾显示 2 个镜像约 6.817 MB、0 容器、0 卷；5 项
 本次 Git 交付仅更新 docs/dynamic-join/TrustFork_Environment_Report.md，继续 research/trustfork-environment-audit 并正常推送至用户 origin，不强推。旧工作区保持原分支、ff1d6084d95b7a246c4c58f4da516c3f65a761ad 和原有六项 untracked；不以报告变更替代实验实现。
 
 原生 Docker 安装与基础验收已完成，未修改实验代码、未调用模型 API；停止，等待后续范围安排。
+
+## 13. Node/Pi 与离线环境联通验收（2026-10-24）
+
+### 13.1 本轮决定、来源与操作范围
+
+**实验不使用 Harbor。** 后续由自定义 Python 调度与消息层，通过明确的 Docker CLI / Compose 接口承担容器启动、工具执行、超时、收尾与结果收集。本轮没有实现该运行层。固定基线中的原适配器确为 class Pi(BaseInstalledAgent)，不是无 Harbor 新入口；只读核对继承关系，没有导入、运行或修改它。机器上已有 Harbor 0.24.0 原样保留，不作为本轮依赖、验收门槛或下一步待办。
+
+执行前查询用户 origin，报告分支仍为 86d9766f87304154f2ea94f860f4cbf7a12ff67b，独立 worktree 干净；无需同步其他提交。旧 pilot 分支、HEAD 和六项 untracked 保持原样。没有创建后续实验开发分支或 PR。
+
+干净源码由已有 Git 对象库执行 git archive 导出，唯一来源为官方固定提交 49490514f5187ba4e04b31929f2f4470e0db7def，输出到本次 Ubuntu ext4 证据目录的 source/。没有从 pilot HEAD、其工作文件或报告 HEAD 构建，也未调用 benchmark / verifier。
+
+| 固定来源 | SHA-256 / 内容 |
+|---|---|
+| trustfork/base-image/Dockerfile | e92d0bd724567c84393305e2cfe48939d87b10a757ab288a6d69a32e62e65af9 |
+| trustfork/tools/ensure_base_image.py | c29ab2b56464d3b5ab3eec6dc91bb8606d92d4410d89611b5951acb9c4cd12ff |
+| 六项原版参数 | NODE_VERSION=24.15.0；PI_VERSION=0.84.1；PI_SUBAGENTS_VERSION=0.15.0；PI_SOURCE_COMMIT=534bcbffb7e1e7551d9ee3572dfeb278e203e493；OPENCODE_VERSION=1.18.13；OPENCLAW_VERSION=2026.7.1-2 |
+
+基线可审核于 [原 Dockerfile](https://github.com/henrymao2004/agent-orchestration-safety/blob/49490514f5187ba4e04b31929f2f4470e0db7def/trustfork/base-image/Dockerfile) 和 [原构建脚本](https://github.com/henrymao2004/agent-orchestration-safety/blob/49490514f5187ba4e04b31929f2f4470e0db7def/trustfork/tools/ensure_base_image.py)。原共享镜像保留三 harness 的安装内容，不代表本实验要执行三个 harness；宿主未安装 OpenCode / OpenClaw，也未安装或启用 pi-subagents。
+
+### 13.2 存储位置与现有 Docker 复核
+
+本节约定 E={WSL_HOME}/.local/share/trustfork-env，A=E/audit-20261024-182703。{WSL_HOME} 表示当前 Ubuntu 普通用户的实际主目录；真实绝对路径已固化到本机 activate.sh 和证据清单，公开报告不包含用户名。源码、脚本、包锁及原始日志均留在 A，不上传目录内容。
+
+| 项目 | 本地位置 | 实际存储依据 |
+|---|---|---|
+| Node | E/node-v24.15.0-linux-x64 | findmnt：/dev/sdd、ext4、/ |
+| Pi 独立 npm 项目 | E/pi-0.84.1 | 同一根 ext4；包含 private ESM package.json、package-lock.json 和 node_modules |
+| npm / uv / pip 缓存 | {WSL_HOME}/.cache/trustfork-env/{npm,uv,pip} | npm / uv 实查为同一根 ext4；pip 缓存目录仅准备，安装复用 uv |
+| 下载、测试、源码与日志 | A/downloads、A/tests、A/source 及 A 内文件 | 同一根 ext4；未先下载到 Windows Downloads |
+| 安装临时目录 | E/tmp | 通过 TMPDIR 显式指定在 Ubuntu 根 ext4 |
+| 既有 Python venv | /mnt/d/envs/trustfork-linux | findmnt：D:\、9p / DrvFS；是既有 D 盘 NTFS 环境，本轮未迁移或偷换解释器 |
+| 镜像与构建缓存 | /var/lib/docker、/var/lib/containerd、Docker 本地 BuildKit | 保持第 12 节的 D 盘 Ubuntu ext4 后端，没有改到 /mnt/d/docker |
+| Ubuntu 后端 | D:\WSL\{DISTRO_ID}\ext4.vhdx | 再次检查 Windows 注册目录仍是指向此 D 盘目录的 Junction；上述 ext4 数据在该 VHDX |
+| WSL swap | D:\TrustFork-Environment\swap\native-docker-20261024-174416\wsl-swap.vhdx | 保持既有 D 盘设置，收尾文件存在；未修改 4 GiB 容量 |
+
+Ubuntu 仍为 26.04 LTS，systemd 正常；/usr/bin/docker 的 Client / Server 均为 29.9.2，默认 endpoint 为 unix:///var/run/docker.sock。Desktop / backend 本轮未运行，集成未恢复。既有 .wslconfig SHA-256 仍为 1797a0b8374eb47484188193fb9fcadfae17b2644409ebf3f015b16e50344cef；daemon.json 仍为 bc9d5b4fe9df9367d4b27be02d2ff7bcb078441d4a73181387310b110e5dc4f4。没有重装或升级 Docker、改变存储根或代理、重启无关服务、处理旧 Desktop VHDX。
+
+### 13.3 Node / Pi 安装、依赖锁与激活
+
+从 [Node 官方 v24.15.0 发布目录](https://nodejs.org/dist/v24.15.0/) 获取 linux-x64.tar.xz 与 SHASUMS256.txt，实际 SHA-256=472655581fb851559730c48763e0c9d3bc25975c59d518003fc0849d3e4ba0f6，与官方清单一致。使用正常 TLS；本轮未建立可信发布签名验证链，签名验证为 NOT_RUN，不能把 SHA 比对称为已验证发布签名。
+
+安装在用户级独立目录，未覆盖系统 Node 或修改全局 shell 配置。新 shell 的 node / npm / npx 来自该目录，pi 来自该 npm 项目的 node_modules/.bin；Node 为 Linux x86-64 ELF，process.platform=linux、process.version=v24.15.0，npm=11.12.1。指定 Python 3.12.13 的 subprocess 绝对路径调用得到相同 process.execPath，没有使用 Windows Node/npm 转接脚本。
+
+Pi 主依赖精确为 @earendil-works/pi-coding-agent@0.84.1，package.json 为 private、type=module，没有 ^ / ~ / latest、overrides 或 NODE_PATH。先取得确切 npm 元数据及 tarball，实际 tarball SHA-256=a69a18596017e91955fd0fd677be69fab5b6ea01d5b06207bcee34ee1522bc20，并校验 SHA-512 dist.integrity 与 npm pack 的 integrity 完全一致。确认发布包自带 npm-shrinkwrap.json，没有改其内部锁。
+
+npm install --ignore-scripts 与随后 npm ci --ignore-scripts --prefer-offline 均退出 0，各安装 144 个依赖包；锁哈希前后一致，npm ls --all --json 均退出 0。没有运行额外安装脚本。实际依赖树中的 pi-agent-core、pi-ai、pi-client、pi-protocol、pi-tui 均为 0.84.1；保留完整树到 A/npm-tree.json，不能仅凭主包版本替代传递依赖证据。
+
+| 文件（E 下） | SHA-256 |
+|---|---|
+| activate.sh | f0bbb743791eed704fe2f07c37ba948fa77ef6216202a71f2b2af8cf254bbdae |
+| pi-0.84.1/package.json | 480d73bee4fe958eac1308b021d1495658f3805e6cb62e191721470c9c90e2eb |
+| pi-0.84.1/package-lock.json | cfcf1c8bc2403c1b4291b70876ccdf122e14b42e140090d96f0b2e197f1aa35f |
+| pi-0.84.1/node_modules/@earendil-works/pi-coding-agent/npm-shrinkwrap.json | a724da15dc849d0ab2fe346845f8986b059ab89339a03a365b5910b23217c0c3 |
+
+发布包要求 Node >=22.19.0，当前版本满足；公开 ESM 入口和 CLI 与 [该版本 package.json](https://github.com/earendil-works/pi/blob/v0.84.1/packages/coding-agent/package.json) 一致。npm 元数据中的签名 / attestation 未另行验证；镜像的 PI_SOURCE_COMMIT 标签也不能据此升级为“已证明 npm 包由该 SHA 构建”。
+
+激活方式（普通用户，显式加载，不依赖交互 profile）：
+
+~~~bash
+source "$HOME/.local/share/trustfork-env/activate.sh"
+node -p 'JSON.stringify({version:process.version,platform:process.platform,execPath:process.execPath})'
+command -v node npm npx pi
+~~~
+
+activate.sh 只设置实验 PATH、npm 专用配置 / 缓存、uv / pip 缓存和 TMPDIR，不给 HOME 赋值，不改全局系统设置。新建 bash --noprofile --norc 的非交互 shell 已验证；Python 使用下列明确参数方式，也已由 /mnt/d/envs/trustfork-linux/bin/python 实测：
+
+~~~python
+subprocess.run(
+    [node_absolute_path, "-e",
+     "console.log(JSON.stringify({version:process.version,platform:process.platform,execPath:process.execPath}))"],
+    check=True, timeout=20, capture_output=True, text=True,
+)
+~~~
+
+node_absolute_path 取 E/node-v24.15.0-linux-x64/bin/node，不依赖 Windows PATH。SDK 检查脚本位于 E/pi-0.84.1 内，因此公开包根 import 从同一项目解析，而不是依赖全局 pi 命令。
+
+### 13.4 Pi 无模型验收与认证文件边界
+
+A/empty 为新建空工作目录，A/agent 为新建独立 agentDir。root 管理入口仅用于 unshare --net 创建独立子进程网络命名空间，再以 runuser 降权到原普通用户；命名空间标识实查与宿主不同。验收环境由明确白名单构造，未继承 provider API key / token；PI_CODING_AGENT_DIR 与 session 目录明确指向 A 内，未加载旧 pilot 工作目录或用户原有 Pi 账户 / 技能 / 扩展。没有调用 prompt、continue、模型摘要、自动压缩或登录操作；安装软件源访问与这些断网功能检查分开。
+
+| 检查项 | 状态 | 实测结果 |
+|---|---|---|
+| 原生 Node 身份 | PASS | Linux / v24.15.0 / 固定绝对 execPath，普通用户运行 |
+| 包根 ESM 导入与公开导出 | PASS | createAgentSession、SessionManager、SettingsManager、ModelRuntime 及七个 create*ToolDefinition 均实际导出为函数 |
+| 七工具定义 / schema | PASS | 实际构造 read、bash、edit、write、grep、find、ls，名称齐全，parameters 为 object schema，execute 存在；没有执行工具 |
+| SDK 选项核对 | PASS | 已安装 sdk.d.ts 实查 noTools?: "all" \| "builtin"、customTools?: ToolDefinition[]；与 [固定版 SDK 源码](https://github.com/earendil-works/pi/blob/v0.84.1/packages/coding-agent/src/core/sdk.ts) 相符 |
+| CLI version / help | PASS | 两项均退出 0，version=0.84.1，单项 30 秒超时，未进入交互 |
+| createAgentSession 初始化、SessionManager 序列化 / 恢复 | NOT_RUN | 只验证导出和定义，本轮未创建模型会话，也未构造假成功会话对象 |
+| 用户凭据隔离与无模型操作 | PASS | 白名单环境、独立 agentDir、断网命名空间；未读取 / 复制用户模型密钥，未发出模型任务 |
+| 严格“任何 auth.json 都不触碰” | FAIL / 已记录限制 | CLI 自动生成并初始化了 A/agent/auth.json，2 字节、0600、内容为空对象 {}、0 个条目；不能声称全进程零 auth.json 文件访问 |
+
+认证文件说明：该空文件属于本轮新建目录，不是用户原有账户文件；检查只确认这个本轮生成文件为空，没有查看用户其他认证文件。没有为消除此副作用修改已发布的 Pi 包，也没有以提供模型 key、伪造 auth 数据或 catch 后返回成功来掩盖。软件与离线基础调用已通过，但“完全不触碰任何 auth.json”的严格要求未达成，后续若坚持此项，需要专门处理 CLI 的初始化行为。
+
+Node 内置测试最终收集 6 项、通过 6、失败 0、跳过 0；日志在 A/offline-host-results.json。真实 Pi 单轮调度、消息暴露、远程工具执行、冻结恢复和完整模型会话契约均不在该结果中。
+
+### 13.5 Python 测试依赖及差异
+
+始终使用已有 /mnt/d/envs/trustfork-linux/bin/python：Python 3.12.13，prefix 对应原 venv；fcntl 可用且是内建模块，PyYAML 6.0.3、packaging 26.3 保持。准备脚本使用系统 Python 处理文件，不将它当实验解释器。未导入 Harbor、调用其 CLI / 环境类，未安装 Docker Python SDK。
+
+修改前 uv pip check 对 91 个现有包通过。先 dry-run 解析兼容方案，再将所有原包版本作为 constraints、四个新包固定到 A/requirements-tests.txt，重新 dry-run 后安装；安装和依赖检查均退出 0。
+
+| 包 | 本轮前 | 本轮后 |
+|---|---|---|
+| pytest | 未安装 | 9.1.1 |
+| pytest-asyncio | 未安装 | 1.4.0 |
+| iniconfig | 未安装 | 2.3.1 |
+| pluggy | 未安装 | 1.7.0 |
+| 原有 91 个包 | 已有固定版本快照 | 0 变更、0 移除；包括已有 Harbor，保持原样 |
+
+安装后为 95 包，uv pip check 通过。uv 缓存在 ext4，既有 venv 在 D 盘 DrvFS，硬链接不可用时工具自动使用完整复制；这是跨文件系统存储方式，未切换环境或重装现有软件。同步临时文件断言与 pytest-asyncio 异步队列 / 文件断言实际收集 2 项，通过 2，无跳过，最终 JUnit 在 A/python-basic.junit.xml。
+
+### 13.6 固定原版共享镜像
+
+起始时目标 trustfork-agents:tf-three-harnesses-v1 和原脚本 LEGACY_IMAGE 均不存在。为流式保存进度并明确来源，使用原脚本给出的相同六项参数、原始 Dockerfile 与上下文显式执行 docker build，输出独立审计标签；没有调用原脚本的“已有标签则复用”分支，没有删改 OpenCode / OpenClaw、构建简化替代镜像或修改原 Dockerfile。
+
+| 镜像证据 | 本轮实测 |
+|---|---|
+| 构建标签 | trustfork-agents:original-49490514-envcheck；旧目标 / legacy 标签未覆盖 |
+| 原始 FROM | python:3.12-slim，仍为原文件的可变标签 |
+| 实际 base digest | python@sha256:a0f57064cbdcd6285fa45f51237ab0b35ea8ebaed06a1f5973e89e19dfb86704；pull、构建 FROM 日志及 provenance materials 一致 |
+| 最终 docker image inspect .Id | sha256:9ca6c9555ff830960857b502eff60b71b669cf3f215dd4543681925bec1186a9 |
+| 构建退出码 / 用时 | 0；build 约 416 秒，设置总上限 2700 秒；实际无需重试 |
+| inspect Size | 2,940,919,123 字节，是镜像层统计，不直接等于新增宿主物理占用 |
+| 证据 | A/image-build.log、image-build-result.json、image-build-metadata.json、image-id.txt |
+
+daemon 继续使用此前已验证的代理拉取基础镜像。构建 RUN 另行传 Docker 支持的 HTTP_PROXY / HTTPS_PROXY / NO_PROXY 及小写 build args：现有代理仅可通过宿主回环访问，先用受控 host 网络的小容器对官方 npm registry 实测 HTTP 200，再仅为可信原版构建使用 --network=host。没有将代理写为 Dockerfile 永久 ENV、引入不明源或关闭 TLS；方法参考 [Docker proxy build args](https://docs.docker.com/build/building/variables/#proxy-arguments)。运行时验收全部使用 network none，不注入模型 key 或挂载宿主目录 / Docker socket。
+
+主镜像 smoke 使用上述 image ID，CPU 2、内存 1 GiB、pids-limit 128，150 秒外层超时；另以同一 image ID、network none、CPU 0.5 / 内存 128 MiB 补做 Flask 实际导入，退出 0 并清理该容器。实际结果：
+
+| 项目 | 状态 | 容器内运行或元数据证据 |
+|---|---|---|
+| Python | PASS | 3.12.15；与原 FROM 的 3.12 系列一致，与宿主 3.12.13 分列 |
+| Node / Pi | PASS | v24.15.0 / 0.84.1；真实命令退出 0 |
+| OpenCode / OpenClaw | PASS | 1.18.13 / 2026.7.1-2；只做版本查询和包元数据核对，没有模型任务 |
+| bash / curl / git / jq / rg | PASS | 实际命令存在，均在 /usr/bin |
+| Flask | PASS | 实际 import flask 成功，分发版本 3.1.3；补充记录为 A/image-flask-import-result.json |
+| Pi 包及公开 SDK 入口 | PASS | 实际全局 npm 包为 0.84.1，入口导入及所需导出成功 |
+| 原 pi-subagents | PASS | /root/.pi/agent/npm/node_modules/@tintinweb/pi-subagents/package.json，0.15.0；仅容器内原版依赖，宿主不启用 |
+| /workspace 文件读写 | PASS | 新建 synthetic environment test 文件并回读正确 |
+| 模型 / 任务 / 评分器 | NOT_RUN | 未调用 |
+
+PI_SOURCE_COMMIT=534bcbffb7e1e7551d9ee3572dfeb278e203e493 仅是原构建参数和镜像标签声明；没有由它推出 npm 包构建来源已证明。原 FROM、apt 及未锁定的 Flask 等内容仍随软件源变化，本轮记录实际 digest / 版本，没有宣称整个原版镜像已达到按位可重复。
+
+### 13.7 Python→真实 Docker CLI 验收
+
+A/tests/test_python_docker_cli.py 使用指定 Python 3.12.13 和真实 /usr/bin/docker，通过标准库 subprocess.run 的参数数组执行，无 shell=True、mocked subprocess、Harbor 或新增容器框架。测试调用进程在独立断网命名空间中以原普通用户运行，仍通过本地 Unix socket 连接已验收 Engine；容器均 network none、CPU 1、内存 512 MiB、pids-limit 128、--pull never，不带模型凭据或宿主挂载。
+
+| pytest 项 | 状态 | 证据 |
+|---|---|---|
+| 原生 CLI / Server / 精确 image ID | PASS | CLI 文件头为 ELF，Client Os=linux、Client / Server=29.9.2；default endpoint 为 Unix socket；inspect Id 与本轮记录一致 |
+| 启动、exec 成功和预期失败 | PASS | 唯一标签容器实际 create / start；/workspace 写入及回读成功；故意 exit 17 被 CalledProcessError 断言识别，容器仍正常运行 |
+| docker cp 文件往返 | PASS | D 盘本地临时文件→容器→本地，两次真实 cp；容器内与回传后的 SHA-256 / 字节均与原件一致 |
+| 超时与容器内任务停止 | PASS | 120 秒 worker 被客户端 2 秒超时中断；确认 worker 已启动后显式 docker stop，inspect Running=false / Pid=0，再删除；没有只停 Python 客户端就宣称任务结束 |
+
+最终收集 4 项，通过 4，错误 / 失败 / 跳过均 0，用时约 5.85 秒；Junit 为 A/python-docker.junit.xml，实际 CLI 事件为 A/python-docker-events.jsonl。事件中有一次预期 exit 17、一次预期 2 秒超时、两次 cp。finally 停止并删除本次容器，标签 io.trustfork.environment-audit=20261024-182703 收尾查询为空，没有依赖外层兜底清理来获得成功。
+
+首轮失败如实保留：Docker 29 返回小写 error: no such object，测试最初按大写文本判断，尚未创建容器就报 1 failed / 1 passed / 2 errors；镜像 smoke 也停在同一存在性探针。已保存初始脚本及失败 JUnit / 日志到 A/backups，按实测改为大小写归一的严格“不存在”分类后再执行，最终得到上述通过结果，没有改镜像或伪造成功对象。其他准备探针修正包括 fcntl 内建模块不提供 __file__、Ubuntu 未装 rg 时改用 hashlib 做校验、隔离白名单 PATH 下使用 /usr/sbin/runuser 的绝对路径；未为修正探针安装无关软件。
+
+### 13.8 脚本、准确调用摘录与重跑
+
+全部脚本与完整记录在本地 D 盘，不进入报告分支；A/artifact-sha256.json 是实际绝对路径与 SHA-256 清单。下表以脱敏位置给出主要文件：
+
+| 文件 | SHA-256 |
+|---|---|
+| E/pi-0.84.1/envcheck-20261024-182703.mjs | 391944a3469fe7d8bbb4ab85df9b0b0fa5d6288d9b47ea062a4510e07ea58a6f |
+| A/requirements-tests.txt | 2e1e08eec44550682fe42806f6f0baa92c694ef1bfb9cec8f2e7e5f920a546dc |
+| A/tests/test_python_environment.py | 3a6365970a840b84a181266f56827d1dc726a4614848a0f997ba418c1482a660 |
+| A/tests/test_python_docker_cli.py | 31d9aaec5b923a5bc0ee7a730b9ce95816df78f66304a8ec25aade05fcd41915 |
+| A/run-offline-host-checks.py | 121a1a8ebedadb31355aba34132c0bfe392e30aa51cef859ce62d4f4ab50864a |
+| A/run-python-docker-checks.py | 9132ca07eadd61b1c8af99f27b4e16a507e6d5c47cb3bf2a43efdfc438505a82 |
+| A/image-smoke.py | 40f814f3202495c7402bb72fb8ea2cf135530416e2a54b5256c49901dfe13dc4 |
+| A/image-smoke-inner.py | 6c0a10e6f821156c190596fdabd1eccb11bd8ffe0ab865f32c949327efbd80e0 |
+| A/check-image-flask-import.py | 71a37bab1d026ee0713b6e76893d398a26df095688e2720e9fa305b724e8a5a8 |
+| A/build-original-image.py | 0a5236f01e2719b6614de28d38e39a701de19b3f4d7e77de590fdf19c6707ff7 |
+| A/check-activation.py | d6d0d966f236292e0bddfa5aa5c7ea53df2fc884d818342d0964b65856fa7dc6 |
+
+以下为已执行测试中的关键调用摘录，完整的唯一名称检查、事件记录、超时与 finally 位于对应脚本，不是另行实现的实验运行层：
+
+~~~python
+def docker(*args, check=True, timeout=25):
+    p = subprocess.run(
+        ["/usr/bin/docker", *args],
+        check=False, timeout=timeout, capture_output=True, text=True,
+    )
+    if check:
+        p.check_returncode()
+    return p
+
+# container 由 fixture 用已记录 IMAGE、network none 和限额创建并启动。
+assert docker("exec", container, "python", "-c", code).stdout.strip() == "exec-roundtrip-ok"
+with pytest.raises(subprocess.CalledProcessError) as failure:
+    docker("exec", container, "sh", "-c", "printf 'expected-failure\\n' >&2; exit 17")
+assert failure.value.returncode == 17
+
+docker("cp", str(original), container + ":/workspace/inbound.txt")
+docker("cp", container + ":/workspace/inbound.txt", str(copied))
+assert copied.read_bytes() == payload
+assert hashlib.sha256(copied.read_bytes()).hexdigest() == expected
+
+# 超时用例明确停止整个测试容器；cleanup 在 finally 中执行。
+with pytest.raises(subprocess.TimeoutExpired):
+    docker("exec", name, "python", "-u", "-c", worker_code, timeout=2)
+docker("stop", "--time", "3", name, timeout=20)
+state = json.loads(docker("inspect", name).stdout)[0]["State"]
+assert state["Running"] is False and state["Pid"] == 0
+~~~
+
+ESM 检查位于独立 Pi 项目内，实际按公开入口加载并构造七个定义，不调用 execute：
+
+~~~javascript
+const sdk = await import("@earendil-works/pi-coding-agent");
+const mapping = {read:"Read", bash:"Bash", edit:"Edit", write:"Write",
+                 grep:"Grep", find:"Find", ls:"Ls"};
+for (const [name, part] of Object.entries(mapping)) {
+  const tool = sdk["create" + part + "ToolDefinition"](isolated);
+  assert.equal(tool.name, name);
+  assert.equal(tool.parameters.type, "object");
+  assert.equal(typeof tool.execute, "function");
+}
+~~~
+
+可重跑入口（将 {WSL_HOME} 替换为本机普通用户主目录；root 入口只建立网络命名空间，脚本内实际测试降权运行）：
+
+~~~text
+wsl.exe -d Ubuntu-26.04 -u root --exec python3 {WSL_HOME}/.local/share/trustfork-env/audit-20261024-182703/run-offline-host-checks.py
+wsl.exe -d Ubuntu-26.04 -u root --exec python3 {WSL_HOME}/.local/share/trustfork-env/audit-20261024-182703/run-python-docker-checks.py
+~~~
+
+原版镜像已保留，无需为重跑版本 / 联通测试再次构建。锁复装应在加载 activate.sh 后于 E/pi-0.84.1 执行 npm ci --ignore-scripts --prefer-offline；不运行模型登录或任务。集成脚本仍严格要求唯一测试名称不存在，以免覆盖别人的容器。
+
+### 13.9 磁盘、保留项与最终交接
+
+| 宿主可用空间 | 18:27:03 | 18:56:40 | 变化 |
+|---|---|---|---|
+| C | 8,134,975,488 字节，7.576 GiB | 7,942,569,984 字节，7.397 GiB | 约 -0.179 GiB |
+| D | 656,940,724,224 字节，611.824 GiB | 651,247,996,928 字节，606.522 GiB | 约 -5.302 GiB |
+
+收尾 Ubuntu ext4.vhdx 文件长度 25,743,589,376 字节，不能直接当宿主实际占用；Docker system df 显示 4 镜像约 2.95 GB、0 容器、0 卷、15 项构建缓存约 2.949 GB，镜像 / 缓存可能共享层，不简单相加。保留本轮原版镜像及 python:3.12-slim 基础镜像，也保留上轮两个小镜像；保留 Node/Pi、锁文件、源码、脚本、必要日志和缓存，不全局 prune。
+
+本轮仅清理自身测试容器和两个 pytest 临时目录，未清理旧数据。新下载 / 安装、npm / uv 缓存、镜像、测试和日志均落在 D 盘既定位置；C 盘变化包含系统、WSL、Codex 等并行写入，不能全部归因于本次安装或承诺零变化。没有模型调用、GPU 作业、完整 benchmark、旧 pilot、verifier 或业务代码修改。
+
+**当前分层结果：** Node/Pi 基础 SDK 与 CLI、Python 同步 / 异步测试、固定原版镜像、Python→Docker 基础容器生命周期均为 PASS，已具备开始离线代码开发的基础环境；严格零 auth.json 文件访问未达成，已记录 CLI 的空文件初始化副作用。Pi 完整调度契约、动态模块、评分、正式 case 与真实 API 仍为后续范围，Harbor 不再属于待办。本轮停在环境阶段，不自动进入这些实现或模型任务。
+
+本次仅提交 docs/dynamic-join/TrustFork_Environment_Report.md 到原 research/trustfork-environment-audit，正常推送用户 origin，不强推、不创建 PR。
