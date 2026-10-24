@@ -64,10 +64,22 @@ def validate_bindings(config: dict, *, formal: bool) -> dict:
     for alias, binding in config["logical_bindings"].items():
         strict_keys(binding, required)
         unresolved += [f"{alias}.{key}" for key in required if binding[key] is None]
+        for key in ('provider','base_url','model_id','key_env'):
+            if binding[key] is not None and (not isinstance(binding[key],str) or not binding[key].strip()):
+                raise DynamicError('invalid_model_binding',alias+'.'+key)
+        for key in ('context_window','max_output_tokens'):
+            value=binding[key]
+            if value is not None and (not isinstance(value,int) or isinstance(value,bool) or value<=0):
+                raise DynamicError('invalid_model_binding',alias+'.'+key)
         if binding["supported_parameters"] is not None and not isinstance(binding["supported_parameters"], list):
             raise DynamicError("invalid_supported_parameters", alias)
+        if binding['supported_parameters'] is not None and (any(not isinstance(x,str) for x in binding['supported_parameters']) or
+                len(set(binding['supported_parameters']))!=len(binding['supported_parameters'])):
+            raise DynamicError('invalid_supported_parameters',alias)
+    if not isinstance(config['real_api_enabled'],bool):raise DynamicError('invalid_real_api_flag','Expected boolean')
     if formal and (unresolved or config["real_api_enabled"] is not True):
         raise DynamicError("unresolved_formal_bindings", "Formal mode is not enabled or fully bound", evidence=sorted(unresolved))
+    if formal and config['mode']!='api':raise DynamicError('invalid_formal_mode','Formal configuration must explicitly select API mode')
     return {"unresolved": sorted(unresolved), "formal_ready": not unresolved and config["real_api_enabled"] is True}
 
 

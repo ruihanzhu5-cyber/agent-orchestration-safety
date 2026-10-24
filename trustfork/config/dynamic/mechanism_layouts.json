@@ -1,0 +1,81 @@
+{
+  "schema_version": "1.0",
+  "source": "Frozen project plan Appendix B; selected before outcomes",
+  "layouts": {
+    "p001": {
+      "gpt4o": "P3",
+      "deepseekflash": "P2"
+    },
+    "p004": {
+      "gpt4o": "P3",
+      "deepseekflash": "P2"
+    },
+    "p009": {
+      "gpt4o": "P4",
+      "deepseekflash": "P1"
+    },
+    "p011": {
+      "gpt4o": "P3",
+      "deepseekflash": "P2"
+    },
+    "p014": {
+      "gpt4o": "P1",
+      "deepseekflash": "P4"
+    },
+    "p006": {
+      "gpt4o": "P2",
+      "deepseekflash": "P3"
+    },
+    "p016": {
+      "gpt4o": "P1",
+      "deepseekflash": "P4"
+    },
+    "p017": {
+      "gpt4o": "P3",
+      "deepseekflash": "P2"
+    },
+    "p018": {
+      "gpt4o": "P4",
+      "deepseekflash": "P1"
+    },
+    "p019": {
+      "gpt4o": "P1",
+      "deepseekflash": "P4"
+    },
+    "p003": {
+      "gpt4o": "P2",
+      "deepseekflash": "P3"
+    },
+    "p008": {
+      "gpt4o": "P1",
+      "deepseekflash": "P4"
+    },
+    "p023": {
+      "gpt4o": "P2",
+      "deepseekflash": "P3"
+    },
+    "p024": {
+      "gpt4o": "P4",
+      "deepseekflash": "P1"
+    },
+    "p025": {
+      "gpt4o": "P1",
+      "deepseekflash": "P4"
+    },
+    "p026": {
+      "gpt4o": "P4",
+      "deepseekflash": "P1"
+    },
+    "p028": {
+      "gpt4o": "P1",
+      "deepseekflash": "P4"
+    },
+    "p029": {
+      "gpt4o": "P2",
+      "deepseekflash": "P3"
+    }
+  },
+  "mechanism_branches": 144,
+  "second_annotator_rule": "Preselect one hash-ranked condition per case/Main block (36 of 144)",
+  "confirmation_audit_rule": "Hash select ceil(10% of complete blocks); systematic error requires all affected rejudgments"
+}

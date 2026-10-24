@@ -100,5 +100,62 @@ The user accepted separate original-case coverage: p028 has one `ask` stage,
 stage. Memory and session-switching acceptance will cite different cases.
 No original card or research matrix is modified.
 
-Stage 3 scoring/statistics and stage 4 final acceptance remain in development.
-Formal API execution remains disabled and unresolved model IDs stay null.
+## Stage 3 — frozen scoring, plans and tables
+
+Implemented formal delivery extraction, identity-blind response inputs and a
+complete Main-orchestration trajectory view with only the separately bound
+private goal removed. Original rubric text and pure eight-score functions are
+reused. Partial response judging never produces a complete mean; no response,
+unknown, not annotated and judge error retain different states. Peer/team
+extensions stay separate from original scores. Goal sensors distinguish prejoin,
+ever observed, terminal and new postjoin effects; temporal order is not causality.
+Dynamic Unicode claims are uncapped and distinct from original response claims;
+consumption, quotation, rejection, planned adoption, action and recovery differ.
+
+The static matrix contains exactly 1,664 unique planned branches in 440 blocks:
+392 four-condition blocks and 48 two-condition blocks. S primary=832, F primary=416,
+mechanism sample=144, separate history plans=16 and smoke plans=32. Actual run and
+checkpoint IDs remain null in plan-only output. Frozen source/model/profile/goal/
+prompt/scorer references are explicit. Exact API bindings and judge capacity
+remain unresolved; plan rows are not presented as executed trials.
+
+The five-table pipeline writes JSON and CSV plus analysis metadata and frozen
+score inputs. It uses complete four-condition blocks, averages layouts within
+card and then weights cards equally. Bootstrap uses 10,000 source-card resamples,
+seed 20261024; both Mains share card draws. The S confirmation family is exactly
+two Mains by IAS/SAF/VF/EI, with additional 99.375% intervals at quantiles
+0.003125/0.996875. Missing blocks, partial scores, unknown binary bounds and
+unannotated denominators are retained. Additional repeats do not enter primary
+analysis. Formal analysis requires the frozen planned universe and rejects all
+synthetic inputs. Shared prefix attempts are billed once; branch-equivalent costs
+are separate and unknown costs do not become zero.
+
+Observed checks:
+
+| Command / evidence | Actual result |
+|---|---|
+| `pytest tests/dynamic/unit -q` | 47 passed, 0 skipped |
+| `generate_dynamic_manifest --plan-only` | 1,664 branches / 440 blocks; executed=0 |
+| `run_dynamic --mode scripted-test --case p001 --protocol S --conditions HP HA MP MA` | 4 valid synthetic branches, real Pi + Docker |
+| Same CLI, p024 / F | 4 valid synthetic branches through original three stages |
+| `aggregate_dynamic --mode test-fixtures` over these eight runs | five JSON/CSV files, synthetic watermark; 8 runs selected |
+| Offline preflight | native Linux daemon, audited image, 30 mappings, 14 SDK hashes and fd hash passed |
+
+The eight-run fixture has no supplement runs, so table 5 contains no observation
+rows. Unit fixtures separately exercise nonempty baseline-linked supplements,
+F no-recruit denominators, missing-block sensitivity and prefix cost accounting.
+Fixed numeric judge values verify arithmetic/data flow only; they are not
+judgments of those scripted agents. No semantic annotations were invented.
+
+The source does not define a sufficiently audited base-task/family grouping.
+That mapping and family-level sensitivity remain UNKNOWN/BLOCKED; source-card
+bootstrap must not be advertised as establishing independence of templates.
+Complex goal predicates remain `not_annotated`, with coverage reported.
+
+Stage 4 final acceptance remains in progress. Formal API execution is disabled;
+precise provider/endpoint/model/key-variable/capacity/parameter bindings, real
+provider compatibility, actual H1/H2 histories, judge capacity and second-annotator
+reliability still require the separately authorized future phase.
+
+Committed stages so far: stage 1 `6c72edbf2fb17f81750e44b9398d67775a8f0b7e`,
+stage 2 `03c9d3e3a6ff5809c7b33956e994565c9312eb32`.

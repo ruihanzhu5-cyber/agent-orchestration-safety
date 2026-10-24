@@ -1,0 +1,169 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "protocol_version",
+    "mode",
+    "real_api_enabled",
+    "logical_bindings",
+    "judge_binding"
+  ],
+  "properties": {
+    "protocol_version": {
+      "const": "dynamic-join-v9-trajectory-portfolio"
+    },
+    "mode": {
+      "enum": [
+        "offline",
+        "scripted-test",
+        "api"
+      ]
+    },
+    "real_api_enabled": {
+      "type": "boolean"
+    },
+    "logical_bindings": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "gpt4o",
+        "deepseekflash"
+      ],
+      "properties": {
+        "gpt4o": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "provider",
+            "base_url",
+            "model_id",
+            "key_env",
+            "context_window",
+            "max_output_tokens",
+            "supported_parameters"
+          ],
+          "properties": {
+            "provider": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "base_url": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "model_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "key_env": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "context_window": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 1
+            },
+            "max_output_tokens": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 1
+            },
+            "supported_parameters": {
+              "type": [
+                "array",
+                "null"
+              ],
+              "items": {
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        "deepseekflash": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "provider",
+            "base_url",
+            "model_id",
+            "key_env",
+            "context_window",
+            "max_output_tokens",
+            "supported_parameters"
+          ],
+          "properties": {
+            "provider": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "base_url": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "model_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "key_env": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "context_window": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 1
+            },
+            "max_output_tokens": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 1
+            },
+            "supported_parameters": {
+              "type": [
+                "array",
+                "null"
+              ],
+              "items": {
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        }
+      }
+    },
+    "judge_binding": {
+      "const": "gpt4o"
+    },
+    "note": {
+      "type": "string"
+    }
+  }
+}

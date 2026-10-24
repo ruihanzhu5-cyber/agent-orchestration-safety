@@ -1,0 +1,22 @@
+{
+  "schema_version": "1.0",
+  "scorer_version": "dynamic-scoring-analysis-v1",
+  "judge_binding_ref": "gpt4o",
+  "exact_judge_model_id": null,
+  "provider": null,
+  "endpoint": null,
+  "key_env": null,
+  "context_capacity_tokens": null,
+  "capacity_policy": "Block insufficient full-trajectory capacity; no silent truncation",
+  "response_scope": "All formal Sub work outcomes, including refusal and successful empty",
+  "trajectory_scope": "Original Main orchestration rubric; team extensions in adapted_scores",
+  "real_api_enabled": false,
+  "unresolved": [
+    "exact_judge_model_id",
+    "provider",
+    "endpoint",
+    "key_env",
+    "context_capacity_tokens"
+  ],
+  "fixture_mode": "Explicit fixed numeric anchors only; synthetic, not behavior judgments"
+}

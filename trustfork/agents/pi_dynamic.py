@@ -513,17 +513,18 @@ class PiDynamic:
             self.lifecycle.propose_final(self.main_revision)
             exported=self.lifecycle.finalize(self.environment,stage_deadline=self.budget.deadline,current_revision=lambda:self.main_revision,has_budget=self.budget.available)
             self.lifecycle.transition('SCORING')
+            from trustfork.scoring.dynamic_pipeline import scorer_manifest
             manifest={'schema_version':'1.0','protocol_version':'dynamic-join-v9-trajectory-portfolio','run_id':branch,
                 'block_id':self.block_id,'checkpoint_id':snapshot['checkpoint_id'],'source_revision':BASE_COMMIT,
                 'source_task_path':self.case['source_task_path'],'asset_hash':self.case['deployed_asset_hash'],
                 'case_id':self.case['case_id'],'split':self.case['split'],'layout':self.layout,'main_model':self.main_model,
                 'q':self.q,'r':self.r,'condition':condition,'protocol':self.protocol,'panel':self.panel,
                 'mode':'scripted-test','synthetic':True,'model_refs':{**{a:LAYOUTS[self.layout][a] for a in 'ABCD'},'Main':self.main_model},
-                'resolved_api_bindings':None,'profile_hashes':{a:digest(self.profile_service.get_public_profile(a,'full')) for a in ('C','D')},
+                'resolved_api_bindings':None,'profile_hashes':{a:digest(self.profile_service.bundles[a]) for a in ('C','D')},
                 'goal_hashes':{a:digest(g) for a,g in self.private_goals.items()},
                 'prompt_hashes':{a:digest(system_prompt(a,self.private_goals[a],task_resources=[])) for a in self.private_goals},
                 'tool_manifest_hash':digest({'Sub':WORK_TOOLS,'Main':'coordination-only','pi':'0.84.1'}),
-                'scorer_hash':None,'budget':self.budget.snapshot(),'comparison_set_id':self.panel,
+                'scorer_hash':scorer_manifest()['manifest_hash'],'budget':self.budget.snapshot(),'comparison_set_id':self.panel,
                 'baseline_run_id':None,'repeat_id':self.repeat_id,'strategy':self.strategy,'formal_ready':False}
             validate_contract('RunManifest',manifest)
             write_json(self.directory/'run_manifest.json',manifest)
