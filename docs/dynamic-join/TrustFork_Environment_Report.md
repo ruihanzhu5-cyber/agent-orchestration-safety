@@ -1,12 +1,12 @@
 # TrustFork 动态入队研究：环境检查报告
 
-检查日期：2026-10-24，Asia/Shanghai（UTC+8）。16:24 为原始资源快照，16:54–17:09 为 Desktop 续查，17:42–18:08 为原生 Docker 安装验收；本轮 Node/Pi 与离线联通验收自 18:27 开始，磁盘收尾快照为 18:56:40。各轮结果分别保留。
+检查日期：2026-10-24，Asia/Shanghai（UTC+8）。16:24 为初始资源快照，16:54–17:09 为 Desktop 续查，17:42–18:08 为原生 Docker 验收，18:27–18:56 为 Node/Pi 安装与离线联通验收；本轮自 19:32 开始，测试为 19:40，宿主磁盘快照为 19:42:47，后续资源与源码复核约 19:45–19:48。各轮事实分别保留。
 
-**当前结论：Linux Node 24.15.0 / Pi 0.84.1、指定 Python 3.12.13 测试环境、固定原版共享镜像及 Python→真实 Docker CLI 基础调用均已实测可用；最终 6 项 Node SDK 测试、2 项 Python 基础测试和 4 项 Python→Docker 测试全部通过，无跳过。新安装、缓存、镜像与证据位于 D 盘。实验明确不使用 Harbor，其历史未验收不再构成阻塞。已具备开始离线代码开发的基础环境；Pi 完整调度契约和动态实验仍未实现。Pi CLI 自动生成隔离空 auth.json 的文件副作用见 13.4，不能宣称严格零 auth.json 访问。**
+**当前结论：READY_FOR_OFFLINE_DEVELOPMENT。已从原作者远程直接新克隆独立 Linux 仓库，HEAD 精确锁定 49490514f5187ba4e04b31929f2f4470e0db7def 且保持干净 detached；整个基础镜像上下文与既有成功构建来源一致，可复用原审计镜像。Linux Node 24.15.0 / Pi 0.84.1、指定 Python 3.12.13、原生 Docker 29.9.2 和 D 盘归属保持，本轮已有离线测试一次 6+2+4 全通过，无失败或跳过。具体 case 本地资源可读；原标签 / 入口映射及一处原 mock-api 哈希元数据不一致已列为后续验收事项。该结论仅表示可开展离线开发，未创建代码分支或实现实验系统。**
 
-本报告保留此前 Part1、Desktop 故障及原生 Engine 安装的历史。用户本轮通过“继续”采用 Node/Pi 环境准备文档，授权固定版本安装、必要测试依赖、固定原版镜像构建及无模型环境验收；不使用 Harbor，不修改实验业务代码、不运行旧 pilot、不读取或复制用户模型密钥、不登录模型、不调用模型 API。PASS / FAIL / UNKNOWN / NOT_RUN 均按具体检查项和时点解释，不把版本、镜像标签或预期错误当作完整实验验收。
+本报告保留此前环境、Desktop 故障、安装及测试的历史。本轮采用用户指定的替代开工检查文档，只做原作者新克隆、现有环境与无模型测试复核、case 静态依赖检查和报告提交；不重复安装、不升级、不拉取或构建镜像、不改实验代码、不调用模型 API。隔离目录生成的空 auth.json 按当前指令属于正常初始化，不再构成开工阻塞。
 
-**阅读历史的边界：第 1–12 节为此前各轮事实，其中的只读范围、未安装、Harbor 待验收与后续建议属于当时状态；当前范围和准备程度以第 13 节为准。历史 Desktop 故障、旧盘映射 UNKNOWN 保留，不与新原生引擎状态混合。**
+**阅读历史的边界：第 1–13 节保留当时范围与结果；当前决定、状态和停止点以第 14 节为准。历史未安装、Harbor 待验收及严格零 auth 文件要求不能覆盖当前决定；Desktop 故障和旧盘映射 UNKNOWN 仍作为独立历史事实保留。**
 
 ## 1. 项目理解
 
@@ -684,3 +684,215 @@ wsl.exe -d Ubuntu-26.04 -u root --exec python3 {WSL_HOME}/.local/share/trustfork
 **当前分层结果：** Node/Pi 基础 SDK 与 CLI、Python 同步 / 异步测试、固定原版镜像、Python→Docker 基础容器生命周期均为 PASS，已具备开始离线代码开发的基础环境；严格零 auth.json 文件访问未达成，已记录 CLI 的空文件初始化副作用。Pi 完整调度契约、动态模块、评分、正式 case 与真实 API 仍为后续范围，Harbor 不再属于待办。本轮停在环境阶段，不自动进入这些实现或模型任务。
 
 本次仅提交 docs/dynamic-join/TrustFork_Environment_Report.md 到原 research/trustfork-environment-audit，正常推送用户 origin，不强推、不创建 PR。
+
+## 14. 代码开发前最终环境复核（2026-10-24）
+
+### 14.1 本轮决定、独立克隆与分支
+
+本轮按用户指定的 TrustFork_Codex_Precode_Environment_Check.md 替代上一份开工检查指令。采用 Python 自定义运行层 + Pi SDK + Docker；不使用 Harbor。执行内容为原作者直接克隆、固定提交与现有环境复核、已有无模型测试一次、具体 case 源码依赖检查及报告提交。保留第 13 节安装结果，本轮没有安装、升级、npm ci、镜像 pull / build、实验业务代码修改或模型请求。没有启动原 case、旧 pilot、benchmark 或 verifier。
+
+公开位置约定如下；实际绝对路径、命令和哈希保存在本机证据中：
+
+| 位置 | 本轮用途 |
+|---|---|
+| E={WSL_HOME}/.local/share/trustfork-env | 已有 Node / Pi 与激活脚本 |
+| A=E/audit-20261024-182703 | 上轮构建、源码与测试证据，保持原样 |
+| B=E/precode-audit-20261024-193242 | 本轮新日志、运行副本和结果 |
+| S={WSL_HOME}/research/trustfork-original-clean-20261024 | 本轮从原作者直接克隆的独立 Linux 仓库 |
+| D:\TrustFork-Environment\precode-audit-20261024-193242 | Windows 资源快照与少量 Linux 摘要副本，均在 D 盘 |
+
+开始时 origin 报告分支及本地独立报告 worktree 均为 d5ddff980f1e978504987eeca19206e55806c7fe，工作区干净。只有本轮流程写报告，没有并行执行另一轮报告修改。
+
+新克隆之前，目标 S 不存在；父目录 findmnt 为 /dev/sdd、ext4，Windows 注册目录到 D 盘 VHDX 的联接已核实。实际执行 git clone --origin upstream --no-checkout https://github.com/henrymao2004/agent-orchestration-safety.git S，再 checkout --detach 固定 SHA；没有使用本地 clone、--reference、--shared、旧 pilot Git 对象或旧工作文件。clone 与 checkout 均退出 0，不需要额外 fetch。
+
+| 核查 | 结果 |
+|---|---|
+| HEAD 精确值 | 49490514f5187ba4e04b31929f2f4470e0db7def；等值核对通过 |
+| 状态 | 开始和测试后 status --porcelain 为空，tracked / staged diff 为空，HEAD 保持 detached |
+| 对象可读性 | cat-file 确认为 commit，HEAD^{tree} 为 tree；构建上下文和 case blob 均实际读取 |
+| Linux Git | /usr/bin/git，2.53.0；git-dir 与 git-common-dir 同为 S/.git，实际是目录 |
+| 对象独立性 | 无 objects/info/alternates，无 Windows linked-worktree 指针；refs 只有该直接 clone 产生的 main / upstream main / upstream HEAD |
+| upstream | https://github.com/henrymao2004/agent-orchestration-safety.git；本轮只读，未推送 |
+| origin | https://github.com/ruihanzhu5-cyber/agent-orchestration-safety.git；仅新仓库设置 remote.pushDefault=origin |
+| 计划代码分支 | research/trustfork-dynamic-join-offline 在新仓库本地、原报告对象库本地及两个远端均未发现；ls-remote 查询成功且为空 |
+| 新代码分支操作 | 未创建、切换、重置或推送；未修改全局 Git 配置或旧仓库 remote |
+
+旧工作区在开始及测试后均为 feature/trustfork-topology-benchmark，HEAD=ff1d6084d95b7a246c4c58f4da516c3f65a761ad，六项 untracked 的 status 逐项不变；没有 reset、clean、stash、切换或执行旧业务实现。报告 worktree 与 S 独立。直接克隆用于明确后续来源，不是认定上轮固定提交导出受污染。
+
+证据为 B/preflight.json、clone-commands.json、clone-complete.json，以及 Windows host-before.json / host-after-tests.json。
+
+### 14.2 新源码与上轮镜像构建来源的完整对照
+
+对 S/trustfork/base-image/ 与 A/source/trustfork/base-image/ 做整个目录递归比较，包括隐藏项、相对路径、文件类型、SHA-256 和执行位；两边均为 4 个普通文件及 1 个目录，没有 symlink 或额外文件，全部一致。4 个文件均无执行位，与 Git 100644 一致；openclaw-batch-wake 目录执行位均为 0111。
+
+| 上下文相对文件 | 两边实测 SHA-256 |
+|---|---|
+| Dockerfile | e92d0bd724567c84393305e2cfe48939d87b10a757ab288a6d69a32e62e65af9 |
+| Dockerfile.openclaw-layer | ebe9c58c9bf2662b2e983ad228617ceb24fa3f740b384f0ab43a1c630e23b26a |
+| openclaw-batch-wake/apply.mjs | d4bc267c4ae1027572ae7090e452d54b7b187ac7058965a2907b8acab12ffe94 |
+| openclaw-batch-wake/subagent-announce.requester-settle-wake.js | bd635d2df6f380f8b89bc21e69b2dbeda85de7a294e93605c3657cb969f358c2 |
+
+S 与 A/source 中的 trustfork/tools/ensure_base_image.py 字节相同，实测 SHA-256=c29ab2b56464d3b5ab3eec6dc91bb8606d92d4410d89611b5951acb9c4cd12ff。
+
+六项参数在新 Dockerfile 默认值、新 ensure_base_image.py 命令字面量、旧 image-build-result.json 的实际 argv / fixed_args、旧 BuildKit metadata 中逐一一致：
+
+| 参数 | 值 |
+|---|---|
+| NODE_VERSION | 24.15.0 |
+| PI_VERSION | 0.84.1 |
+| PI_SUBAGENTS_VERSION | 0.15.0 |
+| PI_SOURCE_COMMIT | 534bcbffb7e1e7551d9ee3572dfeb278e203e493 |
+| OPENCODE_VERSION | 1.18.13 |
+| OPENCLAW_VERSION | 2026.7.1-2 |
+
+旧构建实际命令为 /usr/bin/docker build，带 --progress=plain、--network=host、--pull=false、A/image-id.txt、A/image-build-metadata.json、上述六项参数及既有代理 build-arg 名称，输出标签 trustfork-agents:original-49490514-envcheck，最后的上下文参数精确为 A/source/trustfork/base-image。本轮读取实际 argv，而非仅推测默认 context。日志保存 Dockerfile 加载及 35.15 kB build context 传输记录；旧 build 退出 0。代理值不列入公开报告。
+
+旧 metadata 的 containerimage.digest、旧构建结果、image-id.txt 和本轮 docker image inspect 对应同一 image ID：
+
+~~~text
+sha256:9ca6c9555ff830960857b502eff60b71b669cf3f215dd4543681925bec1186a9
+~~~
+
+构建 base material 仍为 python@sha256:a0f57064cbdcd6285fa45f51237ab0b35ea8ebaed06a1f5973e89e19dfb86704。结合整个 context 的逐项一致和实际构建记录，本轮可复用已有镜像，不需重建。此结论不把标签或 PI_SOURCE_COMMIT 声明扩大为镜像每个内部文件的独立来源证明，也不宣称原 apt / npm / Flask 依赖已经按位可重复构建。
+
+本轮只读取并保留镜像，未覆盖标签、重建或拉取。证据为 B/source-comparison.json、additional-source-and-resource-checks.json 及 A 中原始 build 日志 / metadata / result / iid。
+
+### 14.3 现有版本、存储与资源实测
+
+| 检查 | 本轮结果 |
+|---|---|
+| Ubuntu | Ubuntu-26.04，26.04 LTS；Linux 6.18.54.1-microsoft-standard-WSL2、x86_64，PID 1 为 systemd |
+| 指定 Python | /mnt/d/envs/trustfork-linux/bin/python，3.12.13；sys.prefix=/mnt/d/envs/trustfork-linux，base_prefix 为已有 Linux uv 管理的 3.12.13；fcntl.flock 可用 |
+| 测试依赖 | pytest 9.1.1、pytest-asyncio 1.4.0；iniconfig 2.3.1、pluggy 1.7.0；PyYAML 6.0.3 / packaging 26.3 保持 |
+| Node 实际进程 | v24.15.0、process.platform=linux，execPath=E/node-v24.15.0-linux-x64/bin/node |
+| Pi | 0.84.1，公开包根 SDK 加载及同一 npm 项目 CLI version / help 均通过 |
+| Pi 核心包 | pi-agent-core、pi-ai、pi-client、pi-protocol、pi-tui 实际均为 0.84.1；按实际嵌套 node_modules 查找，未假定都在项目顶层 |
+| 激活 | 新 bash --noprofile --norc 显式 source activate.sh，以及指定 Python 的绝对路径 subprocess，均解析到同一 Linux Node；node / npm / npx / pi 没有混入 Windows 可执行文件 |
+| 锁文件 | activate.sh、package.json、package-lock.json、包内 npm-shrinkwrap.json 的 SHA-256 与 13.3 完全一致；主依赖精确 0.84.1，无 overrides；本轮未 npm ci |
+| Docker | Client / Server 均 29.9.2，/usr/bin/docker 是 Linux ELF；context=default，endpoint=unix:///var/run/docker.sock；daemon 为原生 /usr/bin/dockerd |
+| 服务 | docker.service、containerd.service 均 enabled / active；初始 Ubuntu 停止，进入后服务自动启动，没有对运行中的服务执行 restart |
+| Desktop | Windows 无 Desktop / backend / build 进程；实际 Windows settings-store.json 中 AutoStart=false、IntegratedWslDistros=[]、EnableIntegrationWithDefaultWslDistro=false，配置哈希仍与 13 节一致 |
+| 代理 | /etc/docker/daemon.json 仍为 0600，SHA-256=bc9d5b4fe9df9367d4b27be02d2ff7bcb078441d4a73181387310b110e5dc4f4；既有三个代理字段均存在，docker info 的 HttpProxy / HttpsProxy / NoProxy 实际均非空。没有改配置或为测网 pull |
+| 已有镜像 | 4 项：审计共享镜像、python:3.12-slim、hello-world:latest、busybox:1.37.0；审计 ID 精确匹配 14.2，大小统计 2,940,919,123 字节 |
+
+activate.sh 的哈希仍为 f0bbb743791eed704fe2f07c37ba948fa77ef6216202a71f2b2af8cf254bbdae；package-lock 为 cfcf1c8bc2403c1b4291b70876ccdf122e14b42e140090d96f0b2e197f1aa35f；npm-shrinkwrap 为 a724da15dc849d0ab2fe346845f8986b059ab89339a03a365b5910b23217c0c3。实际激活检查记录在 B/activation-result.json；没有给 HOME 赋值或修改用户 profile。
+
+镜像内部版本复用 13.6 对上述同一不可变 ID 的验收：Python 3.12.15、Node 24.15.0、Pi 0.84.1。本轮没有重复完整 image smoke；宿主与镜像 Python 补丁版本之差保持记录。镜像仍含原 pi-subagents / OpenCode / OpenClaw；宿主没有因此启用它们，后续运行层需要显式隔离 Pi 配置与扩展。
+
+| 存储 | 实测归属 |
+|---|---|
+| Ubuntu 后端 | 注册目录 C:\Users\{USER}\AppData\Local\wsl\{DISTRO_ID} 仍为 Junction，指向 D:\WSL\{DISTRO_ID}；实际 ext4.vhdx 在 D 盘 |
+| S、B、Node / Pi、npm / uv / pip 缓存、E/tmp | findmnt 均为 /dev/sdd、ext4、/；源码、安装临时目录与新日志未放入 C 盘 |
+| Docker / BuildKit | /var/lib/docker 及其 buildkit 为 /dev/sdd 上的 ext4 目录 / bind mount；DockerRootDir=/var/lib/docker |
+| containerd | 既有 /var/lib/containerd 目录挂载归属为同一 /dev/sdd ext4，未迁移或改存储根 |
+| Python venv | 继续使用 /mnt/d/envs/trustfork-linux，为 D:\ 对应的 9p / DrvFS；没有迁移或替换 |
+| WSL swap | .wslconfig 哈希仍为 1797a0b8374eb47484188193fb9fcadfae17b2644409ebf3f015b16e50344cef，配置仍指向 D:\TrustFork-Environment\swap\native-docker-20261024-174416\wsl-swap.vhdx；文件存在，只读独占打开的内部 IOException 为 Win32 32，guest SwapTotal / SwapFree 均 4 GiB |
+| 旧 Desktop VHDX | 没有挂载、迁移、清理或删除；此前实际数据盘映射 UNKNOWN 保留，不混同当前原生 Engine 后端 |
+
+资源为时点快照，不是为实验预留的额度：
+
+| 项目 | 实测值 / 时点 |
+|---|---|
+| 宿主 CPU | i9-13900H，14 物理核、20 逻辑处理器 |
+| WSL / daemon CPU | CPU 数与进程 affinity 均 20；daemon NCPU=20；当前进程和 docker.service cgroup 的 cpu.max 均 max 100000，cpuset=0-19 |
+| cgroup 内存 | 当前进程及 docker.service 的 memory.max / memory.swap.max 均 max，仍受 WSL VM 与宿主资源约束 |
+| WSL / daemon 可见总内存 | 约 15.484 GiB；daemon MemTotal=16,626,094,080 字节 |
+| WSL 当前可用内存 | 后续资源补查 MemAvailable=15,319,352 KiB，约 14.610 GiB；loadavg=0.80 / 0.30 / 0.11 |
+| Windows 当前可用物理内存 | 19:42:47，12,013,264 KiB，约 11.457 GiB；总物理内存约 31.731 GiB |
+| C 盘实际余量 | 19:42:47，7,836,241,920 字节，7.298 GiB |
+| D 盘实际余量 | 同时为 650,805,542,912 字节，606.110 GiB |
+| Ubuntu VHDX 文件长度 | 同时为 26,185,039,872 字节；文件长度、guest 虚拟容量与宿主实际剩余空间分别记录，不混用 |
+
+Windows 与 WSL 可用内存共享宿主资源，不能相加，也不能把可见总内存当保证空闲量。原 task.toml 给单条 case 的容器额度为 2 CPU / 4096 MiB / 10240 MiB storage / 0 GPU；后续先按一条约 2 CPU / 4 GiB case 考虑。本轮小型 Docker 测试使用更小限额，不据此声称完整 case 的峰值、并发或稳定性已验收。C 盘仍有 Windows / WSL / Codex 的正常配置与日志写入，不承诺零字节变化。
+
+只读清单探针的确定性修正保存在 B：初次误把嵌套 Pi 核心包当顶层路径；Docker JSON 代理键应为 HttpProxy / HttpsProxy；root 查询普通用户 Git 被所有权检查拒绝后，改为由原普通用户执行。没有按错误提示修改全局 safe.directory、目录权限或软件；这些是探针问题，未触发测试重跑。
+
+### 14.4 已有无模型测试仅复跑一次
+
+先核对将执行的脚本与 13.8 中 SHA-256 一致，查看资源名称和清理边界，再生成运行副本。原 Node ESM 测试继续在 E/pi-0.84.1 内只读使用，以保持同项目包解析。Python 测试、pytest.ini 和 requirements 复制到 B；只改 runner 输出目录以及本轮容器名 / 所有权标签，并同步更新清理的标签等值检查，没有放宽功能断言。
+
+| B 中的运行副本 | SHA-256 |
+|---|---|
+| run-offline-host-checks.py | 9216aae9e95a21f59c25d148a986924506f8e38f10fe03cdd7df3d678fa1599b |
+| run-python-docker-checks.py | 3cc3502e8e788f8a0615e1d8dd9e04b214e680da51814f84b8c04309ae17593c |
+| tests/test_python_docker_cli.py | f88fea4807c28d7553a39dffb085932de0abe67cfe8263aef43e1b52d55a92f6 |
+| check-activation.py | e9973dfba2a80b35aa819b6146c6924dbf4750e52b21b5f139df02ca611f238b |
+
+Node 脚本哈希仍为 391944a3469fe7d8bbb4ab85df9b0b0fa5d6288d9b47ea062a4510e07ea58a6f；Python 基础脚本仍为 3a6365970a840b84a181266f56827d1dc726a4614848a0f997ba418c1482a660。逐项修改 diff、未改副本哈希及资源预检在 B/test-copy-manifest.json。B/image-build-result.json 是从 A 保留的字节相同旧构建引用，SHA-256=9f4b8e3eb1b8e92cd5e26bcd81c22bc926d12d1406975b819b521ab5b1633199，不是本轮新构建结果。
+
+实际测试沿用 unshare --net + /usr/sbin/runuser 降权到原普通用户，核对网络命名空间不同。凭据环境使用白名单，独立 empty cwd、agentDir / sessionDir；没有读取用户原有模型凭据、登录或模型调用。Docker 通过本地 Unix socket；容器均 --network none、--pull never、CPU 1 / 内存 512 MiB / pids 128，使用精确审计 image ID，不挂宿主目录或 Docker socket。
+
+| 本轮执行 | 数量 / 结果 | 实际计时与证据 |
+|---|---|---|
+| Node SDK / CLI | 收集 6，通过 6，失败 0，跳过 0，取消 0 | Node 输出约 9.030 秒；B/node-test-output.txt、offline-host-results.json |
+| Python 同步 / 异步 | 收集 2，通过 2，错误 / 失败 / 跳过均 0 | pytest 0.087 秒；B/python-basic.junit.xml |
+| Python→真实 Docker CLI | 收集 4，通过 4，错误 / 失败 / 跳过均 0 | pytest 6.479 秒；B/python-docker.junit.xml、python-docker-result.json |
+| 激活检查 | 新非交互 shell 和 Python subprocess 均退出 0 | B/activation-result.json |
+| 一次性监督入口 | 激活 / 宿主 / Docker 三步退出码均 0 | B/checks-once-results.json；没有测试失败后的重试 |
+
+Docker 事件共 28 条：2 次真实 cp，1 次预期 exit 17 被识别，1 次预期 2 秒 TimeoutExpired；确认 worker 已启动后 stop，并以 inspect 验证 Running=false / Pid=0。实际创建、停止、删除容器各 2 次。名称为 tfenv-20261024-193242-precode-python-cli / -timeout，所有权标签 io.trustfork.environment-audit=20261024-193242-precode；运行前均不存在，收尾查询为空。没有依赖外层兜底清理才获得成功，没有停止其他任务或全局 prune。
+
+Pi CLI 在 B/agent/auth.json 生成 2 字节、0600、0 个条目的空对象 {}。这是隔离新目录的正常初始化，按本轮替代指令不构成阻塞；13.4 的历史严格零 auth 文件 FAIL 保留为当时要求的结果。没有修改 Pi 去消除该行为，也未接触用户原有认证文件。
+
+本轮前后核对 73 项旧脚本 / 日志 / 结果 / Node 脚本的内容哈希、长度及 mtime，变更 0。B/original-artifacts-before.json 和 test-summary-and-postflight.json 保留比对；旧 source 中的基础镜像上下文另由 14.2 整目录核对。成功后没有重复跑测试或压力测试。
+
+本轮准确调用入口为：
+
+~~~text
+wsl.exe -d Ubuntu-26.04 -u root --exec python3 {WSL_HOME}/.local/share/trustfork-env/precode-audit-20261024-193242/run-checks-once.py
+~~~
+
+该监督脚本顺序执行 B/check-activation.py、B/run-offline-host-checks.py、B/run-python-docker-checks.py，并保存各步完整参数、退出码和日志；已有结果时拒绝覆盖。另一次复核应先按 B/prepare-test-copies.py 与 test-copy-manifest.json 的路径 / 标签替换清单准备新的独立证据目录和唯一标识，再使用对应新路径调用 run-checks-once.py。不要直接在已完成 A / B 目录重写结果；断言、断网和凭据隔离保持不变。
+
+### 14.5 具体原 case 与评分入口：只读可得性
+
+只从 S 的固定提交读取 trustfork/tasks/indirect/trustfork_0001/；git ls-tree 列出 13 个普通文件，全部实际可读。task.toml 的名称为 trustfork/trustfork_0001，两份测试 JSON 中 task_id 均为 trustfork_0001。范围内无 Git LFS 指针，整个固定树无 160000 submodule 项。没有缺失 Dockerfile COPY 相对目录或启动 / 评分入口所需本地文件；没有执行、导入这些入口或把 tests 文件复制进 /workspace。
+
+| 实际引用 | 已核实文件 / 后续接管要求 |
+|---|---|
+| task.toml、instruction.md | 均可读；指令引用的内容服务位于容器回环 8000 端口，本轮没有访问服务 |
+| environment/Dockerfile | FROM trustfork-agents:tf-three-harnesses-v1；COPY workspace/、home/、mock-api/ 三个本地目录均存在 |
+| environment/docker-compose.yaml | 只覆盖 main.command：sh 启动 python3 /opt/mock-api/app.py，输出 /tmp/mock-api.log，随后 exec sleep infinity；该文件本身没有 build / image 声明 |
+| environment/mock-api/app.py / config.json | 均可读；app 加载同目录 config.json，数据位置映射到 /opt/mock-api/data，依赖 Flask 和标准库 |
+| 实际任务资产 | mock-api/data/ai-chip-market-page.html、workspace/contact.md 存在；HTML 没有 href / src 引用需要再获取的资产 |
+| tests/test.sh | Git 100755；实际评分入口为 python3 /tests/verifier.py |
+| tests/verifier.py | 本地仅标准库导入；main 明确读取 /tests/task_metadata.json、/tests/task_spec.private.json，二者齐全 |
+| 评分的运行期输入 / 输出 | 读取 /logs/agent 的 trajectory.json、hermes-session.jsonl 或 opencode.txt，及可选 /workspace/.trustfork-harness/trajectories；扫描终态 /workspace，写 /logs/verifier/reward.json 与 annotations.json |
+| 正式评分外部条件 | 原 verifier 会调用远程 judge，依赖评分凭据和展示身份环境映射；本轮只读源码，没有读取 key 值、验证 API 或调用评分 |
+| 原运行格式 | 原 Harbor task / Compose 布局，需要运行器完成构建、主服务命令、日志和 evaluator-only /tests 装配；后续由新的 Python / Docker 层显式接管，Harbor 不成为安装或验收门槛 |
+
+可审核原文件：[固定提交的 case 目录](https://github.com/henrymao2004/agent-orchestration-safety/tree/49490514f5187ba4e04b31929f2f4470e0db7def/trustfork/tasks/indirect/trustfork_0001)、[任务 Dockerfile](https://github.com/henrymao2004/agent-orchestration-safety/blob/49490514f5187ba4e04b31929f2f4470e0db7def/trustfork/tasks/indirect/trustfork_0001/environment/Dockerfile)、[评分入口](https://github.com/henrymao2004/agent-orchestration-safety/blob/49490514f5187ba4e04b31929f2f4470e0db7def/trustfork/tasks/indirect/trustfork_0001/tests/test.sh)。
+
+**镜像映射待办：** case 的 FROM 为 trustfork-agents:tf-three-harnesses-v1，本地保留的是 trustfork-agents:original-49490514-envcheck，标签不相同。当前镜像是共享基础层，未包含该 case 的 COPY 层 / 服务装配。后续实现须明确选择已核对 ID 并处理原标签到审计镜像的映射；本轮未改 Dockerfile、加别名、下载同名镜像或构建 case。
+
+**来源元数据与已打包文件分开记录：** task_metadata.json 的 scenario_ref 相对 CANARY_ROOT=trustfork/scenarios/canary 解析，不能直接相对仓库根路径判缺失。场景卡和两项原始资产均已找到并匹配元数据；生成器 materialize_tasks.py 的 http_post 分支会生成任务 HTML，因此原始 HTML 哈希不是已打包页面哈希。
+
+| 来源 / 打包对象 | 实测对照 |
+|---|---|
+| 原场景卡 | 存在，SHA-256=6a032064ff4fe0d62f6892f66ce9bc63fc8b3dd84b651c4dcae9f3417f6c3abd，与元数据一致 |
+| 原始 ai_chip_market.html | 存在，SHA-256=4d2527c37f585a77e7abe28b4ed8b27b8ea260fb673dd6362b975c6cfe4a67e0，与来源记录一致 |
+| case 打包 ai-chip-market-page.html | SHA-256=21f4aa2fc6c01abc2c384679386f405af42c5a36bb33f1683e43446176e1cc5a；生成器对载体进行任务化处理，有明确源码依据，不能据此认定污染 |
+| contact.md | 原始和打包文件均为 074892cf66f99de84eeb5b3eea2ffe789f78771d4112b47b29e7440d8057c261，与 initial_workspace_sha256 一致 |
+| mock-api/app.py 元数据差异 | scenario_asset_sha256 对 workflow/images/official/mock-api/app.py 记 80aee4c446d4392025ae7b52a2a8a4ccec8a6ff0458e4b7b966a1b18775e7e53；该 vendored 文件、trustfork/skills/mock-api/app.py 和 case 内副本实际均为 eb5ba0cb124311cde41c6147a5af8ead05bd059250f68f184cf48e434eedad4f，三份字节一致 |
+
+最后一项是固定原提交中元数据与实际服务文件不一致，原因 UNKNOWN；生成器当前代码会对实际 app_source 取哈希，静态检查不足以确定该记录为何不同。本轮没有改元数据、服务或评分器，也不把这项差异包装为已验证一致。文件实际齐全，原 verifier 没有按该历史 source hash 另行加载脚本，故不阻断离线代码开发；正式 case 资产一致性验收前必须明确处置和记录，不能静默忽略。
+
+完整文件哈希、实际引用及源码摘录在 B/case-file-inventory.json、case-tree.txt、case-dependency-review.json、case-verifier-reference-excerpts.txt、case-provenance-review.json。
+
+### 14.6 最终状态与停止点
+
+**最终状态：READY_FOR_OFFLINE_DEVELOPMENT。**
+
+理由是原作者直接克隆的固定 SHA 干净可读、整个基础镜像上下文与既有成功构建证据一致、原生 Linux Node / Pi / Python / Docker 及 D 盘归属实测保持、12 项无模型测试本轮一次全部通过，且具体 case 的构建 / 启动 / 评分本地资源实际可得。这一状态表示可以开始写代码和做离线测试；不表示动态实验系统已经完成，或已具备直接正式运行 API / scoring 的验收结果。
+
+本阶段真实环境 blocker：无。旧 Desktop 故障、其历史数据盘映射 UNKNOWN、Harbor 未验收、未提供 API key、尚未写动态模块及隔离空 auth.json，均不是本阶段阻塞。
+
+普通开发待办与正式 case 验收前事项：
+
+- 从 S 的固定 detached HEAD 按另行授权建立计划代码分支；本轮没有自动创建。
+- 实现并离线验收 Python 自定义容器生命周期 / 工具 / 消息 / 调度、Pi 会话契约及配置扩展隔离；原镜像内的团队管理扩展不能自动沿用。
+- 明确原 case FROM 标签到现有审计 ID 的映射，接管 Compose 主命令、Flask 服务、任务资产、日志和 evaluator-only 挂载；本轮没有构建或启动 case。
+- 对上述 mock-api 来源哈希元数据不一致做明确的资产合同决定和留痕；模拟服务启动、任务资产加载、原格式轨迹兼容和评分仍须后续实现 / 验收。
+- 动态加入 C/D、履历、Main/A/B/C/D 协作与正式 API / 安全评分均为后续范围，不从这次基础测试推导其已经通过。
+
+本轮只修改并提交原 docs/dynamic-join/TrustFork_Environment_Report.md 到 research/trustfork-environment-audit，正常推送用户 origin；不推 upstream、不强推、不创建 PR。原证据、源码克隆及临时验收脚本不进入报告分支。完成报告交付后停止，等待用户审阅。
