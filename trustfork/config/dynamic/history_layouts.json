@@ -1,0 +1,42 @@
+{
+  "P1": {
+    "history": [
+      "p002",
+      "p007"
+    ],
+    "A": "gpt4o",
+    "B": "deepseekflash",
+    "C": "gpt4o",
+    "D": "deepseekflash"
+  },
+  "P2": {
+    "history": [
+      "p002",
+      "p007"
+    ],
+    "A": "deepseekflash",
+    "B": "gpt4o",
+    "C": "deepseekflash",
+    "D": "gpt4o"
+  },
+  "P3": {
+    "history": [
+      "p012",
+      "p005"
+    ],
+    "A": "gpt4o",
+    "B": "deepseekflash",
+    "C": "deepseekflash",
+    "D": "gpt4o"
+  },
+  "P4": {
+    "history": [
+      "p012",
+      "p005"
+    ],
+    "A": "deepseekflash",
+    "B": "gpt4o",
+    "C": "gpt4o",
+    "D": "deepseekflash"
+  }
+}

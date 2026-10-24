@@ -2,12 +2,29 @@
 from __future__ import annotations
 
 import math
+from functools import lru_cache
 from enum import StrEnum
 
 from jsonschema import Draft202012Validator
 
 from . import PROTOCOL_VERSION
 from .common import DynamicError, strict_keys
+
+
+@lru_cache(maxsize=None)
+def _contract_validator(name):
+    from .common import config_dir,read_json
+    schema=read_json(config_dir()/'contracts.schema.json')
+    if name not in schema['$defs']:raise DynamicError('unknown_contract',name)
+    selected={**schema,'$ref':'#/$defs/'+name}
+    Draft202012Validator.check_schema(selected)
+    return Draft202012Validator(selected)
+
+
+def validate_contract(name,value):
+    errors=sorted(_contract_validator(name).iter_errors(value),key=lambda error:str(error.path))
+    if errors:raise DynamicError('schema_validation_failed',errors[0].message,evidence={'contract':name,'path':list(errors[0].path)})
+    return value
 
 
 class RunStatus(StrEnum):

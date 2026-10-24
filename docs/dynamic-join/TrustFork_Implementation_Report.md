@@ -51,25 +51,54 @@ Unclassified live processes or modified service code/config produce
 `restore_unsupported`; no claim of arbitrary application/RAM restoration is made.
 Four-card L protocol validation remains a later-stage requirement.
 
-## SDK compatibility decisions and remaining work
+## Stage 2 — Pi and dynamic teams
 
-The real Pi 0.84.1 negative grep probe trapped local `rg` despite custom
-Operations. The user authorized only a minimal version/hash-locked remote spawn
-extension, with repository reproduction and real-Docker regression requirements.
-It has not yet passed its acceptance tests; no seven-tool Pi pass is claimed.
+The passive JSONL bridge drives real Pi core for exactly one response and its
+complete tool batch per host permit. Python owns the only ready queue. Main has
+coordination tools; Sub actors retain all seven original work tools and peer
+communication. Initial planning enables registration tools only. Default SDK
+provider retries, automatic compaction, extensions, model catalog refresh and
+real provider access are disabled. Synthetic streams are explicit, never failure
+fallbacks. Actual provider inputs, Pi events and Docker operations are recorded.
 
-A subsequent real-SDK read probe detected host `fs.access` before the custom
-ReadOperations. Its negative result is reproducible with
-`tests/read-contract-probe.mjs`. A separate minimal optional path-existence
-callback has been proposed. This newly identified interface remains BLOCKED
-pending the user's decision and regression validation. Independent modules
-continue; no host fallback is enabled.
+The user-authorized remote path repairs are pinned to Pi 0.84.1 and 14 exact
+implementation/declaration hashes. They cover grep process creation, read path
+existence, the shared write/edit canonical-path queue, and find's process and
+git-ancestor existence calls. Native search, read, edit, write, error and
+truncation logic stays in Pi. See SDK_Compatibility_Decisions.md for negative
+probes and accepted changes. Runs require a fixed-hash public fd 10.3.0 binary;
+they do not auto-download it or change the audited base image.
+
+Implemented atomic admission, S/F/L scheduling, per-recipient FIFO and actual
+exposure receipts, dynamic profiles and all specified supplement settings,
+private goal binding, durable complete idle checkpoints, finite host retries,
+shared budgets and explicit stage/finalization barriers. Refusal and F recruiting
+neither candidate remain valid behavior. An unfinished old invocation cannot
+continue into a new epoch. Original persistent service/files remain; tracked
+nonbaseline background workers are stopped at a stage boundary.
+
+Observed validation:
+
+| Command / evidence | Actual result |
+|---|---|
+| `pytest tests/dynamic/unit ... test_session_contracts.py test_late_join.py -xq` | 38 passed; 32 unit, 2 real Pi, 4 real Docker/Pi L cases |
+| `npm --prefix trustfork/runtime/dynamic run typecheck` | passed |
+| `npm --prefix trustfork/runtime/dynamic run test:contract` | 3 passed, 0 skipped |
+| Real Docker/Pi remote tool semantics | 4 passed; native grep/find oracle, bash truncation, symlink queue |
+| Real common-prefix four-condition S and F no-recruit tests | 2 passed |
+| Independent `npm ci --offline` | passed; idempotence, hash/version rejection, original SDK unchanged |
+| L p004/p006/p008/p028 | executed old-member writes persisted in independent restored branches; original services retained |
+
+Initial test failures exposed Docker commit output, hidden host path checks and
+the rg directory omission; implementation defects were fixed. Two later test
+assumptions were corrected against SDK source: empty chats can have a config leaf,
+and skills are shown only when read is active. Tests now assert real behavior.
+No failing test is counted as passed; full final acceptance remains stage 4.
 
 The user accepted separate original-case coverage: p028 has one `ask` stage,
 `new_session=false`; p024 has three stages with `new_session=true` on its final
 stage. Memory and session-switching acceptance will cite different cases.
 No original card or research matrix is modified.
 
-Stage 2 scheduling/Pi integration, stage 3 scoring/statistics, and stage 4 full
-pipeline acceptance are still in development. Formal API execution remains
-disabled and unresolved model IDs stay null.
+Stage 3 scoring/statistics and stage 4 final acceptance remain in development.
+Formal API execution remains disabled and unresolved model IDs stay null.

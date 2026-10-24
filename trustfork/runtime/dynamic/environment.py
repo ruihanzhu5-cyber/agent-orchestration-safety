@@ -21,6 +21,7 @@ from .case_loader import materialize_case
 from .common import BASE_IMAGE, BASE_IMAGE_ID, DynamicError, canonical, digest, write_json
 from .events import EventLedger
 from .operations import OperationStore
+from .dependencies import fd_binary, fd_lock
 
 
 class DockerEnvironment:
@@ -34,6 +35,7 @@ class DockerEnvironment:
         self.operations = OperationStore(self.root / "operations.sqlite")
         self.active = set()
         self.active_lock = threading.RLock()
+        self.cancelled_operations = set()
         self.accepting = True
         self.frozen = False
         self.prepared = False
@@ -105,6 +107,10 @@ class DockerEnvironment:
         mounts = actual.get("Mounts", [])
         if mounts:
             raise DynamicError("unexpected_task_mount", "Task container must not mount control files or Docker socket", evidence=mounts)
+        # The audited image lacks fd. Copy only this public, fixed-hash tool;
+        # no control directory or mount is exposed to the task environment.
+        self.docker('cp',fd_binary(),self.container+':'+fd_lock()['task_path'])
+        self.docker('exec',self.container,'chmod','755',fd_lock()['task_path'])
         self.prepared = True
         self.start_services()
         self.baseline_processes = self._worker("process.snapshot", {}, "baseline-processes")["processes"]
@@ -123,7 +129,7 @@ class DockerEnvironment:
         except json.JSONDecodeError as error:
             raise DynamicError("invalid_operation_response", "Task operation did not return JSON") from error
         if not body["ok"]:
-            raise DynamicError("remote_" + body["error_type"], body["message"])
+            raise DynamicError("remote_" + body["error_type"], body["message"], evidence={'errno':body.get('errno')})
         return body["result"]
 
     def start_services(self) -> dict:
@@ -142,7 +148,7 @@ class DockerEnvironment:
             time.sleep(0.1)
         raise DynamicError("service_not_ready", "Original mock API did not start", evidence=last)
 
-    def exec_work_operation(self, operation: str, args: dict, op_id: str) -> dict:
+    def exec_work_operation(self, operation: str, args: dict, op_id: str, *, scope=None) -> dict:
         if not self.accepting or self.frozen:
             raise DynamicError("environment_not_accepting", "No work after quiesce or freeze")
         claim = self.operations.claim(op_id, {"operation": operation, "args": args})
@@ -151,7 +157,7 @@ class DockerEnvironment:
         with self.active_lock:
             self.active.add(op_id)
         if self.ledger:
-            self.ledger.append("tool_operation_started", {"op_id": op_id, "operation": operation, "args": args}, tool_call_id=op_id)
+            self.ledger.append("tool_operation_started", {"op_id": op_id, "operation": operation, "args": args}, tool_call_id=op_id, **(scope or {}))
         try:
             result = self._worker(operation, args, op_id, timeout=max(60, args.get("timeout", 0) + 10))
             stored = self.operations.finish(op_id, result)
@@ -159,7 +165,7 @@ class DockerEnvironment:
                 self.ledger.append("tool_operation_finished", {"op_id": op_id, "result": result,
                     "observation_interval": [stored["started_ns"], stored["ended_ns"]],
                     "overlapping_operation_ids": stored["overlapping_operation_ids"],
-                    "attribution_status": "ambiguous" if stored["overlapping_operation_ids"] else "single_recorded_operation"}, tool_call_id=op_id)
+                    "attribution_status": "ambiguous" if stored["overlapping_operation_ids"] else "single_recorded_operation"}, tool_call_id=op_id, **(scope or {}))
             return result
         except BaseException as error:
             if self.operations.get(op_id)["status"] == "started":
@@ -174,16 +180,82 @@ class DockerEnvironment:
             raise DynamicError("frozen_use_export", "Read frozen tar exports instead of exec")
         result = {}
         for path in paths:
-            exists = self._worker("fs.exists", {"path": path}, "observation-exists")["exists"]
-            if not exists:
-                result[path] = {"exists": False}
-                continue
-            info = self._worker("fs.stat", {"path": path}, "observation-stat")
-            result[path] = {"exists": True, **info}
-            if not info["isDirectory"]:
-                data = base64.b64decode(self._worker("fs.read", {"path": path}, "observation-read")["data"])
-                result[path].update(sha256=hashlib.sha256(data).hexdigest(), content_b64=base64.b64encode(data).decode())
+            copied=self.docker('cp',self.container+':'+path,'-',binary=True,check=False)
+            if copied.returncode:
+                if b'could not find' in copied.stderr.lower() or b'no such' in copied.stderr.lower():
+                    result[path]={'exists':False};continue
+                raise DynamicError('observation_failed',path)
+            with tarfile.open(fileobj=io.BytesIO(copied.stdout)) as archive:
+                members=list(archive)
+                if not members:raise DynamicError('empty_observation_archive',path)
+                member=members[0]
+                result[path]={'exists':True,'isDirectory':member.isdir(),'mode':member.mode,'type':member.type.decode(),'link':member.linkname}
+                if member.isfile():
+                    data=archive.extractfile(member).read()
+                    result[path].update(sha256=hashlib.sha256(data).hexdigest(),content_b64=base64.b64encode(data).decode())
         return result
+
+    def cancel_operation(self, identity):
+        self.cancelled_operations.add(identity)
+        deadline = time.monotonic() + 3
+        while True:
+            result = self._worker('process.cancel', {'op_id': identity}, 'cancel-' + identity)
+            state = self.operations.get(identity)
+            if result['cancelled'] or identity not in self.active or (state and state['status']!='started') or time.monotonic()>=deadline:
+                return result
+            time.sleep(0.02)
+
+    def stream_work_operation(self, args, op_id, *, scope=None):
+        if not self.accepting or self.frozen:
+            raise DynamicError('environment_not_accepting', 'No work after quiesce or freeze')
+        claim = self.operations.claim(op_id, {'operation': 'process.stream', 'args': args})
+        if claim['cached']:
+            yield from claim['result']['frames']
+            return
+        if op_id in self.cancelled_operations:
+            frames=[{'kind':'exit','result':{'exitCode':None,'timed_out':False,'cancelled_before_start':True}}]
+            self.operations.finish(op_id,{'frames':frames})
+            yield from frames
+            return
+        with self.active_lock:
+            self.active.add(op_id)
+        if self.ledger:
+            self.ledger.append('tool_operation_started', {'op_id':op_id, 'operation':'process.stream', 'args':args}, tool_call_id=op_id, **(scope or {}))
+        payload = base64.b64encode(canonical({'operation':'process.stream', 'args':args, 'op_id':op_id})).decode()
+        process = subprocess.Popen(['/usr/bin/docker', '--host', 'unix:///var/run/docker.sock',
+            'exec', self.container, 'python', '-c', self.worker_source, payload], env=self.client_env,
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, bufsize=1)
+        frames, finished = [], False
+        try:
+            for line in process.stdout:
+                frame = json.loads(line)
+                frames.append(frame)
+                if frame['kind'] == 'error':
+                    raise DynamicError('remote_' + frame['error_type'], frame['message'])
+                if frame['kind'] == 'exit':
+                    finished = True
+                yield frame
+            code = process.wait(timeout=10)
+            if code or not finished:
+                raise DynamicError('stream_transport_unknown', process.stderr.read()[-1000:])
+            stored = self.operations.finish(op_id, {'frames':frames})
+            if self.ledger:
+                self.ledger.append('tool_operation_finished', {'op_id':op_id, 'exit':frames[-1],
+                    'observation_interval':[stored['started_ns'],stored['ended_ns']],
+                    'overlapping_operation_ids':stored['overlapping_operation_ids'],
+                    'attribution_status':'ambiguous' if stored['overlapping_operation_ids'] else 'single_recorded_operation'}, tool_call_id=op_id, **(scope or {}))
+        except BaseException as error:
+            if self.operations.get(op_id)['status'] == 'started':
+                self.operations.finish(op_id, {'error':type(error).__name__, 'reason':str(error)}, unknown=True)
+            raise
+        finally:
+            process.stdout.close()
+            process.stderr.close()
+            if process.poll() is None:
+                self.cancel_operation(op_id)
+                process.wait(timeout=10)
+            with self.active_lock:
+                self.active.discard(op_id)
 
     def quiesce(self, deadline: float) -> dict:
         self.accepting = False
@@ -204,6 +276,16 @@ class DockerEnvironment:
         self.freeze_finished_ns = time.monotonic_ns()
         return {"status": "frozen", "cutoff_interval": [self.freeze_started_ns, self.freeze_finished_ns]}
 
+    def stop_epoch_processes(self):
+        if self.active:raise DynamicError('old_epoch_active','Drain active work before stopping background workers')
+        result=self._worker('process.stop_new',{'baseline':self.baseline_processes},'stop-old-epoch')
+        baseline={(row['pid'],row['start_ticks']) for row in self.baseline_processes}
+        remaining=[row for row in self._worker('process.snapshot',{},'verify-old-epoch')['processes']
+            if (row['pid'],row['start_ticks']) not in baseline]
+        if remaining:raise DynamicError('old_epoch_processes_remain','Cannot advance stage with live old workers',evidence=remaining)
+        if self.ledger:self.ledger.append('old_epoch_processes_stopped',result)
+        return result
+
     def export_state(self) -> dict:
         if not self.frozen:
             raise DynamicError("export_requires_frozen", "Freeze all branch services first")
@@ -212,6 +294,29 @@ class DockerEnvironment:
         target.write_bytes(data)
         result = {"status": "frozen_export", "workspace_tar": str(target), "sha256": hashlib.sha256(data).hexdigest(),
                   "cutoff_interval": [self.freeze_started_ns, self.freeze_finished_ns], "ram_saved": False}
+        result['additional_exports']={}
+        for name,path in [('mock_api','/opt/mock-api'),('service_log','/tmp/mock-api.log')]:
+            copied=self.docker('cp',self.container+':'+path,'-',binary=True,check=False)
+            if copied.returncode:
+                if b'could not find' in copied.stderr.lower() or b'no such' in copied.stderr.lower():continue
+                raise DynamicError('state_export_failed',path)
+            file=self.root/(name+'-frozen.tar');file.write_bytes(copied.stdout)
+            result['additional_exports'][name]={'path':str(file),'sha256':hashlib.sha256(copied.stdout).hexdigest()}
+        result['filesystem_changes']=self.docker('diff',self.container).stdout.splitlines()
+        result['home_asset_exports']={}
+        home_assets=[row for row in self.case['deployed_assets'] if row['path'].startswith('home/') and row['type'] in ('file','symlink')]
+        for row in home_assets:
+            path='/root/'+row['path'].removeprefix('home/')
+            copied=self.docker('cp',self.container+':'+path,'-',binary=True,check=False)
+            if copied.returncode:
+                if b'could not find' in copied.stderr.lower() or b'no such' in copied.stderr.lower():
+                    result['home_asset_exports'][path]={'status':'absent_at_cutoff'}
+                    continue
+                raise DynamicError('state_export_failed',path)
+            file=self.root/('home-asset-'+hashlib.sha256(path.encode()).hexdigest()[:20]+'.tar')
+            file.write_bytes(copied.stdout)
+            result['home_asset_exports'][path]={'status':'exported','path':str(file),'sha256':hashlib.sha256(copied.stdout).hexdigest()}
+        result['coverage']='workspace, original task home assets, original mock service files/log and complete Docker diff metadata; no RAM or unlisted file contents'
         write_json(self.root / "state-export.json", result)
         return result
 

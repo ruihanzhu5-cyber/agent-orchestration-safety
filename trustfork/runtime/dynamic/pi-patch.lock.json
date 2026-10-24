@@ -1,0 +1,188 @@
+{
+  "pi_version": "0.84.1",
+  "authorization": "User-authorized Docker-only tool paths: grep/read and shared write/edit callbacks; find uses the same optional remote process/existence transport. No permissions, scheduling, communication, injection or scoring changes.",
+  "files": [
+    {
+      "path": "dist/core/tools/grep.js",
+      "original_sha256": "15485f75d1ff037ab7c2b2be9cb38684deaf129356f4df1250e800d8a0b555dd",
+      "patched_sha256": "991a756b04899a692323d6512cbb29ce230258cf045b4bc1edebe8552fcec7c4",
+      "replacements": [
+        {
+          "before": "const rgPath = await ensureTool(\"rg\", true);",
+          "after": "const rgPath = customOps?.spawn ? \"rg\" : await ensureTool(\"rg\", true);"
+        },
+        {
+          "before": "const child = spawn(rgPath, args, { stdio: [\"ignore\", \"pipe\", \"pipe\"] });",
+          "after": "const child = customOps?.spawn ? customOps.spawn(args) : spawn(rgPath, args, { stdio: [\"ignore\", \"pipe\", \"pipe\"] });"
+        }
+      ]
+    },
+    {
+      "path": "dist/core/tools/grep.d.ts",
+      "original_sha256": "cb1b7103658fca88fcc381b1e5f0f42e0e17d900b686c0843fe767a597ac5660",
+      "patched_sha256": "2ecbb64ff392c6dbecdad0b34085c9a3f454390270a0df487a548402368d0b05",
+      "replacements": [
+        {
+          "before": "export interface GrepOperations {",
+          "after": "export interface GrepOperations {\n    /** Optional remote process transport; all parsing and truncation stay in Pi. */\n    spawn?: (args: string[]) => Pick<import(\"node:child_process\").ChildProcessWithoutNullStreams, \"stdout\" | \"stderr\" | \"killed\" | \"kill\" | \"on\">;"
+        }
+      ]
+    },
+    {
+      "path": "dist/core/tools/path-utils.js",
+      "original_sha256": "76acb2622a7f4f54c871a553501340829580f0f9caad627e7dafb8aee8b449af",
+      "patched_sha256": "916a9801fa8804502ac69bfc26bfa0391f657930eabd96b49207a6d31af54047",
+      "replacements": [
+        {
+          "before": "export async function resolveReadPathAsync(filePath, cwd) {\n    const resolved = resolveToCwd(filePath, cwd);\n    if (await pathExists(resolved)) {\n        return resolved;\n    }\n    // Try macOS AM/PM variant (narrow no-break space before AM/PM)\n    const amPmVariant = tryMacOSScreenshotPath(resolved);\n    if (amPmVariant !== resolved && (await pathExists(amPmVariant))) {\n        return amPmVariant;\n    }\n    // Try NFD variant (macOS stores filenames in NFD form)\n    const nfdVariant = tryNFDVariant(resolved);\n    if (nfdVariant !== resolved && (await pathExists(nfdVariant))) {\n        return nfdVariant;\n    }\n    // Try curly quote variant (macOS uses U+2019 in screenshot names)\n    const curlyVariant = tryCurlyQuoteVariant(resolved);\n    if (curlyVariant !== resolved && (await pathExists(curlyVariant))) {\n        return curlyVariant;\n    }\n    // Try combined NFD + curly quote (for French macOS screenshots like \"Capture d'\u00e9cran\")\n    const nfdCurlyVariant = tryCurlyQuoteVariant(nfdVariant);\n    if (nfdCurlyVariant !== resolved && (await pathExists(nfdCurlyVariant))) {\n        return nfdCurlyVariant;\n    }\n    return resolved;\n}\n//# sourceMappingURL=path-utils.js.map",
+          "after": "export async function resolveReadPathAsync(filePath, cwd, exists = pathExists) {\n    const resolved = resolveToCwd(filePath, cwd);\n    if (await exists(resolved)) {\n        return resolved;\n    }\n    // Try macOS AM/PM variant (narrow no-break space before AM/PM)\n    const amPmVariant = tryMacOSScreenshotPath(resolved);\n    if (amPmVariant !== resolved && (await exists(amPmVariant))) {\n        return amPmVariant;\n    }\n    // Try NFD variant (macOS stores filenames in NFD form)\n    const nfdVariant = tryNFDVariant(resolved);\n    if (nfdVariant !== resolved && (await exists(nfdVariant))) {\n        return nfdVariant;\n    }\n    // Try curly quote variant (macOS uses U+2019 in screenshot names)\n    const curlyVariant = tryCurlyQuoteVariant(resolved);\n    if (curlyVariant !== resolved && (await exists(curlyVariant))) {\n        return curlyVariant;\n    }\n    // Try combined NFD + curly quote (for French macOS screenshots like \"Capture d'\u00e9cran\")\n    const nfdCurlyVariant = tryCurlyQuoteVariant(nfdVariant);\n    if (nfdCurlyVariant !== resolved && (await exists(nfdCurlyVariant))) {\n        return nfdCurlyVariant;\n    }\n    return resolved;\n}\n//# sourceMappingURL=path-utils.js.map"
+        }
+      ]
+    },
+    {
+      "path": "dist/core/tools/path-utils.d.ts",
+      "original_sha256": "3863c166812225ba651bae06bbd5ec377b33529fa09554aa753c2c217b691bbc",
+      "patched_sha256": "b2b0e761d746794c769cfd0a161113417f646f785353d581f70495faa4e9c735",
+      "replacements": [
+        {
+          "before": "resolveReadPathAsync(filePath: string, cwd: string)",
+          "after": "resolveReadPathAsync(filePath: string, cwd: string, exists?: (filePath: string) => Promise<boolean>)"
+        }
+      ]
+    },
+    {
+      "path": "dist/core/tools/read.js",
+      "original_sha256": "8de2f9c4fcd1f18c1dbad7d7f6749f0cde9d16863a41c7d9a3cac782908b5773",
+      "patched_sha256": "92ef8db92e369dc1ad8af8dfd84e52c2043ca614d54435f15e4be0918b246a60",
+      "replacements": [
+        {
+          "before": "const absolutePath = await resolveReadPathAsync(path, cwd);",
+          "after": "const absolutePath = await resolveReadPathAsync(path, cwd, options?.operations ? async (candidate) => { try { await ops.access(candidate, 0); return true; } catch { return false; } } : undefined);"
+        }
+      ]
+    },
+    {
+      "path": "dist/core/tools/read.d.ts",
+      "original_sha256": "c5da239034a8f0dfbfb6ee44d15f597f111a30453b113fd348d7a40e9248bcdc",
+      "patched_sha256": "14cd389818b129e9555021f14577201522619fe3c973f0637ea769a68ee1cc6f",
+      "replacements": [
+        {
+          "before": "access: (absolutePath: string) => Promise<void>;",
+          "after": "access: (absolutePath: string, mode?: number) => Promise<void>;"
+        }
+      ]
+    },
+    {
+      "path": "dist/core/tools/file-mutation-queue.js",
+      "original_sha256": "cd300f1ecae2b8d45a7c69011221f4f2e4e289865bf879df537c859889f26e5b",
+      "patched_sha256": "fea9c5085a729cd2c4b74f3da14433b92864722034d15aab695be324050318bd",
+      "replacements": [
+        {
+          "before": "async function getMutationQueueKey(filePath) {",
+          "after": "async function getMutationQueueKey(filePath, canonicalize = realpath) {"
+        },
+        {
+          "before": "return await realpath(resolvedPath);",
+          "after": "return await canonicalize(resolvedPath);"
+        },
+        {
+          "before": "export async function withFileMutationQueue(filePath, fn) {",
+          "after": "export async function withFileMutationQueue(filePath, fn, canonicalize) {"
+        },
+        {
+          "before": "const key = await getMutationQueueKey(filePath);",
+          "after": "const key = await getMutationQueueKey(filePath, canonicalize);"
+        }
+      ]
+    },
+    {
+      "path": "dist/core/tools/file-mutation-queue.d.ts",
+      "original_sha256": "3e7a344dbfe8ab0c825cac1a6a420969a9a82ff85b2479a9de1d93eec12ed885",
+      "patched_sha256": "067ab027b09e0afda769907cb1bc6ea0838c4bded5f76f5bb2cd0bd98603984e",
+      "replacements": [
+        {
+          "before": "fn: () => Promise<T>)",
+          "after": "fn: () => Promise<T>, canonicalize?: (filePath: string) => Promise<string>)"
+        }
+      ]
+    },
+    {
+      "path": "dist/core/tools/write.js",
+      "original_sha256": "2d0da4779c8f0ad799b5a896b520da718c55405e41ff0a226d1d0fdc4b3c5fef",
+      "patched_sha256": "063ffb4793023befc4da9a08001ddf0579bb87ee5b3818e95f7bf466f3dacf0f",
+      "replacements": [
+        {
+          "before": "            });\n        },\n        renderCall",
+          "after": "            }, ops.realpath);\n        },\n        renderCall"
+        }
+      ]
+    },
+    {
+      "path": "dist/core/tools/write.d.ts",
+      "original_sha256": "c38a85e8c740dd43b415517bfdf868f32dd80e77cf5e1e0115753eed9208c852",
+      "patched_sha256": "c88b8ebbe52ee4f827554d95d5cf8ff6b5128c92cce682f26d2cc4d87fda33ec",
+      "replacements": [
+        {
+          "before": "export interface WriteOperations {",
+          "after": "export interface WriteOperations {\n    /** Optional remote canonical path for the existing per-file mutation queue. */\n    realpath?: (absolutePath: string) => Promise<string>;"
+        }
+      ]
+    },
+    {
+      "path": "dist/core/tools/edit.js",
+      "original_sha256": "2485be953c7859ebefb3da0b93c5076577a57d8eb62b9c9dddd239cef22743c3",
+      "patched_sha256": "9116184c069a46f6e67e3fe22fdc35c920385d04ca83c65364ae86be8376b6b6",
+      "replacements": [
+        {
+          "before": "            });\n        },\n        renderCall",
+          "after": "            }, ops.realpath);\n        },\n        renderCall"
+        }
+      ]
+    },
+    {
+      "path": "dist/core/tools/edit.d.ts",
+      "original_sha256": "bf3a6a603d976ef8af804ff5f7dce3e5dc7e71baf104fe2940a0d176487e8c58",
+      "patched_sha256": "24daada28e90d410165ab03a7a22ce73093cf8e4d571d8a1588bedfe35519f40",
+      "replacements": [
+        {
+          "before": "export interface EditOperations {",
+          "after": "export interface EditOperations {\n    /** Optional remote canonical path for the existing per-file mutation queue. */\n    realpath?: (absolutePath: string) => Promise<string>;"
+        }
+      ]
+    },
+    {
+      "path": "dist/core/tools/find.js",
+      "original_sha256": "a87ea307ede30436156dd55fd9ceeec9ac6db1f97615dbf16a2232a55188a7d8",
+      "patched_sha256": "db1a4519824d7514008fd602527189e2094a9e90bb6ac09d544f30c4e6a236a1",
+      "replacements": [
+        {
+          "before": "const fdPath = await ensureTool(\"fd\", true);",
+          "after": "const fdPath = customOps?.spawn ? \"fd\" : await ensureTool(\"fd\", true);"
+        },
+        {
+          "before": "if (await pathExists(path.join(current, \".git\"))) {",
+          "after": "if (await ops.exists(path.join(current, \".git\"))) {"
+        },
+        {
+          "before": "const child = spawn(fdPath, args, { stdio: [\"ignore\", \"pipe\", \"pipe\"] });",
+          "after": "const child = customOps?.spawn ? customOps.spawn(args) : spawn(fdPath, args, { stdio: [\"ignore\", \"pipe\", \"pipe\"] });"
+        }
+      ]
+    },
+    {
+      "path": "dist/core/tools/find.d.ts",
+      "original_sha256": "8e675dc76b8824936f0814ab2939c9dedbeadaa3cd6eca3e6754f22f7ba45cb7",
+      "patched_sha256": "937d1be3157e505dc3d31398adc218919808853efd1fa2195348d447f86daf28",
+      "replacements": [
+        {
+          "before": "export interface FindOperations {",
+          "after": "export interface FindOperations {\n    /** Optional remote process transport; native fd arguments and parsing are unchanged. */\n    spawn?: (args: string[]) => Pick<import(\"node:child_process\").ChildProcessWithoutNullStreams, \"stdout\" | \"stderr\" | \"killed\" | \"kill\" | \"on\">;"
+        },
+        {
+          "before": "    glob: (pattern:",
+          "after": "    glob?: (pattern:"
+        }
+      ]
+    }
+  ]
+}

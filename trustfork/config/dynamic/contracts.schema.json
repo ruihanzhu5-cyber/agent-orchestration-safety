@@ -1,0 +1,911 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "trustfork-dynamic-contracts-v1",
+  "$defs": {
+    "BridgeEnvelope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "rpc_id",
+        "actor_id",
+        "opaque_session_id",
+        "request_id",
+        "branch_id",
+        "task_id",
+        "stage_id",
+        "stage_epoch",
+        "invocation_id",
+        "operation",
+        "payload"
+      ],
+      "properties": {
+        "rpc_id": {
+          "type": "string"
+        },
+        "actor_id": {
+          "enum": [
+            "Main",
+            "A",
+            "B",
+            "C",
+            "D"
+          ]
+        },
+        "opaque_session_id": {
+          "type": "string"
+        },
+        "request_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "branch_id": {
+          "type": "string"
+        },
+        "task_id": {
+          "type": "string"
+        },
+        "stage_id": {
+          "type": "string"
+        },
+        "stage_epoch": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "invocation_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "operation": {
+          "type": "string"
+        },
+        "payload": {
+          "type": "object"
+        }
+      }
+    },
+    "EventEnvelope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "event_id",
+        "sequence",
+        "monotonic_ns",
+        "branch_id",
+        "task_id",
+        "stage_id",
+        "stage_epoch",
+        "actor_id",
+        "event_type",
+        "request_id",
+        "tool_call_id",
+        "message_id",
+        "invocation_id",
+        "payload",
+        "payload_hash"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "1.0"
+        },
+        "event_id": {
+          "type": "string"
+        },
+        "sequence": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "monotonic_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "branch_id": {
+          "type": "string"
+        },
+        "task_id": {
+          "type": "string"
+        },
+        "stage_id": {
+          "type": "string"
+        },
+        "stage_epoch": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "actor_id": {
+          "enum": [
+            "Main",
+            "A",
+            "B",
+            "C",
+            "D",
+            null
+          ]
+        },
+        "event_type": {
+          "type": "string"
+        },
+        "request_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "tool_call_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "message_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "invocation_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "payload": {
+          "type": "object"
+        },
+        "payload_hash": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "PendingDelegation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "delegation_id",
+        "invocation_id",
+        "actor_id",
+        "task_text",
+        "context_refs",
+        "source",
+        "stage_epoch",
+        "status",
+        "release_version",
+        "terminal_status",
+        "request_id"
+      ],
+      "properties": {
+        "delegation_id": {
+          "type": "string"
+        },
+        "invocation_id": {
+          "type": "string"
+        },
+        "actor_id": {
+          "enum": [
+            "A",
+            "B",
+            "C",
+            "D"
+          ]
+        },
+        "task_text": {
+          "type": "string"
+        },
+        "context_refs": {
+          "type": "array"
+        },
+        "source": {
+          "enum": [
+            "initial_plan",
+            "main_voluntary",
+            "runtime_startup"
+          ]
+        },
+        "stage_epoch": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "status": {
+          "enum": [
+            "queued",
+            "released",
+            "started",
+            "terminal"
+          ]
+        },
+        "release_version": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "terminal_status": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "created_event_id": {
+          "type": "string"
+        },
+        "request_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "carried_from_epoch": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "Message": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "message_id",
+        "sender",
+        "recipients",
+        "content",
+        "content_hash",
+        "parent_id",
+        "branch_id",
+        "stage_epoch",
+        "delivery",
+        "terminal_status"
+      ],
+      "properties": {
+        "message_id": {
+          "type": "string"
+        },
+        "sender": {
+          "enum": [
+            "Main",
+            "A",
+            "B",
+            "C",
+            "D"
+          ]
+        },
+        "recipients": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "Main",
+              "A",
+              "B",
+              "C",
+              "D"
+            ]
+          }
+        },
+        "content": {
+          "type": "string"
+        },
+        "content_hash": {
+          "type": "string"
+        },
+        "parent_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "branch_id": {
+          "type": "string"
+        },
+        "stage_epoch": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "delivery": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "status",
+              "request_id",
+              "attempts"
+            ],
+            "properties": {
+              "status": {
+                "enum": [
+                  "queued",
+                  "claimed_for_input",
+                  "input_frozen",
+                  "submitted",
+                  "confirmed_exposure",
+                  "cancelled_new_session"
+                ]
+              },
+              "request_id": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "attempts": {
+                "type": "array"
+              },
+              "confirmed_request_id": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          }
+        },
+        "terminal_status": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "created_event_id": {
+          "type": "string"
+        },
+        "carried_from_epoch": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "FormalDeliverable": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "deliverable_id",
+        "branch_id",
+        "actor_id",
+        "task_id",
+        "stage_id",
+        "stage_epoch",
+        "invocation_id",
+        "request_ref",
+        "recipient_ids",
+        "origin",
+        "content",
+        "content_hash",
+        "result_status",
+        "completion_received",
+        "provider_stop_reason",
+        "forward_of"
+      ],
+      "properties": {
+        "deliverable_id": {
+          "type": "string"
+        },
+        "branch_id": {
+          "type": "string"
+        },
+        "actor_id": {
+          "enum": [
+            "A",
+            "B",
+            "C",
+            "D"
+          ]
+        },
+        "task_id": {
+          "type": "string"
+        },
+        "stage_id": {
+          "type": "string"
+        },
+        "stage_epoch": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "invocation_id": {
+          "type": "string"
+        },
+        "request_ref": {
+          "type": "string"
+        },
+        "recipient_ids": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "Main",
+              "A",
+              "B",
+              "C",
+              "D"
+            ]
+          }
+        },
+        "origin": {
+          "enum": [
+            "invocation_terminal",
+            "peer_work_delivery"
+          ]
+        },
+        "content": {
+          "type": "string"
+        },
+        "content_hash": {
+          "type": "string"
+        },
+        "result_status": {
+          "const": "completed"
+        },
+        "completion_received": {
+          "const": true
+        },
+        "provider_stop_reason": {
+          "enum": [
+            "stop",
+            "length",
+            "toolUse"
+          ]
+        },
+        "forward_of": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "message_id": {
+          "type": "string"
+        },
+        "source_event_id": {
+          "type": "string"
+        }
+      }
+    },
+    "Checkpoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "protocol_version",
+        "task_id",
+        "stage_id",
+        "stage_epoch",
+        "lifecycle_state",
+        "sessions",
+        "directory",
+        "candidates_visible",
+        "delegations",
+        "messages",
+        "scheduler",
+        "budget",
+        "history",
+        "bindings",
+        "environment",
+        "prefix_events",
+        "synthetic",
+        "validation",
+        "checkpoint_id",
+        "content_hash"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "1.0"
+        },
+        "protocol_version": {
+          "const": "dynamic-join-v9-trajectory-portfolio"
+        },
+        "task_id": {
+          "type": "string"
+        },
+        "stage_id": {
+          "type": "string"
+        },
+        "stage_epoch": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "lifecycle_state": {
+          "enum": [
+            "PLAN_READY",
+            "RUNNING"
+          ]
+        },
+        "sessions": {
+          "type": "object"
+        },
+        "directory": {
+          "type": "object"
+        },
+        "candidates_visible": {
+          "type": "boolean"
+        },
+        "delegations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/PendingDelegation"
+          }
+        },
+        "messages": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Message"
+          }
+        },
+        "scheduler": {
+          "type": "object"
+        },
+        "budget": {
+          "type": "object"
+        },
+        "history": {
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "bindings": {
+          "type": "object"
+        },
+        "environment": {
+          "type": "object"
+        },
+        "prefix_events": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/EventEnvelope"
+          }
+        },
+        "synthetic": {
+          "type": "boolean"
+        },
+        "validation": {
+          "type": "object"
+        },
+        "checkpoint_id": {
+          "type": "string"
+        },
+        "content_hash": {
+          "type": "string"
+        }
+      }
+    },
+    "ModelRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "request_id",
+        "logical_request_id",
+        "attempt_id",
+        "actor_id",
+        "stage_id",
+        "stage_epoch",
+        "input_revision",
+        "provider_parameters",
+        "actual_input_ref",
+        "actual_input_hash",
+        "claimed_message_ids",
+        "submitted",
+        "response_status",
+        "maintenance",
+        "output_tokens",
+        "cost",
+        "evidence_refs"
+      ],
+      "properties": {
+        "request_id": {
+          "type": "string"
+        },
+        "logical_request_id": {
+          "type": "string"
+        },
+        "attempt_id": {
+          "type": "string"
+        },
+        "actor_id": {
+          "enum": [
+            "Main",
+            "A",
+            "B",
+            "C",
+            "D"
+          ]
+        },
+        "stage_id": {
+          "type": "string"
+        },
+        "stage_epoch": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "input_revision": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "provider_parameters": {
+          "type": "object"
+        },
+        "actual_input_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "actual_input_hash": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "claimed_message_ids": {
+          "type": "array"
+        },
+        "submitted": {
+          "type": "boolean"
+        },
+        "response_status": {
+          "type": "string"
+        },
+        "maintenance": {
+          "type": "boolean"
+        },
+        "output_tokens": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "cost": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "evidence_refs": {
+          "type": "array"
+        }
+      }
+    },
+    "ScoreRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "metric",
+        "value",
+        "status",
+        "reason",
+        "evidence_refs"
+      ],
+      "properties": {
+        "metric": {
+          "type": "string"
+        },
+        "value": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "status": {
+          "enum": [
+            "complete",
+            "partial",
+            "unknown",
+            "not_applicable",
+            "not_annotated",
+            "judge_error"
+          ]
+        },
+        "reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "evidence_refs": {
+          "type": "array"
+        },
+        "scorer_version": {
+          "type": "string"
+        },
+        "scorer_manifest_hash": {
+          "type": "string"
+        },
+        "prompt_hash": {
+          "type": "string"
+        },
+        "expected_response_ids": {
+          "type": "array"
+        },
+        "scored_response_ids": {
+          "type": "array"
+        },
+        "denominator": {
+          "type": "object"
+        },
+        "diagnostic_subset_value": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "eligible_for_primary": {
+          "type": "boolean"
+        },
+        "subject_scope": {
+          "type": "string"
+        }
+      }
+    },
+    "RunManifest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "protocol_version",
+        "run_id",
+        "block_id",
+        "checkpoint_id",
+        "source_revision",
+        "source_task_path",
+        "asset_hash",
+        "case_id",
+        "split",
+        "layout",
+        "main_model",
+        "q",
+        "r",
+        "condition",
+        "protocol",
+        "panel",
+        "mode",
+        "synthetic",
+        "model_refs",
+        "resolved_api_bindings",
+        "profile_hashes",
+        "goal_hashes",
+        "prompt_hashes",
+        "tool_manifest_hash",
+        "scorer_hash",
+        "budget",
+        "comparison_set_id",
+        "baseline_run_id",
+        "repeat_id",
+        "strategy",
+        "formal_ready"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "1.0"
+        },
+        "protocol_version": {
+          "const": "dynamic-join-v9-trajectory-portfolio"
+        },
+        "run_id": {
+          "type": "string"
+        },
+        "block_id": {
+          "type": "string"
+        },
+        "checkpoint_id": {
+          "type": "string"
+        },
+        "source_revision": {
+          "type": "string"
+        },
+        "source_task_path": {
+          "type": "string"
+        },
+        "asset_hash": {
+          "type": "string"
+        },
+        "case_id": {
+          "type": "string"
+        },
+        "split": {
+          "type": "string"
+        },
+        "layout": {
+          "type": "string"
+        },
+        "main_model": {
+          "type": "string"
+        },
+        "q": {
+          "enum": [
+            "C",
+            "D"
+          ]
+        },
+        "r": {
+          "enum": [
+            "C",
+            "D"
+          ]
+        },
+        "condition": {
+          "enum": [
+            "HP",
+            "HA",
+            "MP",
+            "MA",
+            "normal",
+            "risk"
+          ]
+        },
+        "protocol": {
+          "enum": [
+            "S",
+            "F",
+            "L"
+          ]
+        },
+        "panel": {
+          "type": "string"
+        },
+        "mode": {
+          "enum": [
+            "scripted-test",
+            "api"
+          ]
+        },
+        "synthetic": {
+          "type": "boolean"
+        },
+        "model_refs": {
+          "type": "object"
+        },
+        "resolved_api_bindings": {
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "profile_hashes": {
+          "type": "object"
+        },
+        "goal_hashes": {
+          "type": "object"
+        },
+        "prompt_hashes": {
+          "type": "object"
+        },
+        "tool_manifest_hash": {
+          "type": "string"
+        },
+        "scorer_hash": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "budget": {
+          "type": "object"
+        },
+        "comparison_set_id": {
+          "type": "string"
+        },
+        "baseline_run_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "repeat_id": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "strategy": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "formal_ready": {
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "schema_version": "1.0",
+  "protocol_version": "dynamic-join-v9-trajectory-portfolio",
+  "backend": "docker-direct",
+  "scheduler_policy": "ready_fifo_v1",
+  "initial_members": [
+    "A",
+    "B"
+  ],
+  "joining_members": [
+    "C",
+    "D"
+  ],
+  "prejoin_subagent_execution": false,
+  "initial_plan_format_repairs": 1,
+  "protocols": {
+    "S": {
+      "join_checkpoint": "post_initial_plan_pre_execution",
+      "admission_mode": "cojoin",
+      "hold_final_for_startup": true
+    },
+    "F": {
+      "join_checkpoint": "post_initial_plan_pre_execution",
+      "admission_mode": "voluntary",
+      "hold_final_for_startup": false
+    },
+    "L": {
+      "join_checkpoint": "first_old_member_progress",
+      "admission_mode": "cojoin",
+      "hold_final_for_startup": true
+    }
+  },
+  "initial_newcomer_max_requests_each": 4,
+  "active_sub_limit": 4,
+  "trial_workers": 1,
+  "requests": 120,
+  "output_tokens": 48000,
+  "per_request": 4096,
+  "stage_seconds": 1200,
+  "transport_attempts": 3,
+  "branch_attempts": 2,
+  "judge_attempts": 3,
+  "risk_screening_enabled": false,
+  "reputation_renderer": "portfolio_neutral_v1"
+}

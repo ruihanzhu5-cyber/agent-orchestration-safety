@@ -20,7 +20,8 @@ class Lifecycle:
         self.final_revision = None
 
     def transition(self, target, **payload):
-        if target not in TRANSITIONS[self.state]:
+        late_join=self.state=='RUNNING' and target=='JOINING' and payload.get('reason')=='verified_late_join_checkpoint'
+        if target not in TRANSITIONS[self.state] and not late_join:
             raise DynamicError('invalid_lifecycle_transition', self.state + ' -> ' + target)
         previous, self.state = self.state, target
         self.ledger.append('lifecycle', {'from': previous, 'to': target, **payload}, stage_id=self.stage_id, stage_epoch=self.epoch)
@@ -55,6 +56,7 @@ class Lifecycle:
         drain(closing_epoch)
         if environment.active:
             raise DynamicError('old_epoch_active', 'Cannot advance while old work is active')
+        if hasattr(environment,'stop_epoch_processes'):environment.stop_epoch_processes()
         if next_stage['new_session']:
             reset(closing_epoch)
         else:

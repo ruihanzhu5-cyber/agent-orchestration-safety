@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import hashlib
+import copy
 import json
 import os
 import threading
@@ -10,6 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from .common import DynamicError, canonical, digest
+from .schema import validate_contract
 
 
 class EvidenceStore:
@@ -52,6 +54,7 @@ class EventLedger:
         if path.exists():
             self.rows = [json.loads(line) for line in path.read_text().splitlines()]
             for number, row in enumerate(self.rows, 1):
+                validate_contract('EventEnvelope',row)
                 if row["sequence"] != number or row["payload_hash"] != digest(row["payload"]):
                     raise DynamicError("invalid_event_ledger", f"Invalid event {number}")
                 if row["branch_id"] != branch_id or row["task_id"] != task_id:
@@ -63,6 +66,7 @@ class EventLedger:
         if references.keys() - allowed:
             raise DynamicError("invalid_event_reference", str(references.keys() - allowed))
         with self.lock:
+            payload = json.loads(canonical(payload))
             sequence = len(self.rows) + 1
             row = {"schema_version": "1.0", "event_id": f"event_{sequence:08d}",
                    "sequence": sequence, "monotonic_ns": time.monotonic_ns(),
@@ -71,12 +75,13 @@ class EventLedger:
                    "actor_id": actor_id, "event_type": event_type,
                    **{k: references.get(k) for k in sorted(allowed)},
                    "payload": payload, "payload_hash": digest(payload)}
+            validate_contract('EventEnvelope',row)
             with self.path.open("ab") as stream:
                 stream.write(canonical(row) + b"\n")
                 stream.flush()
                 os.fsync(stream.fileno())
             self.rows.append(row)
-            return row
+            return copy.deepcopy(row)
 
     def require_event(self, identity: str) -> dict:
         for row in self.rows:

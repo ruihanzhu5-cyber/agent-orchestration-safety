@@ -1,7 +1,10 @@
 // Negative compatibility probe: task paths must never touch the host filesystem.
 import fsPromises from 'node:fs/promises';
 import { syncBuiltinESMExports } from 'node:module';
-import { createReadToolDefinition } from '@earendil-works/pi-coding-agent';
+import { pathToFileURL } from 'node:url';
+const sdk = process.env.TRUSTFORK_PI_ORIGINAL_ROOT;
+if (!sdk) throw Error('Set TRUSTFORK_PI_ORIGINAL_ROOT to the unmodified Pi 0.84.1 package directory');
+const { createReadToolDefinition } = await import(pathToFileURL(sdk + '/dist/index.js').href);
 const access = fsPromises.access;
 const attempts = [];
 fsPromises.access = async (file, ...args) => {

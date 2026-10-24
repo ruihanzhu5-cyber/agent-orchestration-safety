@@ -1,8 +1,8 @@
 # v9 implementation compatibility decisions
 
 These are observed implementation constraints, not new research settings. The
-SDK patch below was explicitly authorized by the user on 2026-10-24. Its
-acceptance still requires the real-Docker/SDK regression tests described below.
+user authorized Docker-only tool path repairs. Real SDK/Docker regression tests
+and an independent offline installation now substantiate the implementation.
 
 ## Pi 0.84.1 grep remote execution
 
@@ -62,3 +62,48 @@ All ten files match file_hashes.json. The actual project-plan SHA-256 is
 The implementation document's embedded reference is the older
 b3bb0f559db9e61a08f426af28439746bc7051c3a958d9ed394af228578b715a.
 Original documents are preserved byte-for-byte; source_lock.json records both.
+
+## Accepted read and mutation-queue path repairs
+
+Two subsequent real-SDK traps identified host reads before remote Operations:
+read's asynchronous path-variant resolver used host fs.access, and write/edit's
+shared mutation queue used host realpath. The user separately authorized an
+optional remote existence callback and optional queue canonicalization callback.
+The queue algorithm remains Pi's per-file queue: aliases serialize while other
+files run concurrently. No global operation queue was introduced.
+
+All calls use Docker operations, including F_OK versus R_OK checks. Container-only,
+host-only, nonexistent and same-path/different-content tests prove the active
+namespace. No fallback to host IO is permitted. Image detection operates on
+remotely read bytes; Pi's image processing, path-variant order, read/write/edit
+validation, truncation and errors are preserved.
+
+## Native find transport and pinned fd
+
+The public glob callback bypasses native fd behavior. An initial rg-based
+implementation omitted empty directories. Under the user's authorization to
+repair all tool paths while preserving behavior, find now uses the same optional
+remote spawn pattern as grep, and its .git ancestor checks use remote exists.
+Native fd arguments, parsing, directory suffixes, limit notices and errors stay
+in the original Pi function. Defaults are unchanged when callbacks are absent.
+
+The base image has rg but no fd. The explicit dependency command installs fixed
+fd 10.3.0 from its official release; archive and binary hashes are locked in
+runtime-dependencies.lock.json. Runs never download it and fail on missing or
+changed bytes. Only the public binary is copied into a task. Official source:
+[fd v10.3.0](https://github.com/sharkdp/fd/releases/tag/v10.3.0).
+
+The project lock covers 14 SDK files (implementations and declarations).
+`npm ci --offline` in an independent directory reproduced them; repeated apply
+was idempotent; altered versions and file bytes were rejected. Every corresponding
+file in the original independent Pi installation still matches its original hash.
+Real-Docker oracle comparisons use the unmodified Pi factory inside the task:
+grep matches/context/limits/errors and find empty directories/path globs/gitignore/
+limits/errors agree. Bash retains Pi tail truncation and exposes its full output
+inside the task. Real SDK tests prove one complete batch per host permit, and
+goals/resources survive restore, reload and explicit synthetic compaction.
+
+Pi deliberately omits skill directories for actors without the read tool. Main
+has no work tools; Sub resource tests therefore use a Sub, preserving this native
+SDK rule. An empty conversation may already have model/configuration entries and
+a leaf ID; emptiness is not inferred from a missing session file or null leaf.
