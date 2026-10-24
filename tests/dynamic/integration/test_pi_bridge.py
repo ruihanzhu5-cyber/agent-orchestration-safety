@@ -37,6 +37,9 @@ def test_real_sdk_one_turn_full_batch_and_registry(live):
     second=client.call(session,'execute_turn',{'script':{'text':'done'}},request_id='r2')
     assert second['requests']==1 and second['response']['stopReason']=='stop'
     assert 'PRIVATE_GOAL_FIXED' in second['actual_input']['systemPrompt']
+    receipts=[json.loads(line) for line in (client.root/'network-guard.jsonl').read_text().splitlines()]
+    assert receipts and all(row['guard']['network_attempts']==0 and row['guard']['real_model_requests']==0 and
+        row['guard']['real_judge_requests']==0 for row in receipts)
     assert client.call(session,'execute_turn',{'script':{'text':'must not execute'}},request_id='r3')['status']=='idle'
     main,registry=client.create_session('Main',branch_id='b',task_id='p001',system_prompt='Coordinate')
     assert not set(('read','bash','edit','write','grep','find','ls'))&set(registry['registry'])

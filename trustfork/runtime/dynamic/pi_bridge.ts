@@ -65,7 +65,7 @@ class TaskResources implements ResourceLoader {
   async reload(){} // Sources are explicitly re-supplied and versioned by the host.
 }
 type OwnedSession={session:AgentSession;manager:SessionManager;resources:TaskResources;config:any;active:Envelope|null;
-  scripts:Script[];requests:number;actualInputs:any[];events:any[];transport:RemoteTransport;lastResponse:AssistantMessage|null};
+  scripts:Script[];requests:number;actualInputs:any[];events:any[];transport:RemoteTransport;lastResponse:AssistantMessage|null;abortRequested:boolean};
 const sessions=new Map<string,OwnedSession>();
 function requireSession(e:Envelope){
   const s=sessions.get(e.opaque_session_id);
@@ -121,7 +121,7 @@ async function create(e:Envelope,restore?:any){
   };
   const work=e.actor_id==='Main'?[]:createRemoteTools(transport,spoolRoot!);
   const config={...e.payload,actor_id:e.actor_id,branch_id:e.branch_id,task_id:e.task_id};
-  s={session:undefined as unknown as AgentSession,manager,resources,config,active:null,scripts:[],requests:0,actualInputs:[],events:[],transport,lastResponse:null};
+  s={session:undefined as unknown as AgentSession,manager,resources,config,active:null,scripts:[],requests:0,actualInputs:[],events:[],transport,lastResponse:null,abortRequested:false};
   const tools=[...work,...coordinateDefinitions(()=>s)];
   const created=await createAgentSession({cwd:'/workspace',agentDir:directory,modelRuntime:runtime,model:scriptedModel,
     thinkingLevel:'off',resourceLoader:resources,sessionManager:manager,settingsManager:settings,
@@ -176,10 +176,10 @@ async function dispatch(e:Envelope){
   if(e.operation==='create_session')return create(e);
   if(e.operation==='restore_session')return create(e,e.payload.snapshot);
   const s=requireSession(e);
-  if(e.operation==='cancel'){s.session.agent.abort();return{status:'cancel_requested'};}
+  if(e.operation==='cancel'){s.abortRequested=!!s.active;s.session.agent.abort();return{status:'cancel_requested'};}
   if(e.operation==='execute_turn'){
     if(s.active)throw Error('Actor already has an active permit');
-    s.active=e;s.scripts=[e.payload.script];s.lastResponse=null;
+    s.active=e;s.scripts=[e.payload.script];s.lastResponse=null;s.abortRequested=false;
     const before=s.requests,start=s.events.length;
     try{
       if(e.payload.messages?.length) await s.session.agent.prompt(e.payload.messages);
@@ -190,11 +190,11 @@ async function dispatch(e:Envelope){
       }
       if(s.requests-before!==1)throw Error('Pi did not stop after one complete turn');
       const response=s.lastResponse as AssistantMessage|null;
-      const status=!response || ['error','aborted'].includes(response.stopReason)?'infra_error':'success';
+      const status=s.abortRequested || !response || ['error','aborted'].includes(response.stopReason)?'infra_error':'success';
       const transport=e.payload.script?.transportFailure;
       const generated=!!response?.content.length;
       const effects=s.events.slice(start).some(x=>x.type==='tool_execution_start');
-      return {status,response,events:s.events.slice(start),requests:s.requests-before,
+      return {status,response,termination_status:s.abortRequested?'cancelled':status==='success'?'completed':'provider_error',events:s.events.slice(start),requests:s.requests-before,
         transport_failure:transport?{code:transport,generation_received:generated,tool_effects_started:effects}:null,
         actual_input:s.actualInputs.at(-1),entries:s.manager.getEntries(),leaf_id:s.manager.getLeafId(),
         registry:s.session.getActiveToolNames(),guard:{...guard.counters},synthetic:true};

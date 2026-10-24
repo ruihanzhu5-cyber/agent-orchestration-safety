@@ -101,6 +101,7 @@ class PiDynamic:
         self.pending_final=None;self.current_scripts=None;self.final_text=None
         self.main_profile_introduced=False
         self.self_profile_sessions=set()
+        self.confirming_final=False
         self.client=PiClient(self.directory/'control',self.environment,ledger=self.ledger,coordination=self._coordinate,observer=self._observe_goal)
         self.private_goals={a:NORMAL_GOAL for a in ('Main','A','B','C','D')}
         self.formal_deliverables={}
@@ -209,11 +210,13 @@ class PiDynamic:
             for member in args['actor_ids']:
                 self._create_actor(member)
                 self.delegations.prepare(member,self._stage()['user_request'],source='runtime_startup',epoch=epoch)
+            self.scheduler.begin_startup(args['actor_ids'])
             self.main_revision+=1
             if self.lifecycle.worker_permitted():self._release()
             return result
         if name=='release_member':
             self.membership.release(args['actor_id']);self.main_revision+=1
+            if args['actor_id'] in self.scheduler.startup:self.scheduler.startup[args['actor_id']]['status']='released'
             return {'status':'released'}
         raise DynamicError('unknown_coordination_tool',name)
 
@@ -408,7 +411,7 @@ class PiDynamic:
         peer_corpus='R'+str(int(corpus[1])%4+1)
         bundles={self.q:build_profile(self.q,level,corpus=corpus),self.r:build_profile(self.r,'M' if self.panel=='r70' else 'none',corpus=peer_corpus)}
         self.profile_service=ProfileService(self.ledger.branch_id,bundles,reminder=self.panel=='reminder',
-            membership=lambda actor:self.membership.members[actor]['status'])
+            membership=lambda actor:self.membership.status(actor))
 
     def _drain(self, futures, *, deadline):
         while futures and time.monotonic()<deadline:
@@ -425,6 +428,7 @@ class PiDynamic:
         actor,invocation=futures.pop(future)
         result=future.result()
         unfinished=result['response']['stopReason']=='toolUse'
+        if actor=='Main' and unfinished:self.confirming_final=False
         self.scheduler.complete(actor,unfinished=unfinished)
         if actor=='Main' and not unfinished:
             self.pending_final={'text':text_of(result['response']),'revision':result['input_revision']}
@@ -440,15 +444,16 @@ class PiDynamic:
                 if self.budget.exhausted() or (not futures and not self.budget.available()):
                     self.scheduler.terminate_startup('global_budget_or_timeout')
                     self.pending_final=self.pending_final or {'text':None,'revision':self.main_revision}
-                if self.pending_final and self.scheduler.final_allowed(hard_limit=self.budget.exhausted()):
+                if self.pending_final and (self.protocol=='F' or self.scheduler.final_allowed(hard_limit=self.budget.exhausted())):
                     self._drain(futures,deadline=min(time.monotonic()+30,self.budget.deadline))
                     if self.pending_final['revision']!=self.main_revision and self.budget.available():
                         self.ledger.append('final_stale',{'proposed_revision':self.pending_final['revision'],'current_revision':self.main_revision})
-                        self.pending_final=None;self.scheduler.enqueue_batch(['Main'],reason='confirm_stale_final')
+                        self.pending_final=None;self.confirming_final=True;self.scheduler.enqueue_batch(['Main'],reason='confirm_stale_final')
                     else:
+                        if self.protocol=='F':self.scheduler.terminate_startup('main_final_before_slice_end')
                         self.final_text=self.pending_final['text'];return
                 if self.budget.available():
-                    while self.budget.available() and (permit:=self.scheduler.permit()) is not None:
+                    while self.budget.available() and (permit:=self.scheduler.permit(actors=('Main',) if self.confirming_final else None)) is not None:
                         actor=permit['actor_id'];invocation=self._next_invocation(actor) if actor!='Main' else None
                         reservation=self._reserve(actor)
                         futures[executor.submit(self._turn,actor,'running',invocation,reservation)]=(actor,invocation)
@@ -501,7 +506,7 @@ class PiDynamic:
                 next_stage=self.case['stages'][stage_index+1]
                 self.lifecycle.close_stage(self.environment,next_stage=next_stage,deadline=self.budget.deadline,drain=lambda epoch:None,
                     reset=lambda epoch:self._stage_reset(epoch,True),migrate=lambda epoch,new:self._stage_reset(epoch,False))
-                self.budget.new_stage();self.pending_final=None;self.resources=self._resources()
+                self.budget.new_stage();self.pending_final=None;self.confirming_final=False;self.resources=self._resources()
                 if next_stage['new_session']:
                     self.main_profile_introduced=False
                     for actor in list(self.sessions):

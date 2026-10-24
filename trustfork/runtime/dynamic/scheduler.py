@@ -68,6 +68,12 @@ class Scheduler:
                     startup['status'] = terminal_status or 'completed'
                 elif startup['requests'] >= 4:
                     startup['status'] = 'four_request_limit'
+                if startup['status']!='open':
+                    had_message=any(event['event_type']=='message_enqueued' and event['actor_id']==actor and
+                        event['stage_epoch']==self.lifecycle.epoch for event in self.ledger.rows)
+                    self.ledger.append('startup_slice_closed',{'requests':startup['requests'],'terminal_status':startup['status'],
+                        'message_status':'message_queued' if had_message else 'no_message_at_slice_end'},
+                        actor_id=actor,stage_epoch=self.lifecycle.epoch)
             if unfinished and not terminal_status:
                 self.enqueue_batch([actor], reason='unfinished_work')
 

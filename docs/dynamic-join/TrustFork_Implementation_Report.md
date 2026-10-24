@@ -152,10 +152,145 @@ That mapping and family-level sensitivity remain UNKNOWN/BLOCKED; source-card
 bootstrap must not be advertised as establishing independence of templates.
 Complex goal predicates remain `not_annotated`, with coverage reported.
 
-Stage 4 final acceptance remains in progress. Formal API execution is disabled;
-precise provider/endpoint/model/key-variable/capacity/parameter bindings, real
-provider compatibility, actual H1/H2 histories, judge capacity and second-annotator
-reliability still require the separately authorized future phase.
+## Stage 4 — final offline acceptance and coverage limits
 
-Committed stages so far: stage 1 `6c72edbf2fb17f81750e44b9398d67775a8f0b7e`,
-stage 2 `03c9d3e3a6ff5809c7b33956e994565c9312eb32`.
+Offline acceptance has finished for the implemented controller and the explicit
+fixtures below. Formal API execution remains disabled. The final changes add
+real-backend edge cases, conservative unknown-state handling, startup-slice
+events, reproducible capability evidence and usage instructions. They do not
+change original cards, injection text, permissions, enrollment timing or the
+research matrix. The scheduler still permits independent per-file tool queues;
+no global tool serialization was added.
+
+### Executed checks
+
+All commands use the existing Linux Python 3.12 environment and audited Node
+tools described in README.md. Tests invoke real Pi 0.84.1 and the original Docker
+task environments with explicitly scripted provider responses. No original task
+`tests/test.sh`, real model provider or network judge was invoked.
+
+| Check / retained local evidence | Actual final outcome |
+|---|---|
+| TypeScript `run typecheck` | passed |
+| Node `run test:contract` | 4 passed, 0 skipped |
+| Full Python unit/integration group; `build/dynamic/final-pytest.xml` | 77 passed, 0 skipped; 729.59 seconds |
+| Scoring, backend and goal follow-up; `final-followup.xml` | 57 passed, 0 skipped |
+| Startup-slice follow-up; `final-startup.xml` | 49 passed, 0 skipped |
+| Final backend group plus targeted correction; `final-services.xml`, then `final-services-fixed.xml` | all 7 backend tests have passing final outcomes, 0 skipped |
+| Distinct Python tests across those reports | 79; overlapping reruns are counted once |
+| All-case materialization; `build/dynamic/final-materialized` | 30 mapped, 0 blocked |
+| Offline preflight | passed for daemon, audited image, source locks, SDK patches and fd; formal readiness remains false |
+| Separate clean `npm ci --offline` reproduction | all 14 locked files reproduced; idempotence and unknown version/hash rejection passed; independent original SDK unchanged |
+
+The first final backend pass exposed a test assumption: it searched for
+`python /opt/mock-api/app.py`, whereas the original Compose command is
+`python3 /opt/mock-api/app.py`. The test now matches that original command.
+Its targeted rerun verifies that killing that actual service leads to
+`service_not_ready`. The failed attempt remains in its original JUnit file and
+is not counted as a pass. An earlier image test fixture also contained an invalid
+PNG; native and remote Pi returned the same image error. A valid CRC-checked PNG
+now tests the positive image path without changing SDK image handling.
+
+The final checks include the following concrete behaviors:
+
+| Behavior | Implementation | Executed evidence |
+|---|---|---|
+| All seven tools operate inside the task; no host-path fallback | `pi_bridge.ts`, `remote_tools.ts`, locked SDK callbacks | `test_pi_bridge.py`, `test_remote_tool_semantics.py`; native search/read oracles, host traps, symlink same-file queue and cross-file overlap |
+| Independent S conditions share identical pre-q Main input | `pi_dynamic.py`, `scheduler.py`, `pi_client.py` | `test_dynamic_protocol.py`; HP/HA and MP/MA actual requests match before first q execution, excluding SDK message timestamps only |
+| F no-recruit behavior and unfinished startup work remain valid | `membership.py`, `scheduler.py` | protocol and runtime-edge tests; six actual requests continue beyond the initial four-request slice; no message is fabricated |
+| L branches restore actual old-member work | `environment.py`, `lifecycle.py`, `checkpoints.py` | `test_late_join.py`; p004/p006/p008/p028 old-member writes persist in independent branches |
+| Original memory and session-switch behavior | `pi_bridge.ts`, `pi_dynamic.py` | p028 original memory is actually read into a later request; p024 separately covers three original stages, retained chat and final `new_session=true` reset |
+| Tool cancellation, stage boundaries and final freeze | `environment.py`, `lifecycle.py`, `scheduler.py` | actual cancelled process has no late write; old-epoch background work stops; queued messages migrate once or are cancelled according to reset; frozen workspace and mock state do not change |
+| Original mock data and supported restore boundary | `environment.py` | original HTML bytes preserved over HTTP; mutated file-backed mock data survives restore and is served over HTTP; modified service config is rejected as `restore_unsupported` |
+| State evidence differs from adoption or attribution | `goal_observer.py`, `trajectory_observer.py`, `dynamic_pipeline.py` | actual p001/p028 damage and repair, prejoin damage, unknown baseline and duplicate-name cases; no claim that temporal order proves q caused damage |
+| Complete frozen scoring, tables and synthetic rejection | `dynamic_adapter.py`, `dynamic_pipeline.py`, `aggregate_dynamic.py` | unit tests and the explicit CLI fixtures below; incomplete judgments and missing annotations remain missing |
+
+The original p006 skill is not automatically registered by the unchanged SDK
+discovery/settings in its task image: the actual original discovery result was
+an empty skill list. It remains readable at its original workspace path. Tests
+read its unmodified body through Pi and verify that body in the next actual
+provider input. No new catalog registration, relocated skill or invented stage
+was used to manufacture acceptance.
+
+### Explicit CLI fixtures and analysis output
+
+The retained `build/dynamic/acceptance-v9/scripted` fixture contains 10 valid
+synthetic branches: p001/S with all four conditions, p024/F with all four
+conditions, and a p006 primary/r70 pair. The latter two branches reuse the same
+actual prefix and Docker checkpoint, and the supplement resolves its actual
+primary baseline run ID. Historical content in this fixture is explicit test
+data; actual historical task executions equal zero.
+
+The latest scorer produced five JSON and five CSV files under
+`build/dynamic/acceptance-v9/tables-final-reviewed`, plus analysis metadata.
+Table row counts are 4, 4, 9, 40 and 2. The two table-5 rows are a matched
+supplement observation and its panel summary. These supersede the earlier
+eight-run fixture described in stage 3. Fixed numeric judge values and scripted
+responses validate data flow and arithmetic only. They cannot be reported as
+model performance, attack success, adoption, safety or research findings.
+
+The final static plan still contains exactly 1,664 unique branches in 440
+blocks; executed formal branches equal zero. Actual run/checkpoint identifiers
+remain unset in plan-only output. Planned or synthetic rows do not satisfy
+formal execution denominators.
+
+### Request and filesystem isolation evidence
+
+`build/dynamic/network-guard-audit.json` records 452 guard receipts from 52
+receipt files and 141 deduplicated scripted T3 completions in the CLI fixtures.
+The raw 452 receipts and their source-file hashes are retained in
+`network-guard-receipts.jsonl`, so temporary-test retention cannot erase this
+audit evidence. Positive runs recorded zero outbound attempts and zero host-work
+attempts. Real model requests and real judge requests are both zero. The negative
+Node test deliberately attempted one fetch and verified interception before
+connection; that attempt is not represented as zero. Dependency retrieval and
+Git traffic are separate from provider/judge execution.
+
+The actual repository resides on the WSL Linux ext4 filesystem, as independently
+checked with `pwd -P` and `df -T .`. It was not moved. The first implementation
+commit has the exact audited original base as its parent. All files tracked at
+that base remain byte-for-byte unchanged; original task assets and the original
+Harbor/Pi/scoring entry are intact. Generated task exports, runs, builds, local
+dependency trees and raw test data stay outside Git. Only the implementation
+branch is updated; the earlier pilot and environment-report branch are unchanged.
+
+### Capability limits and unfilled definitions
+
+The authoritative current overlay is
+`trustfork/config/dynamic/case_readiness.json`, reproduced from explicitly cited
+JUnit reports by `update_dynamic_readiness`. See Case_Capabilities.md for all
+30 rows. Static source/assets/public packets pass for all 30 cards. Actual
+initial and executed filesystem restores are verified for six:
+p001/p004/p006/p008/p024/p028. The other 24 restore/runtime statuses remain
+UNKNOWN or not tested. Restore covers quiescent files plus the original declared
+file-backed restartable service, not arbitrary live process memory. Final exports
+cover workspace, original home assets, mock files/logs and Docker diff metadata;
+unlisted file contents are not claimed to have universal forensic coverage.
+
+Six cards have deterministic contact/file-deletion predicates:
+p001/p004/p008/p013/p014/p028. Actual goal-state change/repair/prejoin attribution
+was tested on p001 and p028. The other four predicates are defined but not
+runtime verified. Twenty-four complex boundaries require semantic annotation
+and sufficient object/service evidence; they remain `not_annotated`, not zero.
+Base-task/family grouping is UNKNOWN, family-level sensitivity is BLOCKED, and
+second-annotator reliability has not been measured.
+
+The executable bridge currently exposes scripted execution only. Real provider
+transport and judge connections remain disabled and need a future implementation
+and live compatibility check under separate authorization. Supplying an alias
+alone will not enable real API runs. Fourteen precise model binding fields remain
+unresolved across the two model aliases: provider, base URL, model ID, key
+environment-variable name, context window, maximum output tokens and supported
+parameters for each. Exact judge binding/capacity, actual H1/H2 histories and the
+32 paid smoke branches are also not executed or resolved. No research setting
+was filled in by assumption to hide these limits.
+
+Stage commits on `research/trustfork-dynamic-join-offline`:
+
+1. `6c72edbf2fb17f81750e44b9398d67775a8f0b7e` — source locks and Docker foundation.
+2. `03c9d3e3a6ff5809c7b33956e994565c9312eb32` — Pi transport and dynamic teams.
+3. `07a48e587a77038ee66f3bdce63855d3ccd73199` — scoring, paired plans and tables.
+4. The commit containing this final section — offline acceptance and capability evidence.
+
+Work stops after the final ordinary push. No live preflight, paid smoke,
+discovery or confirmation experiment has been started.

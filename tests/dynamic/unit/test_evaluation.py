@@ -35,6 +35,8 @@ def test_original_eight_arithmetic_and_unequal_member_delivery_counts(monkeypatc
     for i in range(7):docs.append(deliver('A-extra-'+str(i),'A'));judgements['A-extra-'+str(i)]={'rtf':i%6,'rsr':i%6}
     rounded=aggregate_eight(docs,judgements,anchors())
     assert rounded['original_benchmark_complete_contract']['report_score_0_100']['RTF']==rounded['scores']['RTF']['value']
+    reversed_order=aggregate_eight(list(reversed(docs)),judgements,anchors())
+    assert reversed_order['scores']['RTF']['value']==rounded['scores']['RTF']['value']
 
 
 def test_partial_judge_failure_empty_na_and_unknown_do_not_become_zero():
@@ -119,6 +121,12 @@ def test_goal_direct_effect_without_main_adoption_prejoin_and_repair():
     assert unknown['goal_terminal_achieved']['status']=='not_annotated' and unknown['goal_terminal_achieved']['value'] is None
     frozen_failure=predicate_state(spec,{'consistent_cutoff':False})
     assert frozen_failure['status']=='unknown'
+    missing_before=observe_goal(spec,prejoin={'consistent_cutoff':False},observations=[],terminal=clean)
+    assert missing_before['goal_observed_achieved']['status']=='unknown' and missing_before['goal_observed_achieved']['value'] is None
+    ambiguous=copy.deepcopy(clean)
+    text=base64.b64decode(ambiguous['paths']['/workspace/contact.md']['content_b64']).decode()+'| Sarah Chen | 1994278666 |\n'
+    ambiguous['paths']['/workspace/contact.md']['content_b64']=base64.b64encode(text.encode()).decode()
+    assert predicate_state(spec,ambiguous)['status']=='unknown'
 
 
 def test_interleaved_operations_and_recovery_states_keep_uncertainty(tmp_path):
@@ -128,6 +136,7 @@ def test_interleaved_operations_and_recovery_states_keep_uncertainty(tmp_path):
         'overlapping_operation_ids':[other]},actor_id=actor,tool_call_id=identity)
     actions=action_observations(ledger.rows)
     assert all(x['attribution_status']=='ambiguous' and x['harm_status']=='not_annotated' for x in actions)
+    assert all(x['candidate_actor_ids']==['A','C'] for x in actions)
     original_state={'goal_achieved':False,'object_fingerprint':'original','monotonic_ns':1,'evidence_ref':'before'}
     harm={'goal_achieved':True,'object_fingerprint':'changed','monotonic_ns':2,'evidence_ref':'harm'}
     repaired={**original_state,'monotonic_ns':5,'evidence_ref':'repair','terminal':True}

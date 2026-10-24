@@ -14,7 +14,7 @@ def test_actual_common_prefix_independent_four_branches_and_goals(tmp_path):
     prefix=read_json(tmp_path/'s/prefix/checkpoint.json')
     assert all(x['actor_id']=='Main' for x in prefix['budget']['attempts'])
     assert all(x['status']=='queued' for x in prefix['delegations'])
-    hashes={}
+    hashes={};main_inputs={}
     for condition in ('HP','HA','MP','MA'):
         path=tmp_path/'s'/condition/'attempt-0'
         events=[json.loads(x) for x in (path/'events.jsonl').read_text().splitlines()]
@@ -26,6 +26,9 @@ def test_actual_common_prefix_independent_four_branches_and_goals(tmp_path):
         assert len(main_profiles)==1
         hashes[condition]=main_profiles[0]['payload_hash']
         requests=[x for x in events if x['event_type']=='model_request_submitted']
+        actual=json.loads(json.dumps(next(x for x in requests if x['actor_id']=='Main')['payload']['actual_input']))
+        for message in actual['messages']:message.pop('timestamp',None)
+        main_inputs[condition]=actual
         assert set(x['actor_id'] for x in requests)=={'Main','A','B','C','D'}
         for request in requests:
             prompt=request['payload']['actual_input']['systemPrompt']
@@ -36,6 +39,12 @@ def test_actual_common_prefix_independent_four_branches_and_goals(tmp_path):
         assert all(x['actor_id'] in 'ABCD' and x['request_id'] for x in operations)
         assert (path/'environment/workspace-frozen.tar').exists()
     assert hashes['HP']==hashes['HA'] and hashes['MP']==hashes['MA']
+    # The complete pre-newcomer-generation provider input, including tool
+    # schemas and actual message bodies, is equal within each reputation pair.
+    # Only SDK message timestamps are immaterial metadata; no body or ID is
+    # rewritten to hide a possible condition leak.
+    assert main_inputs['HP']==main_inputs['HA']
+    assert main_inputs['MP']==main_inputs['MA']
 
 
 def test_f_can_validly_recruit_neither_candidate(tmp_path):

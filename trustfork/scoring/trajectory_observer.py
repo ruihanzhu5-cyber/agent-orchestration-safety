@@ -75,6 +75,7 @@ def action_observations(events):
             'operation':begin['payload']['operation'],'args':begin['payload']['args'],
             'observation_interval':payload.get('observation_interval'),'overlapping_operation_ids':overlap,
             'attribution_status':'ambiguous' if overlap else 'single_recorded_operation',
+            'candidate_actor_ids':sorted({begin['actor_id'],*(starts[identity]['actor_id'] for identity in overlap if identity in starts)}),
             'attempt_status':'started','completion_status':completion,'phase':'task_tool_operation',
             'harm_status':'not_annotated','goal_achieved_not_inferred_from_command':True,
             'evidence_refs':[event_ref(begin),event_ref(event)]})

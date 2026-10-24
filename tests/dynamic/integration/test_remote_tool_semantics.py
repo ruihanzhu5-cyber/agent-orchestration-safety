@@ -2,6 +2,8 @@ import base64
 import json
 import shlex
 import re
+import struct
+import zlib
 import pytest
 from trustfork.runtime.dynamic.case_loader import load_case
 from trustfork.runtime.dynamic.environment import DockerEnvironment
@@ -36,7 +38,7 @@ def native_tool(env,args,name):
     cli=base64.b64decode(locate['output']).decode().strip()
     assert cli.endswith('/dist/cli.js')
     module=cli.removesuffix('/dist/cli.js')+'/dist/index.js'
-    factory={'grep':'createGrepToolDefinition','find':'createFindToolDefinition'}[name]
+    factory={'grep':'createGrepToolDefinition','find':'createFindToolDefinition','read':'createReadToolDefinition'}[name]
     script='import {'+factory+'} from '+json.dumps('file://'+module)+";const args=JSON.parse(process.argv[1]);try{const result=await "+factory+"('/workspace').execute('native',args,undefined,undefined,{});console.log(JSON.stringify({ok:true,result}));}catch(e){console.log(JSON.stringify({ok:false,error:e.message}));}"
     result=env.exec_work_operation('process.argv',{'argv':['node','--input-type=module','-e',script,json.dumps(args)]},'native_'+name+str(abs(hash(json.dumps(args,sort_keys=True)))))
     assert result['exitCode']==0
@@ -113,3 +115,21 @@ def test_real_docker_symlink_edit_and_write_share_original_queue(tools):
     ends=[e for e in result['events'] if e['type']=='tool_execution_end']
     assert len(ends)==2 and not any(e['isError'] for e in ends)
     assert call('read',{'path':'/workspace/target.txt'})['content'][0]['text']=='second'
+
+
+def test_read_native_offsets_errors_and_binary_image_bytes(tools):
+    env,client,call,_=tools
+    call('write',{'path':'/workspace/read-lines.txt','content':'one\ntwo\nthree\n'})
+    for options in [{'offset':2,'limit':1},{'offset':99},{'limit':1}]:
+        args={'path':'/workspace/read-lines.txt',**options};expected=native_tool(env,args,'read')
+        if expected['ok']:assert call('read',args)==expected['result']
+        else:
+            with pytest.raises(DynamicError,match=re.escape(expected['error'])):call('read',args)
+    def chunk(kind,data):
+        return struct.pack('!I',len(data))+kind+data+struct.pack('!I',zlib.crc32(kind+data)&0xffffffff)
+    raw=b'\x89PNG\r\n\x1a\n'+chunk(b'IHDR',struct.pack('!IIBBBBB',1,1,8,2,0,0,0))+chunk(b'IDAT',zlib.compress(b'\x00\x00\xff\x00'))+chunk(b'IEND',b'')
+    png=base64.b64encode(raw).decode()
+    env.exec_work_operation('fs.write',{'path':'/workspace/pixel.png','data':png},'public-pixel-fixture')
+    expected=native_tool(env,{'path':'/workspace/pixel.png'},'read');assert expected['ok']
+    actual=call('read',{'path':'/workspace/pixel.png'})
+    assert actual==expected['result'] and any(part['type']=='image' for part in actual['content'])

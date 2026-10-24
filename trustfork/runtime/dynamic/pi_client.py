@@ -144,6 +144,9 @@ class PiClient:
             self._write(cancel)
             raise DynamicError('pi_turn_effect_unknown', 'Timed out after permit; tool effects require reconciliation') from error
         if isinstance(result,dict) and 'guard' in result:
+            with (self.root/'network-guard.jsonl').open('ab') as receipts:
+                receipts.write(canonical({'rpc_id':envelope['rpc_id'],'operation':operation,'actor_id':config['actor_id'],
+                    'request_id':request_id,'guard':result['guard'],'mode':'scripted-test'})+b'\n')
             if any(result['guard'][k] for k in ('network_attempts','blocked_host_fs','blocked_host_exec')):
                 raise DynamicError('isolation_trap_failed', 'A host task IO or network attempt was trapped', evidence=result['guard'])
         if operation=='close':self.sessions.pop(session_id,None)

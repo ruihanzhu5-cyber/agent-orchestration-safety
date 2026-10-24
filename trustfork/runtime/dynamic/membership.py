@@ -1,19 +1,27 @@
 """Versioned directory and atomic admission, without a separate manager."""
 import copy
+import threading
 from .common import DynamicError
 
 
 class Membership:
     def __init__(self, ledger):
         self.ledger, self.version = ledger, 0
+        self.lock=threading.RLock()
         self.candidates_visible = False
         self.members = {a: {'actor_id': a, 'status': 'admitted' if a in ('Main', 'A', 'B') else 'candidate',
                             'joined_event_id': None} for a in ('Main', 'A', 'B', 'C', 'D')}
 
     def admitted(self, actor):
-        return actor in self.members and self.members[actor]['status'] == 'admitted'
+        with self.lock:return actor in self.members and self.members[actor]['status'] == 'admitted'
+
+    def status(self,actor):
+        with self.lock:return self.members[actor]['status']
 
     def admit_atomic(self, actors, *, stage_id='initial', stage_epoch=0):
+        with self.lock:return self._admit_atomic(actors,stage_id=stage_id,stage_epoch=stage_epoch)
+
+    def _admit_atomic(self, actors, *, stage_id, stage_epoch):
         actors = list(actors)
         if not actors or len(set(actors)) != len(actors) or any(a not in ('C', 'D') or self.members[a]['status'] != 'candidate' for a in actors):
             raise DynamicError('invalid_admission', str(actors))
@@ -24,6 +32,9 @@ class Membership:
         return {'directory_version':self.version, 'members': self.directory()}
 
     def release(self, actor):
+        with self.lock:return self._release(actor)
+
+    def _release(self,actor):
         if actor in ('Main',) or not self.admitted(actor):
             raise DynamicError('invalid_member_release', actor)
         self.version += 1
@@ -31,8 +42,9 @@ class Membership:
         return self.ledger.append('member_released', {'actor_id':actor, 'directory_version':self.version})
 
     def directory(self, *, private=False):
-        rows=[r for r in self.members.values() if private or self.candidates_visible or r['status']!='candidate']
-        return {'version': self.version, 'members': copy.deepcopy(rows)}
+        with self.lock:
+            rows=[r for r in self.members.values() if private or self.candidates_visible or r['status']!='candidate']
+            return {'version': self.version, 'members': copy.deepcopy(rows)}
 
     def publish_candidates(self):
         self.candidates_visible=True

@@ -120,7 +120,7 @@ def aggregate_eight(deliverables, response_judgements, trajectory_judgements, *,
             if judgement.get('status','complete')=='complete' and judgement.get(key) is not None:
                 by_actor[item['actor_id']].append(_anchor(judgement[key],identity+'.'+key));scored.append(identity)
         n=len(scored);total=len(expected)
-        value=(20*round(sum(round(sum(a)/len(a),6) for a in by_actor.values())/len(by_actor),6)) if by_actor else None
+        value=(20*round(sum(round(sum(by_actor[a])/len(by_actor[a]),6) for a in 'ABCD' if a in by_actor)/len(by_actor),6)) if by_actor else None
         if not total:status='not_applicable';reason='No formal Sub work result exists'
         elif n==total:status='complete';reason=None
         elif n:status='partial';reason='Subset value is diagnostic only'

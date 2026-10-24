@@ -6,7 +6,7 @@ from collections import defaultdict
 from pathlib import Path
 from trustfork.runtime.dynamic.common import DynamicError,read_json,write_json,digest,repo_root,file_hash,strict_keys
 from trustfork.runtime.dynamic.case_loader import load_case
-from trustfork.runtime.dynamic.schema import validate_contract
+from trustfork.runtime.dynamic.schema import validate_contract,validate_bindings
 from .dynamic_adapter import extract_formal_deliverables,response_judge_view,trajectory_judge_view,judge_prompts,aggregate_eight,scripted_fixture_scores
 from .dynamic_metrics import automatic_metrics,semantic_metrics
 from .goal_observer import frozen_workspace,observe_goal,predicate_state
@@ -99,7 +99,14 @@ def score_run(path,*,mode='formal'):
         if run[field]!=manifest[field]:raise DynamicError('run_manifest_field_mismatch',field)
     if mode=='formal' and (manifest['synthetic'] or manifest['mode']!='api'):
         raise DynamicError('synthetic_formal_rejected','Formal manifest is not an API execution')
+    if mode=='formal':
+        if not manifest['formal_ready'] or manifest['resolved_api_bindings'] is None:
+            raise DynamicError('unresolved_formal_bindings','Formal records require their complete frozen model bindings')
+        validate_bindings(manifest['resolved_api_bindings'],formal=True)
     events=load_events(directory,run);refs={event_ref(e) for e in events};case=load_case(run['case_id'])
+    if mode=='formal' and any(e['payload'].get('synthetic') is True or (e['event_type']=='model_response' and
+        (e['payload'].get('response') or {}).get('provider')=='scripted') for e in events):
+        raise DynamicError('synthetic_event_formal_rejected','Synthetic provenance cannot be removed by changing a run flag')
     deliverables=extract_formal_deliverables(events,task_id=run['case_id'],allowed_branch_ids={e['branch_id'] for e in events})
     for value in deliverables:validate_contract('FormalDeliverable',value)
     bindings=read_json(directory/'private_bindings.json')

@@ -2,7 +2,7 @@ import copy
 import json
 import pytest
 from trustfork.runtime.dynamic.common import DynamicError,config_dir,read_json
-from trustfork.runtime.dynamic.schema import validate_contract
+from trustfork.runtime.dynamic.schema import validate_contract,validate_schema
 from trustfork.runtime.dynamic.events import EventLedger
 from trustfork.runtime.dynamic.goals import LAYOUTS
 from trustfork.runtime.dynamic.initial_plan import parse_initial_plan
@@ -33,3 +33,13 @@ def test_frozen_config_layouts_failures_and_context_refs():
     with pytest.raises(DynamicError,match='invalid_plan_context_reference'):parse_initial_plan(json.dumps(plan))
     plan['assignments'][0]['context_refs']=['task://current-stage']
     assert parse_initial_plan(json.dumps(plan),allowed_context_refs=['task://current-stage'])['plan']['assignments']
+
+
+def test_all_frozen_configuration_schemas_reject_unlisted_changes():
+    schema=read_json(config_dir()/'frozen_configs.schema.json')
+    for name in schema['$defs']:
+        value=read_json(config_dir()/name)
+        validate_schema(value,{**schema,'$ref':'#/$defs/'+name})
+        changed=copy.deepcopy(value);changed['unlisted_experiment_setting']=True
+        with pytest.raises(DynamicError):validate_schema(changed,{**schema,'$ref':'#/$defs/'+name})
+    validate_schema(read_json(config_dir()/'model_bindings.example.json'),read_json(config_dir()/'model_bindings.schema.json'))
