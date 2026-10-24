@@ -1,10 +1,12 @@
 # TrustFork 动态入队研究：环境检查报告
 
-检查日期：2026-10-24，Asia/Shanghai（UTC+8）。宿主资源主快照：16:24:28。Docker 启动续查：同日 16:54–17:09；原始资源快照和续查结果分别注明。资源值随运行状态变化。
+检查日期：2026-10-24，Asia/Shanghai（UTC+8）。宿主资源主快照：16:24:28；Desktop 启动续查：16:54–17:09；本轮 WSL 原生 Engine 安装与验收：17:42–18:08。各轮结果分别注明，资源值随运行状态变化。
 
-**最新续查结论：已按用户授权启动安装好的 Docker Desktop，但后台在初始化本地 sailor-ingest.sock 时以 WinError 1920 失败，Linux daemon 仍不可达；实际 WSL 集成可用性未通过，daemon CPU / 内存、当前数据 VHDX 映射和镜像清单均为 UNKNOWN。配置路径与历史文件大小不能替代运行证据。详见第 11 节。本次仍未进入 Part2。**
+**当前结论：Ubuntu-26.04 内的原生 Docker Engine / CLI 29.9.2 已通过基础容器验收，Desktop 停止时仍可使用本发行版的 Unix socket。Docker、containerd、构建缓存和 apt 数据均位于 D 盘 Ubuntu ext4 VHDX；4 GiB WSL swap 已明确配置并验证在 D 盘。Desktop 保留且集成关闭，四份旧 VHDX 未执行写入或清理；旧 Desktop 数据盘映射仍为 UNKNOWN。Node / Pi、完整实验镜像及 Harbor / Pi 生命周期尚未验收。详见第 12 节。**
 
-本报告依据 Part1 新版要求和用户随后明确允许“启动现有 Ubuntu，只读检查”的补充授权。PASS 表示该项实查成功；FAIL 表示当前明确缺失或不满足该项；UNKNOWN 表示证据不足；NOT_RUN 表示未执行。版本查询成功不代表集成验收通过。
+本报告保留 Part1 只读检查及随后 Desktop 启动续查的历史。用户本轮在会话中明确选择“按文档执行原生 Docker 方案”，授权在现有 Ubuntu-26.04 安装原生 Engine、调整 D 盘 swap、拉取小型公共镜像并运行基础测试容器；不修改实验代码、不续跑旧 pilot、不调用模型 API。PASS 表示该项实查成功；FAIL 表示该次检查明确失败；UNKNOWN 表示证据不足；NOT_RUN 表示未执行。
+
+**阅读历史的边界：第 1–11 节的版本、FAIL / UNKNOWN、只读范围及“未安装”描述均对应此前检查时点，不能覆盖本轮新授权或原生 Engine 的当前结果。Desktop 的故障与旧镜像清单 UNKNOWN 仍保留，不与新建原生引擎的镜像清单混合。**
 
 ## 1. 项目理解
 
@@ -268,4 +270,173 @@ uv tool list 曾尝试初始化既有缓存并因权限拒绝退出 2；未安�
 - **后续建议：** 将本地 socket 启动障碍列为环境准备阶段的首个问题；具体修复方案需另行明确范围。本轮不因启动失败自动清理 socket、重置 Desktop、重装或升级。若恢复 daemon，再继续只读核实额度、当前数据盘、WSL 同一 daemon 身份和镜像清单。
 - **Git 交付：** 同一 docs/dynamic-join/TrustFork_Environment_Report.md、同一 research/trustfork-environment-audit 分支，仅提交报告，正常推送，不强推。旧工作区保持原分支 / HEAD 和原有 6 个 untracked 状态条目；未进入 Part2。
 
-环境检查已完成，未开始安装环境或修改实验代码；等待你核对报告后再继续。
+## 12. WSL 原生 Docker Engine 安装与验收（2026-10-24）
+
+### 12.1 授权、起点与方案选择
+
+用户明确采用 D 盘 WSL 原生 Engine 方案。17:42 查询远端 research/trustfork-environment-audit，仍为 4c264aa74b472e08c0191a85972f62801106796b；独立报告 worktree 干净，未切换旧 pilot。Ubuntu-22.04 与 docker-desktop 均停止，只进入已有 Ubuntu-26.04。Windows 当前令牌不是管理员，Linux sudo -n true 返回 1；正常的 wsl -d Ubuntu-26.04 -u root 管理入口返回 uid=0，因此本轮 Linux 安装不需要索要 sudo 密码或 Windows UAC。
+
+实测发行版是 Ubuntu 26.04 LTS / resolute / amd64，内核 6.18.54.1-microsoft-standard-WSL2；PID 1 为 systemd，is-system-running 返回 running。现有 /etc/wsl.conf 已包含 systemd=true，本轮未修改它。安装前没有列出的冲突包，也没有 Docker / containerd 数据目录。仅有系统服务和本次检查进程，没有其他发行版或无关用户任务需要避让。
+
+Docker 当前官方安装页明确支持 Ubuntu 26.04，使用该发行版自己的 resolute/stable 仓库；没有借用其他 Ubuntu 代号、运行 convenience script 或全系统升级。安装方法依据 [Docker Ubuntu 官方安装页](https://docs.docker.com/engine/install/ubuntu/)；WSL 服务管理依据 [Microsoft systemd 说明](https://learn.microsoft.com/en-us/windows/wsl/systemd)。
+
+旧 Desktop 的 sailor-ingest.sock 故障仍是历史事实。此前进一步只读枚举见 socket 的属性为 0x420，重解析标签为 0x80000023（AF_UNIX），以 OPEN_REPARSE_POINT 尝试只读打开仍返回 1920；普通 run 目录本身不是重解析点。标签表示 Unix socket，不能单凭该标签或 fsutil 的失败认定文件损坏。相关错误在 Docker 官方仓库的 [issue 676](https://github.com/docker/desktop-feedback/issues/676) 及 [issue 554](https://github.com/docker/desktop-feedback/issues/554) 有报告；维护者称较新版本包含缓解，但本机 4.95.0 仍失败，不能据此证明本机底层原因或保证升级能解决。更底层的 NTFS、过滤驱动、更新回滚或权限原因仍为 UNKNOWN，未完成占用句柄排查。标签含义见 [Microsoft 重解析标签表](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-fscc/c8e77b37-3909-4fe6-a4ea-2b9d423b1ee4)。
+
+按本次新范围，不再执行 socket 修复；没有手动删除或重命名旧 socket / 其目录、修改整棵 ACL、恢复出厂、注销发行版或删除任何旧 VHDX。
+
+### 12.2 Desktop 隔离、配置视图与旧数据
+
+Desktop 与 backend 进程在本轮开始及收尾均未发现；没有再次启动 Desktop。保留已安装的 Desktop，无需卸载，也没有触发卸载的数据保护前提。本轮仅修改集成设置：
+
+| 字段 | 原值 | 本轮值 |
+|---|---|---|
+| AutoStart | false | false，保留 |
+| IntegratedWslDistros | ["Ubuntu-26.04"] | [] |
+| EnableIntegrationWithDefaultWslDistro | 原文件未显式设置 | false |
+| CustomWslDistroDir 与其他配置 | 既有值 | 保留 |
+
+字段含义参考 [Docker WSL 集成说明](https://docs.docker.com/desktop/features/wsl/) 与 [官方仓库中对应字段说明](https://github.com/docker/for-win/issues/13426)；在本机已安装 backend 二进制中也核对到同名字段。采用文本局部修改并逐项比较其余 JSON 值，没有用少量字段覆盖整份设置。
+
+发现一个必须区别的宿主视图问题：Codex 子进程打开逻辑 %APPDATA%\Docker\settings-store.json 时，最终路径落在 Codex 包的 LocalCache\Roaming\Docker；WSL 的 /mnt/c 物理宿主视图看到另一份实际 Roaming\Docker 配置。两者内容与初始校验值不同。首次 Windows 修改只作用于缓存视图，随后已分别备份并从 WSL 修正物理宿主配置，最终两个视图都验证集成关闭。这个重定向是实测事实，尚不足以解释旧 Desktop 的 WinError 1920。
+
+| 配置 / 备份 | SHA-256 与结果 |
+|---|---|
+| .wslconfig 原件备份 | b1e0dc3b048759e9e286dec61036ee4363e33b904049e6b9e2ae94aac4b2a4fd |
+| .wslconfig 修改后 | 1797a0b8374eb47484188193fb9fcadfae17b2644409ebf3f015b16e50344cef |
+| 实际宿主 Desktop 原件 | 0ab861eeb5034a10be6116bf775e84653e47537a42be83cb88702ef3f2983f67 |
+| 实际宿主 Desktop 修改后 | fc72640febee73ddc0c7c999794741b4bfc0c47ba2d90bf1bfd4820042a96006 |
+| Codex 逻辑视图首次备份 | e8d4e75562f24209f0ccf2c3a8c81fb629d0796644e90a107bc38bc9e2735e6a |
+| Codex 缓存视图最终值 | 609829ed67e3ec6a8e87174a5362d29936c378b2b5bb72ff42fac16870716aab |
+
+本地宿主配置备份及精简执行证据保存在 D:\TrustFork-Environment\native-docker-20261024-174416\，不上传。实际宿主原件为 backups\physical-settings-store.before.json；首次逻辑视图原件为 backups\settings-store.before.json；WSL 原件为 backups\wslconfig.before。不要把后续 codex-settings-store.before.json 当成首次修改前的原件。
+
+第 11.3 节的四份旧 Desktop VHDX 均原位保留，本轮没有挂载、复制、迁移或清理它们；收尾比较的长度与 LastWriteTimeUtc 均未变。没有做这些盘的完整内容备份或哈希校验，盘内完整性与活动数据盘映射仍为 UNKNOWN，不能把“保留原文件”写成“已验证完整备份”。新原生 Engine 不复用这些 Desktop 数据盘。
+
+### 12.3 D 盘存储链路与 swap
+
+注册表的 Ubuntu-26.04 BasePath 位于 C:\Users\{USER}\AppData\Local\wsl\{DISTRO_ID}；fsutil reparsepoint query 证实它是 0xa0000003 目录联接，目标为 D:\WSL\{DISTRO_ID}。实际 Ubuntu 文件为该 D 盘目录中的 ext4.vhdx。Linux 根挂载为 /dev/sdd、ext4；下表的持久目录设备号均与 / 相同，且未发现将它们重定向到 DrvFS 的符号链接。
+
+| 数据类别 | Linux 实际路径 / 依据 | Windows 后端与结论 |
+|---|---|---|
+| 原生 Docker 元数据、卷、容器数据 | docker info 的 DockerRootDir=/var/lib/docker；findmnt 为 /dev/sdd[/var/lib/docker]、ext4；与根目录同一设备 | D:\WSL\{DISTRO_ID}\ext4.vhdx；PASS |
+| 镜像内容与容器快照 | containerd config dump 的 root=/var/lib/containerd、state=/run/containerd；数据目录 findmnt 为 /dev/sdd、ext4 | 同一 D 盘 Ubuntu VHDX；PASS。state 为 /run 内存运行态 |
+| 构建缓存与 BuildKit | /var/lib/docker/buildkit 为 ext4、同一设备；Buildx default 的 driver=docker，endpoint=default，实际连接本地原生 socket | 同一 D 盘 Ubuntu VHDX；PASS；没有启动额外 BuildKit 容器或远程 builder |
+| apt 包、索引和下载缓存 | /usr、/var/lib/apt、/var/cache/apt 在 Ubuntu 根文件系统；92.4 MB 包从 apt 直接下载到该发行版 | 同一 D 盘 Ubuntu VHDX；PASS；未经过 Windows Downloads |
+| 本次磁盘临时目录 | 为安装进程设置 TMPDIR=/var/tmp/trustfork-native-20261024-174416，findmnt 为 /dev/sdd、ext4 | 同一 D 盘 Ubuntu VHDX；PASS |
+| Linux 用户目录、Linux 配置备份 | {WSL_HOME}、/root、/var/lib/trustfork-environment/native-docker-20261024-174416 均为根 ext4 | 同一 D 盘 Ubuntu VHDX；PASS |
+| /tmp | 初查为 tmpfs，未把它误称为 ext4；安装进程使用上述 /var/tmp | 内存临时数据，可交换到下述 D 盘 swap |
+| 宿主配置备份、命令和测试证据 | D:\TrustFork-Environment\native-docker-20261024-174416 | D 盘普通目录，未放入 Desktop 管理目录 |
+| WSL swap | /proc/swaps 为 /dev/sdc，4,194,304 KiB；不能仅凭设备名判断宿主盘 | 下述 D 盘专用后端经状态对照验证；PASS |
+
+新安装使用 Docker 29 的 containerd image store，实测 Driver=overlayfs、DriverStatus 含 io.containerd.snapshotter.v1。分别核验两个数据根，未只看 data-root，也未将它们设置成 /mnt/d/docker。两处存储关系参考 [Docker daemon 存储说明](https://docs.docker.com/engine/daemon/) 与 [containerd image store 文档](https://docs.docker.com/engine/storage/containerd/)。
+
+原 .wslconfig 没有显式 swapFile，原后端位置不能确认。保留实测 4 GiB 容量，向原 [wsl2] 段合并：
+
+~~~ini
+swap=4GB
+swapFile=D:\\TrustFork-Environment\\swap\\native-docker-20261024-174416\\wsl-swap.vhdx
+~~~
+
+networkingMode=mirrored、autoProxy=true、dnsTunneling=true 均保留，没有更改 memory、processors 或 Windows pagefile。配置语法依据 [Microsoft .wslconfig 文档](https://learn.microsoft.com/en-us/windows/wsl/wsl-config)。
+
+证据链不是只看配置：新后端启动前不存在；Ubuntu 启动后在上述 D 盘物理路径生成，Linux swap 容量仍为 4 GiB；只读独占打开返回 WinError 32。受控有序停止 Ubuntu 并 wsl --shutdown 后，路径不存在（stat 返回 WinError 2）；重新启动后同一路径以新的 CreationTimeUtc 再次生成，独占只读打开又返回 32。路径的原生最终解析也确认为 D 盘。运行中的文件长度为 37,748,736 字节，不等于客体 4 GiB swap 容量。本轮未手动删除 swap 文件。
+
+Get-DiskImage 对这个已用状态下的新 swap 仍返回 Attached=false。因此第 11.3 节历史查询的 false 只能作为该 API 的返回值，不能单独证明 WSL / HCS 没有使用对应 VHDX；它们没有提供旧 Desktop 活动映射。旧盘仍维持 UNKNOWN。
+
+### 12.4 实际安装及客户端解耦
+
+官方 apt 源使用 https://download.docker.com/linux/ubuntu、resolute、stable、amd64、Signed-By=/etc/apt/keyrings/docker.asc。官方 key 通过正常 TLS 获取，文件 SHA-256 为 1500c1f56fa9e26b9b8f42452a553675796ade0807cdce11975eb98170b3a570；apt 更新成功并验证签名索引。安装前先检查候选版本并 simulate，再明确选择以下版本：
+
+| 包 | 候选及实际安装版本 | 运行时版本 |
+|---|---|---|
+| docker-ce | 5:29.9.2-1~ubuntu.26.04~resolute | Engine 29.9.2 |
+| docker-ce-cli | 5:29.9.2-1~ubuntu.26.04~resolute | CLI 29.9.2，linux/amd64 |
+| containerd.io | 2.4.2-3~ubuntu.26.04~resolute | containerd 2.4.2，runc 1.5.2 |
+| docker-buildx-plugin | 0.38.1-1~ubuntu.26.04~resolute | Buildx 0.38.1 |
+| docker-compose-plugin | 5.6.1-1~ubuntu.26.04~resolute | Compose 5.6.1 |
+
+使用 apt-get --no-install-recommends；新增 13 包，0 升级、0 移除。另 8 项为 iptables、nftables、libip4tc2、libip6tc2、libnfnetlink0、libnetfilter-conntrack3、libnftnl11、libnftables1。没有删除冲突包，没有安装 Node / Pi、rootless extras 或模型插件，没有升级 Python / Harbor / Ubuntu。
+
+当前用户新会话中 command -v docker=/usr/bin/docker，file 为 x86-64 Linux ELF；旧 Windows 转接脚本仍可能在 PATH 后部，但不再是被解析执行的命令。默认 context 的实际 endpoint=unix:///var/run/docker.sock，DOCKER_HOST / DOCKER_CONTEXT / DOCKER_CONFIG 未设置，未使用 Windows npipe。/var/run/docker.sock 权限为 root:docker、0660；未开放无认证 2375，也未 chmod 666。用户原先已属 docker 组，没有新增组授权；该组现可控制宿主级原生 daemon，具有 root 等级能力，见 [Docker 非 root 用户说明](https://docs.docker.com/engine/install/linux-postinstall/)。
+
+用户 ~/.docker/config.json 修改前已备份。本轮只移除明确属于 Desktop 的 credsStore=desktop.exe，保留其他值；未输出或删除 auths / token。原件 SHA-256 为 13e051486615a60a7ecdba7c62a478436caa40bd924b2a118ffdf88941d3e517，修改后为 ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356。
+
+docker.service、containerd.service 均 active / running、enabled；本发行版的实际 dockerd 进程和 /usr/bin/dockerd 已核对。收尾 docker info：CPU 20、MemTotal=16,626,081,792 字节（约 15.484 GiB）、CgroupVersion=2。这是 daemon 实测可见资源，不是给实验保证的空闲量；未额外限制整台 daemon，测试容器另设限额。服务设为 Ubuntu 启动时自动运行，不承诺 Windows 开机后 WSL 一直保持运行；WSL 空闲停止后，重新进入 Ubuntu 会启动其服务。
+
+### 12.5 网络故障与有依据的配置变更
+
+首次 docker pull hello-world:latest 退出 1：daemon 对官方 registry 的 HTTPS 直连连接超时。没有把它归为 Docker 安装失败，也未反复拉取。针对同一 registry 的有超时对照显示：
+
+| 检查 | 退出码 / 观测 | 能支持的结论 |
+|---|---|---|
+| apt 官方源、签名索引 | 0 | apt 网络及源配置可用 |
+| root shell 使用已有代理查询 registry /v2/ | curl 0，HTTP 401 | TLS 与认证入口可达；401 是匿名访问的正常认证挑战 |
+| root shell 绕过代理直连同一入口 | curl 28，连接超时 | 本次直连路径不可用 |
+| Docker 服务初始 Environment | 无代理字段 | shell 的代理并未自动等价为 daemon 配置 |
+
+从本机 WSL 已有代理环境取值，并已核实它是无认证的可达回环代理，未盲抄未知 Windows 地址。在原先不存在、已记录为 ABSENT 的 /etc/docker/daemon.json 中只新增官方支持的 proxies 段，权限 0600，SHA-256 为 bc9d5b4fe9df9367d4b27be02d2ff7bcb078441d4a73181387310b110e5dc4f4。具体代理地址只保存在本机；没有关闭 TLS 校验、加入第三方镜像站或开放 daemon TCP。确认没有运行容器后重启原生服务，后续两个 pull 均为 0。方法依据 [Docker daemon 代理文档](https://docs.docker.com/engine/daemon/proxy/)。
+
+已确认的是直连失败、代理可达、初始服务未配置代理，以及配置后拉取成功。DNS 污染、网络过滤或其他直连故障的更底层原因未定。后续拉取仍依赖该本地代理可用，不把这次成功当成无条件的网络保证。
+
+### 12.6 逐项验收、失败记录与资源清理
+
+本次资源前缀 tfenv-20261024-174416，统一标签 io.trustfork.environment-audit=20261024-174416。所有容器仅用于基础容器功能，不是 TrustFork 任务。常规功能命令使用 15–30 秒超时，镜像 pull 150 秒、最小 build 90 秒、服务 restart 60 秒；apt 更新 180 秒、安装 420 秒。失败后先检查原因，不采用无限重试。
+
+| 验收项 | 状态 | 命令类别、退出码与精简证据 |
+|---|---|---|
+| Linux 原生客户端与真实连接 | PASS | 新用户会话解析 /usr/bin/docker；context inspect 返回本地 Unix socket；docker version 的 Client / Server 均 29.9.2，0 |
+| 服务及 Desktop 解耦 | PASS | systemctl is-active / is-enabled 均 0；Desktop / backend 不在运行；本发行版实际 dockerd ELF 路径已核对 |
+| D 盘持久存储和 swap | PASS | findmnt / readlink / 文件设备号 / 注册联接 / swap 状态对照，证据见 12.3 |
+| 官方最小容器 | PASS | pull 后 docker run hello-world:latest，0；网络 none、CPU 0.5、内存 64 MiB、pids-limit 64；inspect State.ExitCode=0 |
+| 命名卷文件读写 | PASS | writer / reader 两个 BusyBox 容器均 0；测试文件 SHA-256=68f97a5dbdec6ea52d9a39852b1d4e5856e99b4748c31bb3ad0abb001efdd57a |
+| 容器本地网络 | PASS | 专用 --internal 网络的 httpd 服务与客户端 wget 请求成功，0；无宿主端口发布 |
+| CPU / 内存约束 | PASS | client / server inspect 的 NanoCpus=500000000、Memory=67108864，PortBindings 为空；容器内 cpu.max=50000 100000、memory.max=67108864；0 |
+| Compose | PASS | compose version、config -q、run --pull never 均 0；从已有测试卷读出原内容 |
+| Buildx 本地构建 | PASS | inspect default：driver=docker，endpoint=default，BuildKit 0.34.0；用已拉取 BusyBox 作基础，仅 COPY 本地小文件，--pull=false、--network=none，无额外下载步骤；build 和新镜像运行均 0 |
+| 原生服务重启持久性 | PASS | 无运行容器时 systemctl restart docker.service，0；新用户会话仍连接同一 Engine ID，原镜像 / 测试卷可读，校验值不变 |
+| Ubuntu / WSL 受控重启 | PASS | 无其他发行版和无关任务时 systemctl poweroff、wsl --shutdown 均 0；启动后 boot ID 改变，Engine ID 不变，服务自动 active / enabled，已有镜像及测试卷校验仍通过 |
+| 普通用户可用性 | PASS | 重启后的新 Linux 用户会话无需 sudo 即可 docker version / info / run，均 0；不是仅 root 一次性验证 |
+| 现有 Harbor venv 的 Python Docker SDK ping | NOT_RUN | 独立目录及已安装分发元数据确认 Harbor 0.24.0 存在、docker SDK 分发包不存在；未为此安装新包，不能宣称 Harbor 生命周期已验收 |
+| 完整实验镜像、Pi、mock、七工具、冻结恢复和真实模型 API | NOT_RUN | 本轮未执行 |
+
+保留失败与探针限制：首次镜像 pull 的退出 1 已由有依据的代理配置解决。普通用户解析 root 进程 /proc/PID/exe 的初始断言未通过，随后以 root readlink 证实实际 /usr/bin/dockerd，普通用户探针改用可读取的 comm 与 systemd ExecStart 后继续；没有因此改 ACL。普通用户遍历 daemon 私有 BuildKit 目录也未通过，最终存储检查以 root 只读完成。停止后的 swap 状态脚本原先假设文件仍存在，stat 因 WinError 2 退出 1；未将这次探针标为成功，后续按“路径消失、重启重建”的实际状态解释。最初仅凭 import spec 判断可选 SDK 存在过于宽泛，尝试访问 DockerClient 报 AttributeError；干净工作目录和分发元数据校正后，SDK ping 保持 NOT_RUN，未调用任何模型 API。
+
+验收完成后，核对标签、名称和停止状态，只删除本次 9 个容器、1 个专用网络、1 个测试卷、1 个构建镜像以及本次新建的三个小构建文件。清理命令均为 0，未执行全局 prune。收尾新原生引擎的 docker ps -a 与 volume ls 均为空；此结果仅针对新引擎，不代表旧 Desktop 没有容器或卷。
+
+保留供后续复用的镜像清单：
+
+| 镜像 | 实际 repo digest | CLI 显示大小 |
+|---|---|---|
+| hello-world:latest | hello-world@sha256:11a3eb1597e864c51b3f56733cb2e8a90bf0c284bfc05f9444d81c558bc848aa | 25.9 kB |
+| busybox:1.37.0 | busybox@sha256:bdf57e528e45e4433820e045b29b4597825a1c9e38353532d90a01445013f82e | 6.77 MB |
+
+docker system df 收尾显示 2 个镜像约 6.817 MB、0 容器、0 卷；5 项本次 BuildKit 缓存约 6.795 MB 保留在 D 盘。镜像与缓存可能共享数据，不能简单相加推断物理增长。测试日志、脚本和配置备份留在 D 盘的本地证据目录，不提交到仓库。
+
+### 12.7 配置、软件回退与磁盘变化
+
+所有计划手动改动的既有配置先保存原件并核对 SHA-256。Linux 清单位于 /var/lib/trustfork-environment/native-docker-20261024-174416/config-manifest.json，原件在其 backups/ 子目录；清单记录 /etc/wsl.conf 与用户 Docker 配置的原属性、校验值，并记录 daemon.json、Docker apt source/key 等原先不存在。包安装前后清单也保存于该 D 盘 Ubuntu 文件系统。没有修改 shell 启动文件。
+
+回退方案供后续需要时执行，本轮未回退：
+
+1. 先核查无关容器 / WSL 任务；有任务则安排窗口。停止并禁用本次原生 docker.service、docker.socket、containerd.service，不删除 /var/lib/docker、/var/lib/containerd 或镜像 / 卷数据。
+2. 恢复配置前先比较当前值与本报告“修改后”校验值。若用户后来已有其他改动，只合并恢复本次字段，不覆盖新修改。用户 Docker 配置从 Linux 原件恢复 uid/gid/mode；首次唯一手动移除的字段为 Desktop credsStore。将本次新建 daemon.json 移到 D 盘备份目录留存，使原先“不存在”的状态恢复，再按需 reload / restart；不批量删除目录。
+3. 若需要回到原 Desktop 设置，分别恢复实际宿主 Roaming 配置与 Codex 缓存视图的原件，使用 12.2 指定的正确备份。恢复集成不等于修好 Desktop 的历史 socket 故障；不要同时启动两套 Docker。
+4. 如需撤销软件，先 apt simulate 检查当前依赖，再 remove 本次新装的五个 Docker 包；不要 purge 数据或 autoremove 无关软件。其余八个新依赖只有在确认没有后续依赖后才单独处理。Docker apt source/key 原先不存在，可校验后移入 D 盘备份留存；若已被其他配置引用则先保留。
+5. 若需撤销 swap 位置，备份当前 .wslconfig，按校验值恢复本次原件或只撤销新增 swap / swapFile 字段，保留其他设置；无其他任务时有序重启 WSL。D 盘现有文件由 WSL 生命周期处理，本方案不手工删除 VHDX，不调整 Windows pagefile。/etc/wsl.conf 未改，无需回退。
+
+| 项目 | 本轮前：17:44:16 | 本轮后：18:08:19 | 边界 |
+|---|---|---|---|
+| C 盘可用 | 7,710,457,856 字节，7.181 GiB | 8,171,995,136 字节，7.611 GiB | 增加约 0.430 GiB；有系统 / WSL / 其他进程变化，不能全部归因于本次操作 |
+| D 盘可用 | 657,118,015,488 字节，611.989 GiB | 656,881,426,432 字节，611.769 GiB | 减少约 0.220 GiB；含新引擎、索引、缓存、swap 与本地证据等同时变化 |
+| Ubuntu ext4.vhdx 文件长度 | 19,918,749,696 字节 | 20,115,881,984 字节 | 文件长度增加 197,132,288 字节；不是 Linux 已用空间或宿主物理占用的直接等价值 |
+| Linux 根文件系统 | — | 虚拟总容量 1,081,101,176,832 字节，可用 1,007,864,299,520 字节 | 底层仍受 D 盘实际约 611.769 GiB 余量约束，不能宣称另有约 1 TB 实盘 |
+
+本次主动新增的大体积持久数据均定位到 D 盘 Ubuntu VHDX 或 D 盘专用目录；没有向 C 盘放置新的 Engine 包、镜像、快照、卷、构建缓存或备份。C 盘原有 Windows / WSL 组件仍会写日志、注册和少量配置，本轮修改的 .wslconfig 与 Desktop 设置也在 C 盘，不能承诺 C 盘字节数完全不变。
+
+### 12.8 当前交接结论
+
+原生 Docker 基础能力已 PASS，后续在 Ubuntu-26.04 使用 /usr/bin/docker 与默认 Unix socket 即可，无需 Docker Desktop 运行。Linux Python 3.12.13 / Harbor 0.24.0 仍保留。下一步可以单独准备原生 Linux Node / Pi 及必要测试依赖，再验收完整实验镜像和 Harbor / Pi 生命周期；本轮没有自动进入这些工作，也没有修改实验设计、实现代码、旧 pilot 或调用模型 API。
+
+本次 Git 交付仅更新 docs/dynamic-join/TrustFork_Environment_Report.md，继续 research/trustfork-environment-audit 并正常推送至用户 origin，不强推。旧工作区保持原分支、ff1d6084d95b7a246c4c58f4da516c3f65a761ad 和原有六项 untracked；不以报告变更替代实验实现。
+
+原生 Docker 安装与基础验收已完成，未修改实验代码、未调用模型 API；停止，等待后续范围安排。
