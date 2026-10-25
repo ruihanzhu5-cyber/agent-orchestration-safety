@@ -1,0 +1,367 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "annotation_version",
+    "claim_annotations",
+    "action_annotations",
+    "adoptions",
+    "goal_state_annotations"
+  ],
+  "properties": {
+    "annotation_version": {
+      "const": "dynamic-annotations-v1"
+    },
+    "claim_annotations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "value",
+          "status",
+          "evidence_refs",
+          "annotator_version",
+          "claim_id",
+          "text_hash",
+          "char_span",
+          "speaker_actor",
+          "stage_epoch",
+          "harm_status"
+        ],
+        "properties": {
+          "value": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "status": {
+            "enum": [
+              "complete",
+              "unknown",
+              "not_annotated",
+              "not_applicable",
+              "judge_error"
+            ]
+          },
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "evidence_refs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "uniqueItems": true
+          },
+          "annotator_version": {
+            "type": "string",
+            "minLength": 1
+          },
+          "claim_id": {
+            "type": "string"
+          },
+          "text_hash": {
+            "type": "string"
+          },
+          "char_span": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "minItems": 2,
+            "maxItems": 2
+          },
+          "speaker_actor": {
+            "enum": [
+              "Main",
+              "A",
+              "B",
+              "C",
+              "D"
+            ]
+          },
+          "stage_epoch": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "harm_status": {
+            "enum": [
+              "harmful",
+              "not_harmful",
+              "unknown",
+              "not_annotated"
+            ]
+          }
+        }
+      }
+    },
+    "action_annotations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "value",
+          "status",
+          "evidence_refs",
+          "annotator_version",
+          "action_id",
+          "operation_id",
+          "actor_id",
+          "stage_epoch",
+          "harm_status",
+          "effect_status",
+          "side_effect_evidence_refs"
+        ],
+        "properties": {
+          "value": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "status": {
+            "enum": [
+              "complete",
+              "unknown",
+              "not_annotated",
+              "not_applicable",
+              "judge_error"
+            ]
+          },
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "evidence_refs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "uniqueItems": true
+          },
+          "annotator_version": {
+            "type": "string",
+            "minLength": 1
+          },
+          "action_id": {
+            "type": "string"
+          },
+          "operation_id": {
+            "type": "string"
+          },
+          "actor_id": {
+            "enum": [
+              "Main",
+              "A",
+              "B",
+              "C",
+              "D"
+            ]
+          },
+          "stage_epoch": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "harm_status": {
+            "enum": [
+              "harmful",
+              "not_harmful",
+              "unknown",
+              "not_annotated"
+            ]
+          },
+          "effect_status": {
+            "enum": [
+              "observed",
+              "unknown",
+              "not_assessed"
+            ]
+          },
+          "side_effect_evidence_refs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "adoptions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "value",
+          "status",
+          "evidence_refs",
+          "annotator_version",
+          "claim_id",
+          "consumer_actor",
+          "stage_epoch",
+          "actual_request_ref",
+          "adoption_state"
+        ],
+        "properties": {
+          "value": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "status": {
+            "enum": [
+              "complete",
+              "unknown",
+              "not_annotated",
+              "not_applicable",
+              "judge_error"
+            ]
+          },
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "evidence_refs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "uniqueItems": true
+          },
+          "annotator_version": {
+            "type": "string",
+            "minLength": 1
+          },
+          "claim_id": {
+            "type": "string"
+          },
+          "consumer_actor": {
+            "enum": [
+              "Main",
+              "A",
+              "B",
+              "C",
+              "D"
+            ]
+          },
+          "stage_epoch": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "actual_request_ref": {
+            "type": "string"
+          },
+          "adoption_state": {
+            "enum": [
+              "quoted",
+              "rejected",
+              "proposed",
+              "adopted_plan",
+              "acted",
+              "uncertain"
+            ]
+          },
+          "action_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      }
+    },
+    "goal_state_annotations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "value",
+          "status",
+          "evidence_refs",
+          "annotator_version",
+          "goal_spec_hash",
+          "timepoint",
+          "reversibility"
+        ],
+        "properties": {
+          "value": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "status": {
+            "enum": [
+              "complete",
+              "unknown",
+              "not_annotated",
+              "not_applicable",
+              "judge_error"
+            ]
+          },
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "evidence_refs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "uniqueItems": true
+          },
+          "annotator_version": {
+            "type": "string",
+            "minLength": 1
+          },
+          "goal_spec_hash": {
+            "type": "string"
+          },
+          "timepoint": {
+            "enum": [
+              "prejoin",
+              "observation",
+              "terminal"
+            ]
+          },
+          "observation_ref": {
+            "type": "string"
+          },
+          "reversibility": {
+            "enum": [
+              "reversible",
+              "irreversible",
+              "unknown"
+            ]
+          },
+          "stage_epoch": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "actor_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      }
+    }
+  }
+}

@@ -58,27 +58,32 @@ def annotate_adoption(observation, *, state, evidence_refs, available_event_refs
 
 
 def action_observations(events):
+    from trustfork.runtime.dynamic.operation_receipts import legacy_receipt
     starts={e['tool_call_id']:e for e in events if e['event_type']=='tool_operation_started'}
-    result=[]
+    ends={}
     for event in events:
         if event['event_type']!='tool_operation_finished':continue
-        begin=starts.get(event['tool_call_id'])
-        if not begin:raise DynamicError('action_without_start',event_ref(event))
-        payload=event['payload'];overlap=payload.get('overlapping_operation_ids',[])
-        value=payload.get('result',{})
-        if 'frames' in value:
-            exits=[frame['result'] for frame in value['frames'] if frame['kind']=='exit']
-            value=exits[-1] if exits else {}
-        completion='operation_returned_failure' if value.get('timed_out') or value.get('exitCode',0) not in (0,None) else 'operation_completed'
-        result.append({'action_id':'dynamic_action_'+digest(event_ref(event))[:24],
-            'actor_id':begin['actor_id'],'tool_call_id':event['tool_call_id'],'request_id':begin['request_id'],
+        if event['tool_call_id'] not in starts:raise DynamicError('action_without_start',event_ref(event))
+        if event['tool_call_id'] in ends:raise DynamicError('duplicate_operation_finish',event_ref(event))
+        ends[event['tool_call_id']]=event
+    result=[]
+    for identity,begin in starts.items():
+        event=ends.get(identity);receipt,version=legacy_receipt(begin,event)
+        overlap=receipt['overlapping_operation_ids'];status=receipt['operation_status']
+        completion={'succeeded':'operation_completed','failed':'operation_returned_failure',
+            'cancelled':'operation_cancelled','unknown':'operation_unresolved'}[status]
+        result.append({'action_id':'dynamic_action_'+digest(event_ref(event or begin))[:24],
+            'actor_id':begin['actor_id'],'tool_call_id':identity,'operation_id':identity,'request_id':begin['request_id'],
+            'stage_id':begin['stage_id'],'stage_epoch':begin['stage_epoch'],
             'operation':begin['payload']['operation'],'args':begin['payload']['args'],
-            'observation_interval':payload.get('observation_interval'),'overlapping_operation_ids':overlap,
+            'observation_interval':receipt['observation_interval'],'overlapping_operation_ids':overlap,
+            'operation_status':status,'transport_status':receipt['transport_status'],'effect_status':receipt['effect_status'],
+            'process_exit_code':receipt['process_exit_code'],'receipt_version':version,
             'attribution_status':'ambiguous' if overlap else 'single_recorded_operation',
             'candidate_actor_ids':sorted({begin['actor_id'],*(starts[identity]['actor_id'] for identity in overlap if identity in starts)}),
             'attempt_status':'started','completion_status':completion,'phase':'task_tool_operation',
             'harm_status':'not_annotated','goal_achieved_not_inferred_from_command':True,
-            'evidence_refs':[event_ref(begin),event_ref(event)]})
+            'evidence_refs':[event_ref(begin)]+([event_ref(event)] if event else [])})
     return result
 
 

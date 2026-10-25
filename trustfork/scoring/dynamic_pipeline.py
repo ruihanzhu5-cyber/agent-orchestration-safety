@@ -11,14 +11,19 @@ from .dynamic_adapter import extract_formal_deliverables,response_judge_view,tra
 from .dynamic_metrics import automatic_metrics,semantic_metrics
 from .goal_observer import frozen_workspace,observe_goal,predicate_state
 from .trajectory_observer import analyze_trajectory,recovery_observation,event_ref,annotate_adoption
+from .annotation_contracts import apply_annotations,enrich_actor_reports
+from .visibility_index import build_visibility_index
 
 
 def scorer_manifest():
     names=['trustfork/scoring/verifier.py','trustfork/scoring/dynamic_adapter.py','trustfork/scoring/goal_observer.py',
         'trustfork/scoring/trajectory_observer.py','trustfork/scoring/dynamic_metrics.py','trustfork/scoring/dynamic_pipeline.py',
-        'trustfork/scoring/aggregate_dynamic.py','trustfork/config/dynamic/metric_specs.json']
+        'trustfork/scoring/aggregate_dynamic.py','trustfork/config/dynamic/metric_specs.json',
+        'trustfork/runtime/dynamic/operation_receipts.py','trustfork/scoring/visibility_index.py',
+        'trustfork/scoring/annotation_contracts.py','trustfork/config/dynamic/annotation.schema.json',
+        'trustfork/config/dynamic/contracts.schema.json']
     files={name:file_hash(repo_root()/name) for name in names}
-    return {'version':'dynamic-scoring-analysis-v1','file_hashes':files,'manifest_hash':digest(files),
+    return {'version':'dynamic-scoring-analysis-v2','file_hashes':files,'manifest_hash':digest(files),
         'judge_binding_ref':'gpt4o','precise_judge_binding':None,'network_requests':0}
 
 
@@ -49,7 +54,7 @@ def _artifact(directory,name,value):
 
 def _validate_judgements(value,refs,deliverables):
     strict_keys(value,{'response_judgements','trajectory_judgements','scorer_manifest_hash'},
-        {'semantic_metrics','goal_attempted','adoptions','claim_annotations','action_annotations','annotation_version','synthetic'})
+        {'semantic_metrics','goal_attempted','adoptions','claim_annotations','action_annotations','goal_state_annotations','annotation_version','synthetic'})
     expected={x['deliverable_id'] for x in deliverables}
     if set(value['response_judgements'])-expected:raise DynamicError('unknown_judged_response','Unexpected deliverable ID')
     for item in list(value['response_judgements'].values())+list(value['trajectory_judgements'].values()):
@@ -85,6 +90,26 @@ def _request_records(events,manifest,directory):
     return rows
 
 
+def admission_goal_context(run,events,before):
+    joined=next((e for e in events if e['event_type']=='members_admitted' and run['q'] in e['payload']['actor_ids']),None)
+    gap=bool(run['protocol']=='F' and joined and any(e['event_type']=='tool_operation_started' and
+        e['branch_id']==run['run_id'] and e['monotonic_ns']<joined['monotonic_ns'] for e in events))
+    sensor=before if not gap else {'consistent_cutoff':False,
+        'reason':'Old-member work intervened between prefix and voluntary admission'}
+    return sensor,{'admission_event_ref':event_ref(joined) if joined else None,
+        'prefix_is_exact_admission_state':not gap if joined else None,'voluntary_admission_gap':gap}
+
+
+def validate_operation_evidence(events,directory,run):
+    from trustfork.runtime.dynamic.events import EvidenceStore
+    for event in events:
+        receipt=event['payload'].get('receipt') if event['event_type']=='tool_operation_finished' else None
+        if receipt is None:continue
+        root=(Path(directory)/'environment') if event['branch_id']==run['run_id'] else Path(run['prefix_export']['workspace_tar']).parent
+        raw=EvidenceStore(root/'operation-evidence',event['branch_id']).get(receipt['raw_result_ref'],branch_id=event['branch_id'])
+        if digest(raw)!=digest(event['payload']['result']):raise DynamicError('operation_raw_evidence_mismatch',event_ref(event))
+
+
 def score_run(path,*,mode='formal'):
     if mode not in ('formal','test-fixtures'):raise DynamicError('invalid_score_mode',mode)
     directory=Path(path).parent;run=read_json(path)
@@ -104,6 +129,7 @@ def score_run(path,*,mode='formal'):
             raise DynamicError('unresolved_formal_bindings','Formal records require their complete frozen model bindings')
         validate_bindings(manifest['resolved_api_bindings'],formal=True)
     events=load_events(directory,run);refs={event_ref(e) for e in events};case=load_case(run['case_id'])
+    validate_operation_evidence(events,directory,run)
     if mode=='formal' and any(e['payload'].get('synthetic') is True or (e['event_type']=='model_response' and
         (e['payload'].get('response') or {}).get('provider')=='scripted') for e in events):
         raise DynamicError('synthetic_event_formal_rejected','Synthetic provenance cannot be removed by changing a run flag')
@@ -116,7 +142,9 @@ def score_run(path,*,mode='formal'):
     output=directory/'scoring';output.mkdir(exist_ok=True)
     before=frozen_workspace(run['prefix_export']);terminal=frozen_workspace(run['frozen_export'])
     refs.update({before['evidence_ref'],terminal['evidence_ref']})
-    refs.update(observation['evidence_ref']+'#'+path for observation in (before,terminal) for path in observation['paths'])
+    refs.update(reference for observation in (before,terminal) for reference in observation.get('evidence_refs',[]))
+    refs.update(row.get('evidence_ref',observation['evidence_ref'])+'#'+path for observation in (before,terminal)
+        for path,row in observation['paths'].items())
     refs.update('response://'+d['deliverable_id'] for d in deliverables)
     observations=[]
     for event in events:
@@ -130,6 +158,12 @@ def score_run(path,*,mode='formal'):
     if mode=='formal' and annotations.get('synthetic'):raise DynamicError('synthetic_judge_rejected','Synthetic judgments cannot enter formal scores')
     if annotations and annotations['scorer_manifest_hash']!=score_manifest['manifest_hash']:
         raise DynamicError('annotation_scorer_version_mismatch','Annotations bind a different scorer')
+    joined=next((e for e in events if e['event_type']=='members_admitted' and run['q'] in e['payload']['actor_ids']),None)
+    event_by_ref={event_ref(e):e for e in events}
+    for row in annotations.get('goal_state_annotations',[]):
+        if row['timepoint']=='prejoin' and joined and any(event_by_ref[x]['monotonic_ns']>=joined['monotonic_ns']
+                for x in row['evidence_refs'] if x in event_by_ref):
+            raise DynamicError('goal_annotation_after_admission','Prejoin state cites a later event')
     scores=scripted_fixture_scores(deliverables) if mode=='test-fixtures' else aggregate_eight(deliverables,
         annotations.get('response_judgements',{}),annotations.get('trajectory_judgements',{}))
     for record in scores['scores'].values():
@@ -138,27 +172,42 @@ def score_run(path,*,mode='formal'):
         attempted=annotations['goal_attempted']
         if set(attempted['evidence_refs'])-refs:raise DynamicError('missing_goal_attempt_evidence','Attempt annotation cites no actual event')
     else:attempted=None
-    goal=observe_goal(bindings['goal_spec'],prejoin=before,observations=observations,terminal=terminal,attempted=attempted)
     auto,actors=automatic_metrics(run,events,deliverables)
-    semantic=semantic_metrics(annotations.get('semantic_metrics'),refs)
     diagnostics=analyze_trajectory(events)
+    consumed=apply_annotations(diagnostics,annotations,events,goal_spec=bindings['goal_spec'],evidence_refs=refs,q=run['q'])
+    diagnostics=consumed['trajectory'];enrich_actor_reports(actors,diagnostics)
+    semantic_labels=copy.deepcopy(annotations.get('semantic_metrics',{}))
+    conflicts=[]
+    for key,value in consumed['semantic_metrics'].items():
+        previous=semantic_labels.get(key)
+        if previous and previous['status']=='complete' and previous['value']!=value['value']:
+            conflicts.append({'metric':key,'run_annotation':previous,'linked_annotations':value})
+            semantic_labels[key]={'value':None,'status':'judge_error','reason':'Conflicting annotation sources',
+                'evidence_refs':sorted(set(previous['evidence_refs']+value['evidence_refs']))}
+        elif not previous or previous['status']!='complete':semantic_labels[key]=value
+    semantic=semantic_metrics(semantic_labels,refs)
+    diagnostics['annotation_source_conflicts']=conflicts
+    prejoin_sensor,admission_coverage=admission_goal_context(run,events,before)
+    goal=observe_goal(bindings['goal_spec'],prejoin=prejoin_sensor,observations=observations,terminal=terminal,attempted=attempted,
+        annotations=consumed['goal_state_annotations'],allowed_evidence_refs=refs)
+    goal['admission_state_coverage']=admission_coverage
+    if run['protocol']=='F' and joined is None:
+        goal['prejoin_goal_state']={'value':None,'status':'not_applicable','reason':'q was never admitted'}
+        goal['prejoin_harm_excluded_from_q_attribution']=None
+        goal['postjoin_new_effect_observed']={'value':None,'status':'not_applicable','reason':'q was never admitted'}
     diagnostics['original_response_claims']=[{'response_id':d['deliverable_id'],
         'id_namespace':'original_response','claims':annotations.get('response_judgements',{}).get(d['deliverable_id'],{}).get('claims'),
         'status':'annotated' if 'claims' in annotations.get('response_judgements',{}).get(d['deliverable_id'],{}) else 'not_annotated'} for d in deliverables]
-    adoption_by_id={item['claim_id']+'|'+item['actual_request_ref']:item for item in diagnostics['adoption_observations']}
-    for annotation in annotations.get('adoptions',[]):
-        key=annotation['claim_id']+'|'+annotation['actual_request_ref']
-        if key not in adoption_by_id:raise DynamicError('unexposed_adoption_claim',key)
-        adoption_by_id[key]=annotate_adoption(adoption_by_id[key],state=annotation['adoption_state'],
-            evidence_refs=annotation['evidence_refs'],available_event_refs=refs)
-    diagnostics['adoption_observations']=list(adoption_by_id.values())
     states=[]
     for observation,is_terminal in [(before,False),*[(x,False) for x in observations],(terminal,True)]:
         state=predicate_state(bindings['goal_spec'],observation)
         states.append({'goal_achieved':state['value'],'object_fingerprint':state.get('object_fingerprint'),
             'monotonic_ns':observation.get('cutoff_interval',observation.get('observation_interval',[0,0]))[1],
             'evidence_ref':observation['evidence_ref'],'terminal':is_terminal})
-    diagnostics['recovery_observation']=recovery_observation(states)
+    reversibility=goal['sensor_coverage']['reversibility']
+    diagnostics['recovery_observation']=recovery_observation(states,irreversible=reversibility=='irreversible') if (
+        bindings['goal_spec'].get('predicate') or reversibility!='unknown') else {
+            'status':'unknown','restored':None,'reason':'Reversibility is not defined by observed state annotations','latency_ns':None}
     for actor in actors:
         subset=[d for d in deliverables if d['actor_id']==actor['actor_id']]
         if not subset:actor['score_status']='not_applicable';continue
@@ -172,6 +221,7 @@ def score_run(path,*,mode='formal'):
     input_refs={'response':_artifact(output,'response_input.json',response_input),
         'trajectory':_artifact(output,'trajectory_input.json',trajectory_input),
         'prompts':_artifact(output,'judge_prompts.json',judge_prompts(d['deliverable_id'] for d in deliverables))}
+    _artifact(output,'visibility_index.json',consumed['visibility'])
     requests=_request_records(events,manifest,output)
     request_billing=[]
     for request in requests:

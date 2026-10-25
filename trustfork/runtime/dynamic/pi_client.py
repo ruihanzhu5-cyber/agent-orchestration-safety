@@ -98,10 +98,13 @@ class PiClient:
             identity = 'op_' + digest({'session':row['opaque_session_id'],'request':row['request_id'],'op':payload.get('op_id')})
             scope={k:row[k] for k in ('actor_id','stage_id','stage_epoch','request_id','invocation_id')}
             if operation == 'tool_operation':
-                result = self.environment.exec_work_operation(payload['operation'],payload['args'],identity,scope=scope)
+                try:result = self.environment.exec_work_operation(payload['operation'],payload['args'],identity,scope=scope)
+                finally:self._observe_operation(row,identity,payload['operation'],payload['args'])
             elif operation == 'tool_stream':
-                for frame in self.environment.stream_work_operation(payload['args'],identity,scope=scope):
-                    self._write({'kind':'host_response','rpc_id':row['rpc_id'],'frame':frame})
+                try:
+                    for frame in self.environment.stream_work_operation(payload['args'],identity,scope=scope):
+                        self._write({'kind':'host_response','rpc_id':row['rpc_id'],'frame':frame})
+                finally:self._observe_operation(row,identity,'process.stream',payload['args'])
                 result = {'status':'complete'}
             elif operation == 'tool_cancel':
                 result = self.environment.cancel_operation(identity)
@@ -111,10 +114,6 @@ class PiClient:
                 result = self.coordination(row['actor_id'],payload['name'],payload['args'],row)
             else:
                 raise DynamicError('unknown_bridge_event', operation)
-            if self.observer and operation in ('tool_operation','tool_stream'):
-                actual_op=payload.get('operation','process.stream')
-                if actual_op in ('fs.write','process.bash','process.argv','process.stream'):
-                    self.observer(row,identity,actual_op,payload['args'])
             self._write({'kind':'host_response','rpc_id':row['rpc_id'],'payload':result})
         except (OSError, ValueError, DynamicError, subprocess.SubprocessError) as error:
             if row['operation'] in ('model_request_submitted','pi_event'):
@@ -123,6 +122,16 @@ class PiClient:
                 number = error.evidence.get('errno') if isinstance(error,DynamicError) and isinstance(error.evidence,dict) else None
                 self._write({'kind':'host_response','rpc_id':row['rpc_id'],
                     'error':{'message':str(error),'code':errno.errorcode.get(number) if number else None}})
+
+    def _observe_operation(self,row,identity,operation,args):
+        if not self.observer or operation not in ('fs.write','process.bash','process.argv','process.stream'):return
+        try:self.observer(row,identity,operation,args)
+        except Exception as error:
+            # A passive measurement failure is explicit, and cannot turn a
+            # completed work operation into a different tool response/retry.
+            if self.ledger:self.ledger.append('passive_observer_error',{'status':'unknown','operation_id':identity,
+                'error_type':type(error).__name__,'reason':str(error)},actor_id=row['actor_id'],
+                stage_id=row['stage_id'],stage_epoch=row['stage_epoch'],request_id=row['request_id'])
 
     def call(self, session_id, operation, payload=None, *, request_id=None, stage_id='initial', epoch=0, invocation_id=None, timeout=180):
         config = self.sessions[session_id]

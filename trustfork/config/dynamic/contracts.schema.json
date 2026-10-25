@@ -925,6 +925,120 @@
           "type": "boolean"
         }
       }
+    },
+    "OperationReceipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "actor_id",
+        "request_id",
+        "invocation_id",
+        "raw_result_ref",
+        "started_event_ref",
+        "schema_version",
+        "operation_id",
+        "operation",
+        "transport_status",
+        "operation_status",
+        "process_exit_code",
+        "timed_out",
+        "cancelled",
+        "effect_status",
+        "observation_interval",
+        "overlapping_operation_ids"
+      ],
+      "properties": {
+        "actor_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "request_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "invocation_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "raw_result_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "started_event_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "schema_version": {
+          "const": "2.0"
+        },
+        "operation_id": {
+          "type": "string"
+        },
+        "operation": {
+          "type": "string"
+        },
+        "transport_status": {
+          "enum": [
+            "complete",
+            "error",
+            "unknown"
+          ]
+        },
+        "operation_status": {
+          "enum": [
+            "succeeded",
+            "failed",
+            "cancelled",
+            "unknown"
+          ]
+        },
+        "process_exit_code": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "timed_out": {
+          "type": "boolean"
+        },
+        "cancelled": {
+          "type": "boolean"
+        },
+        "effect_status": {
+          "enum": [
+            "not_assessed",
+            "unknown",
+            "observed"
+          ]
+        },
+        "observation_interval": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "integer"
+          },
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "overlapping_operation_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
     }
   }
 }

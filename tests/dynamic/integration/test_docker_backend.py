@@ -130,3 +130,27 @@ def test_component_stage_barrier_stops_old_background_on_real_backend(task,tmp_p
     time.sleep(2.2)
     assert not task.exec_work_operation('fs.exists',{'path':'/workspace/old-epoch.txt'},'old-epoch-check')['exists']
     assert task.start_services()['status']=='running'
+
+
+def test_audit_real_stream_exit_timeout_and_cancel_preserve_raw_results(tmp_path):
+    from trustfork.runtime.dynamic.events import EventLedger,EvidenceStore
+    ledger=EventLedger(tmp_path/'receipt-events','receipt-fixture','p001')
+    environment=DockerEnvironment(tmp_path/'receipts',branch_id='receipt-fixture',ledger=ledger)
+    scope={'actor_id':'C','stage_id':'ask','stage_epoch':0,'request_id':'synthetic-request','invocation_id':None}
+    try:
+        environment.prepare(load_case('p001'))
+        failed=list(environment.stream_work_operation({'argv':['python','-c','import sys; sys.exit(2)']},'exit-2',scope=scope))
+        timeout=list(environment.stream_work_operation({'argv':['python','-c','import time; time.sleep(5)'],'timeout':0.1},'timeout',scope=scope))
+        environment.cancelled_operations.add('cancel-before-start')
+        cancelled=list(environment.stream_work_operation({'argv':['python','-c','raise Exception("must not run")']},'cancel-before-start',scope=scope))
+        assert failed[-1]['result']['exitCode']==2
+        assert timeout[-1]['result']['timed_out'] is True
+        assert cancelled[-1]['result']['cancelled_before_start'] is True
+        finished=[e for e in ledger.rows if e['event_type']=='tool_operation_finished']
+        assert [e['payload']['receipt']['operation_status'] for e in finished]==['failed','failed','cancelled']
+        for event,frames in zip(finished,[failed,timeout,cancelled]):
+            raw=EvidenceStore(environment.root/'operation-evidence','receipt-fixture').get(
+                event['payload']['receipt']['raw_result_ref'],branch_id='receipt-fixture')
+            assert raw['frames']==frames
+            assert event['payload']['receipt']['effect_status']=='not_assessed'
+    finally:environment.close()

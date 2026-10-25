@@ -116,7 +116,8 @@ def test_goal_direct_effect_without_main_adoption_prejoin_and_repair():
     preexisting=observe_goal(spec,prejoin=harmed,observations=[],terminal=harmed)
     assert preexisting['prejoin_harm_excluded_from_q_attribution'] is True and not preexisting['postjoin_new_effect_observed']['value']
     blocked=observe_goal(spec,prejoin=clean,observations=[],terminal=clean,attempted={'value':True,'status':'complete','evidence_refs':['attempt']})
-    assert blocked['goal_attempted']['value'] and not blocked['goal_observed_achieved']['value']
+    assert blocked['goal_attempted']['value'] and blocked['goal_observed_achieved']['value'] is None
+    assert blocked['goal_observed_achieved']['status']=='unknown'  # no continuous coverage of the interval
     unknown=observe_goal({'semantic_judge_needed':True},prejoin=clean,observations=[],terminal=clean)
     assert unknown['goal_terminal_achieved']['status']=='not_annotated' and unknown['goal_terminal_achieved']['value'] is None
     frozen_failure=predicate_state(spec,{'consistent_cutoff':False})
@@ -155,3 +156,56 @@ def test_unknown_rate_bounds_and_unannotated_separate():
     assert binary_summary([])['known_fraction'] is None
     with pytest.raises(DynamicError,match='unresolved_annotation_evidence'):
         semantic_metrics({'critical_delegation':{'value':True,'status':'complete','evidence_refs':['invented']}},set())
+
+
+@pytest.mark.parametrize('result,status',[
+    ({'exitCode':0,'timed_out':False},'succeeded'),
+    ({'exitCode':2,'timed_out':False},'failed'),
+    ({'exitCode':0,'timed_out':True},'failed'),
+    ({'exitCode':None,'cancelled_before_start':True},'cancelled'),
+    ({},'unknown')])
+def test_audit_legacy_stream_exit_is_not_default_success(tmp_path,result,status):
+    ledger=EventLedger(tmp_path/'receipts','b','p001')
+    ledger.append('tool_operation_started',{'operation':'process.stream','args':{'argv':['sh','-c','fixture']}},
+        actor_id='C',request_id='r',tool_call_id='op')
+    ledger.append('tool_operation_finished',{'exit':{'kind':'exit','result':result},
+        'observation_interval':[1,2],'overlapping_operation_ids':[]},actor_id='C',request_id='r',tool_call_id='op')
+    action=action_observations(ledger.rows)[0]
+    assert action['operation_status']==status
+    assert action['effect_status'] in ('not_assessed','unknown')
+    assert action['receipt_version']=='legacy-exit-v1'
+
+
+def test_audit_unfinished_operation_remains_unknown_and_rg_no_match_is_normal(tmp_path):
+    from trustfork.runtime.dynamic.operation_receipts import make_operation_receipt
+    ledger=EventLedger(tmp_path/'receipts','b','p001')
+    ledger.append('tool_operation_started',{'operation':'fs.write','args':{'path':'/workspace/x'}},
+        actor_id='C',request_id='r',tool_call_id='lost')
+    action=action_observations(ledger.rows)[0]
+    assert action['operation_status']=='unknown' and action['completion_status']=='operation_unresolved'
+    receipt=make_operation_receipt('grep-op','process.stream',{'argv':['rg','absent','/workspace']},
+        {'exitCode':1,'timed_out':False},scope={'actor_id':'C','request_id':'r'},
+        raw_result_ref='evidence://'+'0'*64,started_event_ref='b::start',interval=[1,2])
+    assert receipt['operation_status']=='succeeded' and receipt['process_exit_code']==1
+    assert receipt['effect_status']=='not_assessed'
+
+
+def test_audit_backend_errors_and_prestart_cancellation_have_receipts(tmp_path,monkeypatch):
+    from trustfork.runtime.dynamic.environment import DockerEnvironment
+    from trustfork.runtime.dynamic.events import EvidenceStore
+    ledger=EventLedger(tmp_path/'receipts','b','p001');env=DockerEnvironment(tmp_path/'env',branch_id='b',ledger=ledger)
+    scope={'actor_id':'C','stage_id':'ask','stage_epoch':0,'request_id':'r','invocation_id':None}
+    def absent(*a,**kw):raise DynamicError('remote_FileNotFoundError','fixture missing file')
+    monkeypatch.setattr(env,'_worker',absent)
+    with pytest.raises(DynamicError,match='remote_FileNotFoundError'):
+        env.exec_work_operation('fs.read',{'path':'/workspace/missing'},'absent',scope=scope)
+    env.cancelled_operations.add('cancel-before-start')
+    frames=list(env.stream_work_operation({'argv':['never-start']},'cancel-before-start',scope=scope))
+    assert frames[0]['result']['cancelled_before_start'] is True
+    finished=[e for e in ledger.rows if e['event_type']=='tool_operation_finished']
+    assert len(finished)==2
+    assert [e['payload']['receipt']['operation_status'] for e in finished]==['failed','cancelled']
+    for event in finished:
+        receipt=event['payload']['receipt']
+        assert receipt['actor_id']=='C' and receipt['request_id']=='r' and receipt['schema_version']=='2.0'
+        assert EvidenceStore(env.root/'operation-evidence','b').get(receipt['raw_result_ref'],branch_id='b')

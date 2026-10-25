@@ -19,7 +19,8 @@ import yaml
 from . import remote_worker
 from .case_loader import materialize_case
 from .common import BASE_IMAGE, BASE_IMAGE_ID, DynamicError, canonical, digest, write_json
-from .events import EventLedger
+from .events import EventLedger,EvidenceStore
+from .operation_receipts import make_operation_receipt
 from .operations import OperationStore
 from .dependencies import fd_binary, fd_lock
 
@@ -33,6 +34,7 @@ class DockerEnvironment:
         self.label = "io.trustfork.dynamic.run=" + self.run_id
         self.ledger = ledger
         self.operations = OperationStore(self.root / "operations.sqlite")
+        self.operation_evidence=EvidenceStore(self.root/'operation-evidence',self.run_id)
         self.active = set()
         self.active_lock = threading.RLock()
         self.cancelled_operations = set()
@@ -156,24 +158,37 @@ class DockerEnvironment:
             return claim["result"]
         with self.active_lock:
             self.active.add(op_id)
-        if self.ledger:
-            self.ledger.append("tool_operation_started", {"op_id": op_id, "operation": operation, "args": args}, tool_call_id=op_id, **(scope or {}))
+        start=self.ledger.append("tool_operation_started", {"op_id": op_id, "operation": operation, "args": args}, tool_call_id=op_id, **(scope or {})) if self.ledger else None
         try:
             result = self._worker(operation, args, op_id, timeout=max(60, args.get("timeout", 0) + 10))
             stored = self.operations.finish(op_id, result)
-            if self.ledger:
-                self.ledger.append("tool_operation_finished", {"op_id": op_id, "result": result,
-                    "observation_interval": [stored["started_ns"], stored["ended_ns"]],
-                    "overlapping_operation_ids": stored["overlapping_operation_ids"],
-                    "attribution_status": "ambiguous" if stored["overlapping_operation_ids"] else "single_recorded_operation"}, tool_call_id=op_id, **(scope or {}))
+            self._record_operation_end(operation,args,op_id,result,stored,scope,start)
             return result
         except BaseException as error:
             if self.operations.get(op_id)["status"] == "started":
-                self.operations.finish(op_id, {"error": type(error).__name__, "reason": str(error)}, unknown=True)
+                raw={"error": type(error).__name__, "reason": str(error)}
+                stored=self.operations.finish(op_id,raw,unknown=True)
+                self._record_operation_end(operation,args,op_id,raw,stored,scope,start,error=error)
             raise
         finally:
             with self.active_lock:
                 self.active.discard(op_id)
+
+    def _record_operation_end(self,operation,args,op_id,result,stored,scope,start,*,error=None,stream=False):
+        reference=self.operation_evidence.put(result)
+        interval=[stored['started_ns'],stored['ended_ns']];overlap=stored['overlapping_operation_ids']
+        receipt=make_operation_receipt(op_id,operation,args,result,scope=scope,error=error,
+            raw_result_ref=reference,started_event_ref=start['branch_id']+'::'+start['event_id'] if start else None,
+            interval=interval,overlaps=overlap,cancel_requested=op_id in self.cancelled_operations)
+        if self.ledger:
+            from .schema import validate_contract
+            validate_contract('OperationReceipt',receipt)
+            payload={'op_id':op_id,'receipt':receipt,'result':result,'observation_interval':interval,
+                'overlapping_operation_ids':overlap,'attribution_status':'ambiguous' if overlap else 'single_recorded_operation'}
+            if stream:
+                exits=[f for f in result.get('frames',[]) if f.get('kind')=='exit']
+                if exits:payload['exit']=exits[-1]  # legacy readers retain their original raw shape
+            self.ledger.append('tool_operation_finished',payload,tool_call_id=op_id,**(scope or {}))
 
     def capture_observation(self, paths: list[str]) -> dict:
         if self.frozen:
@@ -212,21 +227,22 @@ class DockerEnvironment:
         if claim['cached']:
             yield from claim['result']['frames']
             return
+        start=self.ledger.append('tool_operation_started',{'op_id':op_id,'operation':'process.stream','args':args},tool_call_id=op_id,**(scope or {})) if self.ledger else None
         if op_id in self.cancelled_operations:
             frames=[{'kind':'exit','result':{'exitCode':None,'timed_out':False,'cancelled_before_start':True}}]
-            self.operations.finish(op_id,{'frames':frames})
+            stored=self.operations.finish(op_id,{'frames':frames})
+            self._record_operation_end('process.stream',args,op_id,{'frames':frames},stored,scope,start,stream=True)
             yield from frames
             return
         with self.active_lock:
             self.active.add(op_id)
-        if self.ledger:
-            self.ledger.append('tool_operation_started', {'op_id':op_id, 'operation':'process.stream', 'args':args}, tool_call_id=op_id, **(scope or {}))
         payload = base64.b64encode(canonical({'operation':'process.stream', 'args':args, 'op_id':op_id})).decode()
-        process = subprocess.Popen(['/usr/bin/docker', '--host', 'unix:///var/run/docker.sock',
-            'exec', self.container, 'python', '-c', self.worker_source, payload], env=self.client_env,
-            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, bufsize=1)
+        process=None
         frames, finished = [], False
         try:
+            process = subprocess.Popen(['/usr/bin/docker', '--host', 'unix:///var/run/docker.sock',
+                'exec', self.container, 'python', '-c', self.worker_source, payload], env=self.client_env,
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, bufsize=1)
             for line in process.stdout:
                 frame = json.loads(line)
                 frames.append(frame)
@@ -239,19 +255,17 @@ class DockerEnvironment:
             if code or not finished:
                 raise DynamicError('stream_transport_unknown', process.stderr.read()[-1000:])
             stored = self.operations.finish(op_id, {'frames':frames})
-            if self.ledger:
-                self.ledger.append('tool_operation_finished', {'op_id':op_id, 'exit':frames[-1],
-                    'observation_interval':[stored['started_ns'],stored['ended_ns']],
-                    'overlapping_operation_ids':stored['overlapping_operation_ids'],
-                    'attribution_status':'ambiguous' if stored['overlapping_operation_ids'] else 'single_recorded_operation'}, tool_call_id=op_id, **(scope or {}))
+            self._record_operation_end('process.stream',args,op_id,{'frames':frames},stored,scope,start,stream=True)
         except BaseException as error:
             if self.operations.get(op_id)['status'] == 'started':
-                self.operations.finish(op_id, {'error':type(error).__name__, 'reason':str(error)}, unknown=True)
+                raw={'error':type(error).__name__,'reason':str(error),'frames':frames}
+                stored=self.operations.finish(op_id,raw,unknown=True)
+                self._record_operation_end('process.stream',args,op_id,raw,stored,scope,start,error=error,stream=True)
             raise
         finally:
-            process.stdout.close()
-            process.stderr.close()
-            if process.poll() is None:
+            if process is not None:
+                process.stdout.close();process.stderr.close()
+            if process is not None and process.poll() is None:
                 self.cancel_operation(op_id)
                 process.wait(timeout=10)
             with self.active_lock:
@@ -301,7 +315,8 @@ class DockerEnvironment:
                 if b'could not find' in copied.stderr.lower() or b'no such' in copied.stderr.lower():continue
                 raise DynamicError('state_export_failed',path)
             file=self.root/(name+'-frozen.tar');file.write_bytes(copied.stdout)
-            result['additional_exports'][name]={'path':str(file),'sha256':hashlib.sha256(copied.stdout).hexdigest()}
+            result['additional_exports'][name]={'path':str(file),'sha256':hashlib.sha256(copied.stdout).hexdigest(),
+                'source_path':path,'coverage':'this_original_service_path_only'}
         result['filesystem_changes']=self.docker('diff',self.container).stdout.splitlines()
         result['home_asset_exports']={}
         home_assets=[row for row in self.case['deployed_assets'] if row['path'].startswith('home/') and row['type'] in ('file','symlink')]

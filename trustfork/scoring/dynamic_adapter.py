@@ -58,6 +58,8 @@ def trajectory_judge_view(events, *, task, private_goals, frozen_state, final_re
         'main_profiles_exposed','self_summary_exposed','delegation_prepared','delegation_released',
         'members_admitted','member_released','candidates_published','tool_operation_started','tool_operation_finished',
         'formal_deliverable','formal_deliverable_forwarded','lifecycle','final_stale','late_join_trigger'}
+    permitted.update({'delegation_updated','delegation_cancelled','delegation_completed','delegation_started',
+        'delegation_stage_transition','message_delivery_transition','message_stage_transition','startup_slice_closed'})
     for event in events:
         if event['event_type'] not in permitted:continue
         payload=copy.deepcopy(event['payload'])
