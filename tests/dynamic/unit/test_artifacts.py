@@ -41,3 +41,19 @@ def test_seal_keeps_originals_and_verifies_index(tmp_path,monkeypatch):
     assert archive.is_file() and (campaign.path/'campaign.json').is_file()
     with pytest.raises(DynamicError,match='archive_exists'):campaign.seal(archive)
     assert safe_slug('CON').startswith('block-')
+
+
+def test_index_preserves_alias_metadata_without_reading_or_recursing_into_targets(tmp_path,monkeypatch):
+    monkeypatch.setenv('TRUSTFORK_ARTIFACT_ROOT',str(tmp_path/'root'))
+    campaign=Campaign.create(commit='abc',config={},plan=[],mode='mock',campaign_id='aliases')
+    outside=tmp_path/'outside';outside.mkdir();(outside/'canary.txt').write_text('DO_NOT_INDEX_EXTERNAL_CONTENT')
+    external=campaign.path/'external-alias';external.symlink_to(outside,target_is_directory=True)
+    internal=campaign.path/'test-current';internal.symlink_to('diagnostics',target_is_directory=True)
+    rows=campaign.index();campaign.verify()
+    links=[r for r in rows if r.get('type')=='symlink']
+    assert len(links)==2 and all(r['followed'] is False for r in links)
+    assert not any('canary' in r['path'] or r['path'].startswith('external-alias/') for r in rows)
+    (outside/'canary.txt').write_text('External contents are not claimed as indexed evidence')
+    campaign.verify()
+    external.unlink();external.symlink_to(tmp_path/'different-target',target_is_directory=True)
+    with pytest.raises(DynamicError,match='artifact_hash_mismatch'):campaign.verify()

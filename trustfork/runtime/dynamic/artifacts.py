@@ -10,6 +10,7 @@ import re
 import shutil
 import tarfile
 import uuid
+import hashlib
 from .common import DynamicError,canonical,digest,file_hash,read_json
 
 
@@ -100,8 +101,15 @@ class Campaign:
         with file_lock(self.path/'.index.lock'):
             previous={r['path']:r for r in read_json(self.path/'artifact-index.json')['files']} if (self.path/'artifact-index.json').exists() else {}
             rows=[]
-            for path in sorted(self.path.rglob('*')):
-                if path.is_symlink():raise DynamicError('artifact_symlink','External evidence cannot be silently indexed')
+            paths=[]
+            for directory,dirs,files in os.walk(self.path,followlinks=False):
+                paths.extend(Path(directory)/name for name in dirs+files)
+            for path in sorted(paths):
+                if path.is_symlink():
+                    target=os.readlink(path);name=path.relative_to(self.path).as_posix()
+                    rows.append({'path':name,'size':path.lstat().st_size,'sha256':hashlib.sha256(os.fsencode(target)).hexdigest(),
+                        'type':'symlink','target':target,'followed':False,'role':name.split('/')[0],'source':{}})
+                    continue
                 if not path.is_file() or path.name=='artifact-index.json' or path.name.endswith(('.lock','.tmp')):continue
                 name=path.relative_to(self.path).as_posix()
                 prior=previous.get(name,{})
@@ -125,6 +133,10 @@ class Campaign:
         if index['content_hash']!=digest(index['files']):raise DynamicError('artifact_index_corrupt','Index hash differs')
         for row in index['files']:
             path=self.path/row['path']
+            if row.get('type')=='symlink':
+                if not path.is_symlink() or hashlib.sha256(os.fsencode(os.readlink(path))).hexdigest()!=row['sha256']:
+                    raise DynamicError('artifact_hash_mismatch',row['path'])
+                continue
             if not path.is_file() or path.is_symlink() or file_hash(path)!=row['sha256']:
                 raise DynamicError('artifact_hash_mismatch',row['path'])
         return index
