@@ -166,3 +166,147 @@ def test_plan_no_fake_work_and_budget_reservations(tmp_path):
     assert restored.output_tokens==2 and len(restored.attempts)==2
     with pytest.raises(DynamicError,match='transport_retry_limit'):
         restored.reserve('r',3)
+
+
+def audit_runtime(tmp_path, protocol='S'):
+    """Use the real coordination/queue methods without a model or container."""
+    from trustfork.agents.pi_dynamic import PiDynamic
+    runtime=PiDynamic.__new__(PiDynamic)
+    runtime.protocol=protocol;runtime.case=load_case('p001')
+    runtime.ledger=EventLedger(tmp_path/'audit-events','audit-branch','p001')
+    runtime.membership=Membership(runtime.ledger)
+    runtime.delegations=Delegations(runtime.ledger,runtime.membership)
+    runtime.mailbox=Mailbox(runtime.ledger,runtime.membership)
+    runtime.lifecycle=Lifecycle(runtime.ledger,'ask');runtime.lifecycle.state='RUNNING'
+    runtime.scheduler=Scheduler('audit',runtime.ledger,runtime.membership,runtime.lifecycle)
+    runtime.main_revision=0;runtime.formal_deliverables={};runtime.created=[]
+    runtime._create_actor=lambda actor:runtime.created.append(actor)
+    return runtime
+
+
+def audit_scope(runtime):
+    return {'stage_epoch':runtime.lifecycle.epoch,'stage_id':runtime.lifecycle.stage_id,
+            'request_id':'actual-main-request','invocation_id':None}
+
+
+@pytest.mark.parametrize('protocol',['S','L'])
+def test_audit_open_startup_cannot_be_released_updated_or_cancelled(tmp_path,protocol):
+    runtime=audit_runtime(tmp_path,protocol)
+    runtime.membership.admit_atomic(['C','D']);runtime.scheduler.begin_startup(['C','D'])
+    row=runtime.delegations.prepare('C','Original task',source='runtime_startup')
+    for name,args in [('release_member',{'actor_id':'C'}),
+            ('update_delegation',{'delegation_id':row['delegation_id'],'task_text':'skip startup'}),
+            ('cancel_delegation',{'delegation_id':row['delegation_id']})]:
+        result=runtime._coordinate('Main',name,args,audit_scope(runtime))
+        assert result['status']=='startup_contract_active'
+    assert runtime.membership.admitted('C')
+    assert runtime.scheduler.startup['C']=={'requests':0,'status':'open'}
+    assert runtime.delegations.get(row['delegation_id'])['task_text']=='Original task'
+    assert not runtime.scheduler.final_allowed()
+
+
+def test_audit_f_recruit_only_registers_and_does_not_start_work(tmp_path):
+    runtime=audit_runtime(tmp_path,'F')
+    runtime._coordinate('Main','recruit',{'actor_ids':['C']},audit_scope(runtime))
+    assert runtime.created==['C'] and runtime.membership.admitted('C')
+    assert runtime.delegations.rows==[] and list(runtime.scheduler.queue)==[]
+    assert runtime.scheduler.startup['C']['status']=='not_admitted'
+    assert runtime.scheduler.final_allowed()
+    runtime._coordinate('Main','delegate_work',{'actor_id':'C','task_text':'voluntary work'},audit_scope(runtime))
+    assert runtime.scheduler.permit()['actor_id']=='C'
+    assert runtime._next_invocation('C')['source']=='main_voluntary'
+
+
+def test_audit_f_peer_message_is_a_real_wake_source(tmp_path):
+    runtime=audit_runtime(tmp_path,'F')
+    runtime._coordinate('Main','recruit',{'actor_ids':['C']},audit_scope(runtime))
+    runtime._coordinate('A','send_message',{'recipients':['C'],'content':'Please inspect the shared task'},audit_scope(runtime))
+    assert runtime.delegations.rows==[]
+    assert runtime.scheduler.permit()['actor_id']=='C'
+    assert runtime._next_invocation('C') is None
+
+
+def test_audit_delegation_versions_and_scope_are_append_only(tmp_path):
+    runtime=audit_runtime(tmp_path)
+    row=runtime.delegations.prepare('A','first',epoch=2,stage_id='fragment_3',request_id='prepare')
+    runtime.delegations.update(row['delegation_id'],'second',stage_id='fragment_3',epoch=2,request_id='update')
+    runtime.delegations.cancel(row['delegation_id'],stage_id='fragment_3',epoch=2,request_id='cancel')
+    events=[e for e in runtime.ledger.rows if e['event_type'].startswith('delegation_')]
+    assert [e['event_type'] for e in events]==['delegation_prepared','delegation_updated','delegation_cancelled']
+    assert [e['payload']['version'] for e in events]==[1,2,3]
+    assert events[0]['payload']['task_text']=='first'
+    assert events[1]['payload']['previous_task_text']=='first'
+    assert events[1]['payload']['task_text']=='second'
+    assert [e['request_id'] for e in events]==['prepare','update','cancel']
+    assert all(e['stage_id']=='fragment_3' and e['stage_epoch']==2 for e in events)
+
+
+def test_audit_cancelled_queue_marker_does_not_drop_peer_or_start_empty_turn(tmp_path):
+    runtime=audit_runtime(tmp_path)
+    runtime.scheduler.work_available=runtime._has_pending_work
+    row=runtime.delegations.prepare('A','cancelled task');runtime._release()
+    runtime.delegations.cancel(row['delegation_id'])
+    assert runtime.scheduler.permit() is None
+    runtime.mailbox.enqueue('B',['A'],'peer task remains',branch_id='audit-branch')
+    runtime.scheduler.enqueue_batch(['A'],reason='peer_message')
+    assert runtime.scheduler.permit()['actor_id']=='A'
+    runtime.scheduler.complete('A',unfinished=True)
+    packet=runtime.mailbox.claim('A','read-peer',epoch=0)
+    runtime.mailbox.advance('A','read-peer','input_frozen');runtime.mailbox.advance('A','read-peer','submitted')
+    runtime.mailbox.confirm('A','read-peer',{'peer_messages':packet},successful=True)
+    assert runtime.scheduler.permit()['actor_id']=='A'  # real unfinished batch continuation
+    runtime.scheduler.complete('A',unfinished=False)
+    runtime.scheduler.enqueue_batch(['A'],reason='stale_after_cancel')
+    assert runtime.scheduler.permit() is None
+
+
+def test_audit_message_recipient_terminal_replay_and_coverage(tmp_path):
+    from trustfork.scoring.dynamic_metrics import automatic_metrics
+    runtime=audit_runtime(tmp_path);runtime.membership.admit_atomic(['C','D'])
+    runtime.mailbox.enqueue('C',['A','Main'],'same result',branch_id='audit-branch')
+    packet=runtime.mailbox.claim('A','a',epoch=0);runtime.mailbox.advance('A','a','input_frozen');runtime.mailbox.advance('A','a','submitted')
+    runtime.mailbox.confirm('A','a',{'peer_messages':packet},successful=True)
+    runtime.mailbox.stage_transition(0,1,new_session=True)
+    values,_=automatic_metrics({'q':'C','case_id':'p001'},runtime.ledger.rows,[])
+    assert values['delivery_coverage']['fraction']==1
+    assert values['delivery_coverage_recipient']['fraction']==0.5
+    assert values['message_recipient_terminal_counts']=={'confirmed_exposure':1,'cancelled_new_session':1}
+
+
+def test_audit_formal_delivery_has_stable_message_and_source_links(tmp_path):
+    runtime=audit_runtime(tmp_path)
+    row=runtime.delegations.prepare('A','work',source='initial_plan')
+    runtime._formal('A',runtime.delegations.get(row['delegation_id']),
+        {'content':[{'type':'text','text':'actual work result'}],'stopReason':'stop'},'a-request')
+    event=next(e for e in runtime.ledger.rows if e['event_type']=='formal_deliverable')
+    message=next(e for e in runtime.ledger.rows if e['event_type']=='message_enqueued')
+    assert event['payload']['message_id']==message['message_id']
+    assert message['payload']['deliverable_id']==event['payload']['deliverable_id']
+    assert message['payload']['source_event_ref']=='audit-branch::'+event['event_id']
+    assert any(e['event_type']=='delegation_completed' for e in runtime.ledger.rows)
+
+
+def test_audit_startup_budget_termination_emits_actual_counts_and_allows_release(tmp_path):
+    runtime=audit_runtime(tmp_path);runtime.membership.admit_atomic(['C','D'])
+    runtime.scheduler.begin_startup(['C','D']);runtime.scheduler.terminate_startup('global_budget_or_timeout')
+    closed=[e for e in runtime.ledger.rows if e['event_type']=='startup_slice_closed']
+    assert len(closed)==2 and all(e['payload']['actual_requests']==0 for e in closed)
+    assert all(e['payload']['terminal_status']=='global_budget_or_timeout' for e in closed)
+    assert runtime._coordinate('Main','release_member',{'actor_id':'C'},audit_scope(runtime))['status']=='released'
+    release=next(e for e in runtime.ledger.rows if e['event_type']=='member_released')
+    assert release['stage_id']=='ask' and release['request_id']=='actual-main-request'
+
+
+def test_audit_explicit_initial_invocation_completion_closes_startup(tmp_path):
+    from concurrent.futures import Future
+    runtime=audit_runtime(tmp_path);runtime.membership.admit_atomic(['C','D'])
+    runtime.scheduler.begin_startup(['C']);runtime.delegations.prepare('C','initial',source='runtime_startup')
+    runtime._release();assert runtime.scheduler.permit()['actor_id']=='C'
+    invocation=runtime._next_invocation('C')
+    runtime.delegations.complete(invocation['invocation_id'],stage_id='ask',epoch=0,
+        request_id='actual-C',terminal_status='completed_via_peer')
+    future=Future();future.set_result({'response':{'stopReason':'toolUse'}})
+    runtime._settle(future,{future:('C',invocation)})
+    assert runtime.scheduler.startup['C']['status']=='initial_invocation_completed'
+    assert runtime.scheduler.final_allowed()
+    assert 'C' in runtime.scheduler.continuations

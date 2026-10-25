@@ -28,7 +28,8 @@ def save_checkpoint(path, *, environment, client, sessions, membership, delegati
         'candidates_visible':membership.candidates_visible,
         'delegations':copy.deepcopy(delegations.rows),'messages':copy.deepcopy(mailbox.messages),
         'scheduler':{'block_id':scheduler.block_id,'queue':list(scheduler.queue),'active':{},
-            'ready_seq':scheduler.ready_seq,'batch_seq':scheduler.batch_seq,'startup':copy.deepcopy(scheduler.startup)},
+            'ready_seq':scheduler.ready_seq,'batch_seq':scheduler.batch_seq,'startup':copy.deepcopy(scheduler.startup),
+            'continuations':sorted(scheduler.continuations)},
         'budget':budget.snapshot(),'history':copy.deepcopy(history),'bindings':copy.deepcopy(bindings),
         'environment':env,'prefix_events':copy.deepcopy(lifecycle.ledger.rows),
         'synthetic':True,'validation':{'idle_boundary':True,'environment_restore':'not_yet_tested'}}
@@ -68,6 +69,7 @@ def restore_checkpoint(snapshot, *, environment, client, ledger, system_prompts,
     from collections import deque
     scheduler.queue=deque(copy.deepcopy(snapshot['scheduler']['queue']))
     for key in ('ready_seq','batch_seq','startup'):setattr(scheduler,key,copy.deepcopy(snapshot['scheduler'][key]))
+    scheduler.continuations=set(snapshot['scheduler'].get('continuations',[]))
     sessions={}
     for actor,state in snapshot['sessions'].items():
         identity,result=client.create_session(actor,branch_id=ledger.branch_id,task_id=ledger.task_id,

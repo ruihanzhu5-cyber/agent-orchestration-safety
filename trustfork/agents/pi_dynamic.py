@@ -97,6 +97,7 @@ class PiDynamic:
         self.membership=Membership(self.ledger);self.delegations=Delegations(self.ledger,self.membership)
         self.mailbox=Mailbox(self.ledger,self.membership);self.lifecycle=Lifecycle(self.ledger,self.case['stages'][0]['id'])
         self.scheduler=Scheduler(self.block_id,self.ledger,self.membership,self.lifecycle);self.budget=Budget()
+        self.scheduler.work_available=self._has_pending_work
         self.sessions={};self.profile_service=None;self.main_revision=0;self.request_serial=0
         self.pending_final=None;self.current_scripts=None;self.final_text=None
         self.main_profile_introduced=False
@@ -167,20 +168,23 @@ class PiDynamic:
                 identity=forward
             else:
                 identity='deliverable_'+uuid.uuid4().hex
-            message=self.mailbox.enqueue(actor,args['recipients'],args['content'],branch_id=self.ledger.branch_id,epoch=epoch)
+            message_id=uuid.uuid4().hex
             payload={'deliverable_id':identity,'actor_id':actor,'task_id':self.case['case_id'],'branch_id':self.ledger.branch_id,
                 'stage_id':self.lifecycle.stage_id,'stage_epoch':epoch,'invocation_id':scope['invocation_id'] or ('peer_'+uuid.uuid4().hex),
                 'request_ref':scope['request_id'],'recipient_ids':args['recipients'],'origin':'peer_work_delivery',
                 'content':args['content'],'content_hash':digest(args['content']),'result_status':'completed',
-                'completion_received':True,'provider_stop_reason':'toolUse','forward_of':forward,'message_id':message['message_id']}
+                'completion_received':True,'provider_stop_reason':'toolUse','forward_of':forward,'message_id':message_id}
             event=self.ledger.append('formal_deliverable_forwarded' if forward else 'formal_deliverable',payload,
                 actor_id=actor,stage_id=self.lifecycle.stage_id,stage_epoch=epoch,request_id=scope['request_id'],
                 invocation_id=payload['invocation_id'])
+            message=self.mailbox.enqueue(actor,args['recipients'],args['content'],branch_id=self.ledger.branch_id,
+                epoch=epoch,message_id=message_id,deliverable_id=identity,
+                source_event_ref=self.ledger.branch_id+'::'+event['event_id'])
             if not forward:
                 payload['source_event_id']=event['event_id'];self.formal_deliverables[identity]=payload
             if args.get('complete_invocation') and scope['invocation_id']:
-                for row in self.delegations.rows:
-                    if row['invocation_id']==scope['invocation_id']:row.update(status='terminal',terminal_status='completed_via_peer')
+                self.delegations.complete(scope['invocation_id'],stage_id=self.lifecycle.stage_id,epoch=epoch,
+                    request_id=scope['request_id'],terminal_status='completed_via_peer')
             if 'Main' in args['recipients']:self.main_revision+=1
             self.scheduler.enqueue_batch(args['recipients'],reason='explicit_peer_work_delivery')
             return {'status':'queued','deliverable_id':identity,'message_id':message['message_id']}
@@ -199,37 +203,46 @@ class PiDynamic:
         if actor!='Main':raise DynamicError('coordination_role_mismatch',name)
         if name=='delegate_work':
             result=self.delegations.prepare(args['actor_id'],args['task_text'],epoch=epoch,
-                source='initial_plan' if self.lifecycle.state=='PLANNING' else 'main_voluntary',request_id=scope['request_id'])
-            if self.lifecycle.worker_permitted():self._release()
+                source='initial_plan' if self.lifecycle.state=='PLANNING' else 'main_voluntary',request_id=scope['request_id'],stage_id=self.lifecycle.stage_id)
+            if self.lifecycle.worker_permitted():self._release(request_id=scope['request_id'])
             return {'status':'queued','delegation_id':result['delegation_id'],'invocation_id':result['invocation_id']}
-        if name=='update_delegation':return self.delegations.update(args['delegation_id'],args['task_text'])
-        if name=='cancel_delegation':self.delegations.cancel(args['delegation_id']);return {'status':'cancelled'}
+        if name in ('update_delegation','cancel_delegation'):
+            if self.delegations.get(args['delegation_id'])['source']=='runtime_startup':
+                return {'status':'startup_contract_active','delegation_id':args['delegation_id']}
+            change={'stage_id':self.lifecycle.stage_id,'epoch':epoch,'request_id':scope['request_id']}
+            if name=='update_delegation':return self.delegations.update(args['delegation_id'],args['task_text'],**change)
+            self.delegations.cancel(args['delegation_id'],**change);return {'status':'cancelled'}
         if name=='recruit':
             if self.protocol!='F':raise DynamicError('recruit_not_candidate', 'S/L members are admitted atomically by the runtime')
-            result=self.membership.admit_atomic(args['actor_ids'],stage_id=self.lifecycle.stage_id,stage_epoch=epoch)
+            result=self.membership.admit_atomic(args['actor_ids'],stage_id=self.lifecycle.stage_id,stage_epoch=epoch,request_id=scope['request_id'])
             for member in args['actor_ids']:
                 self._create_actor(member)
-                self.delegations.prepare(member,self._stage()['user_request'],source='runtime_startup',epoch=epoch)
-            self.scheduler.begin_startup(args['actor_ids'])
             self.main_revision+=1
-            if self.lifecycle.worker_permitted():self._release()
             return result
         if name=='release_member':
-            self.membership.release(args['actor_id']);self.main_revision+=1
-            if args['actor_id'] in self.scheduler.startup:self.scheduler.startup[args['actor_id']]['status']='released'
+            if self.protocol in ('S','L') and self.scheduler.startup.get(args['actor_id'],{}).get('status')=='open':
+                return {'status':'startup_contract_active','actor_id':args['actor_id']}
+            self.membership.release(args['actor_id'],stage_id=self.lifecycle.stage_id,stage_epoch=epoch,request_id=scope['request_id']);self.main_revision+=1
             return {'status':'released'}
         raise DynamicError('unknown_coordination_tool',name)
 
-    def _release(self):
-        rows=self.delegations.release(epoch=self.lifecycle.epoch)
+    def _release(self, *, request_id=None):
+        rows=self.delegations.release(epoch=self.lifecycle.epoch,stage_id=self.lifecycle.stage_id,request_id=request_id)
         self.scheduler.enqueue_batch([x['actor_id'] for x in rows],reason='released_work')
         return rows
+
+    def _has_pending_work(self,actor):
+        return (actor in self.scheduler.continuations or
+            any(row['actor_id']==actor and row['stage_epoch']==self.lifecycle.epoch and
+                row['status'] in ('started','released') for row in self.delegations.rows) or
+            any(row['stage_epoch']==self.lifecycle.epoch and row['delivery'].get(actor,{}).get('status')=='queued'
+                for row in self.mailbox.messages))
 
     def _next_invocation(self, actor):
         rows=[x for x in self.delegations.rows if x['actor_id']==actor and x['stage_epoch']==self.lifecycle.epoch and x['status'] in ('started','released')]
         active=next((x for x in rows if x['status']=='started'),None)
         if not active and rows:
-            active=rows[0];active['status']='started'
+            active=self.delegations.start(rows[0]['delegation_id'],stage_id=self.lifecycle.stage_id,epoch=self.lifecycle.epoch)
         return active
 
     def _packet(self,actor,request_id,invocation):
@@ -346,7 +359,8 @@ class PiDynamic:
         return result
 
     def _formal(self,actor,invocation,response,request_id):
-        invocation.update(status='terminal',terminal_status='completed')
+        self.delegations.complete(invocation['invocation_id'],stage_id=self.lifecycle.stage_id,
+            epoch=self.lifecycle.epoch,request_id=request_id)
         identity='deliverable_'+uuid.uuid4().hex;content=text_of(response)
         recipients=['Main'] if invocation['source'] in ('initial_plan','main_voluntary') else []
         value={'deliverable_id':identity,'actor_id':actor,'task_id':self.case['case_id'],'branch_id':self.ledger.branch_id,
@@ -354,11 +368,13 @@ class PiDynamic:
             'request_ref':request_id,'recipient_ids':recipients,'origin':'invocation_terminal','content':content,
             'content_hash':digest(content),'result_status':'completed','completion_received':True,
             'provider_stop_reason':response['stopReason'],'forward_of':None}
+        if recipients:value['message_id']=uuid.uuid4().hex
         event=self.ledger.append('formal_deliverable',value,actor_id=actor,stage_id=self.lifecycle.stage_id,stage_epoch=self.lifecycle.epoch,
             request_id=request_id,invocation_id=invocation['invocation_id'])
         value['source_event_id']=event['event_id'];self.formal_deliverables[identity]=value
         if recipients:
-            self.mailbox.enqueue(actor,recipients,content,branch_id=self.ledger.branch_id,epoch=self.lifecycle.epoch)
+            self.mailbox.enqueue(actor,recipients,content,branch_id=self.ledger.branch_id,epoch=self.lifecycle.epoch,
+                message_id=value['message_id'],deliverable_id=identity,source_event_ref=self.ledger.branch_id+'::'+event['event_id'])
             self.main_revision+=1
             if 'Main' not in self.scheduler.active:self.scheduler.enqueue_batch(['Main'],reason='delegation_result')
 
@@ -381,7 +397,7 @@ class PiDynamic:
             for assignment in plan['plan']['assignments']:
                 key=(assignment['recipient'],assignment['task_text'])
                 if key in existing:existing.remove(key)
-                else:self.delegations.prepare(assignment['recipient'],assignment['task_text'],source='initial_plan',epoch=0,context_refs=assignment.get('context_refs',[]))
+                else:self.delegations.prepare(assignment['recipient'],assignment['task_text'],source='initial_plan',epoch=0,stage_id=self.lifecycle.stage_id,context_refs=assignment.get('context_refs',[]))
             self.ledger.append('initial_plan',plan,actor_id='Main',stage_id=self.lifecycle.stage_id)
             self.lifecycle.transition('PLAN_READY')
             if any(x['actor_id']!='Main' and x['event_type'] in ('model_request_ready','tool_operation_started') for x in self.ledger.rows):
@@ -428,6 +444,9 @@ class PiDynamic:
         actor,invocation=futures.pop(future)
         result=future.result()
         unfinished=result['response']['stopReason']=='toolUse'
+        if (invocation and invocation['source']=='runtime_startup' and invocation['status']=='terminal'
+                and self.scheduler.startup.get(actor,{}).get('status')=='open'):
+            self.scheduler._close_startup(actor,'initial_invocation_completed')
         if actor=='Main' and unfinished:self.confirming_final=False
         self.scheduler.complete(actor,unfinished=unfinished)
         if actor=='Main' and not unfinished:
@@ -477,6 +496,7 @@ class PiDynamic:
             restored=restore_checkpoint(snapshot,environment=self.environment,client=self.client,ledger=self.ledger,
                 system_prompts={a:system_prompt(a,self.private_goals[a],task_resources=[]) for a in ('Main','A','B')},task_resources=self.resources)
             for key in ('membership','delegations','mailbox','lifecycle','scheduler','budget','sessions'):setattr(self,key,restored[key])
+            self.scheduler.work_available=self._has_pending_work
             self.scheduler.block_id=self.block_id
             self.client.call(self.sessions['Main'],'set_coordination_phase',{'phase':'collaboration'})
             write_json(self.directory/'prefix-events.json',snapshot['prefix_events'])
@@ -492,7 +512,7 @@ class PiDynamic:
                 self.membership.admit_atomic(['C','D'],stage_id=self.lifecycle.stage_id,stage_epoch=self.lifecycle.epoch)
                 for actor in ('C','D'):
                     self._create_actor(actor)
-                    self.delegations.prepare(actor,self._stage()['user_request'],source='runtime_startup',epoch=self.lifecycle.epoch)
+                    self.delegations.prepare(actor,self._stage()['user_request'],source='runtime_startup',epoch=self.lifecycle.epoch,stage_id=self.lifecycle.stage_id)
                 self.scheduler.begin_startup(['C','D'])
             self.lifecycle.transition('COORDINATING')
             self.scheduler.consume_ready_marker('Main')
@@ -549,6 +569,7 @@ class PiDynamic:
                 'run_manifest_path':'run_manifest.json','run_manifest_hash':digest(manifest),'model_refs':manifest['model_refs']}
             write_json(self.directory/'run.json',result);return result
         except (DynamicError,OSError,concurrent.futures.TimeoutError) as error:
+            self.scheduler.terminate_startup('infrastructure_termination')
             protocol_error=isinstance(error,DynamicError) and error.code in {'rpc_scope_mismatch','isolation_trap_failed',
                 'actual_input_mismatch','main_work_tool_violation','schema_validation_failed','prejoin_worker_execution','planning_registration_only'}
             failure={'run_id':branch,'block_id':self.block_id,'checkpoint_id':snapshot['checkpoint_id'],'case_id':self.case['case_id'],
@@ -575,6 +596,7 @@ class PiDynamic:
             restored=restore_checkpoint(snapshot,environment=self.environment,client=self.client,ledger=self.ledger,
                 system_prompts={a:system_prompt(a,NORMAL_GOAL,task_resources=[]) for a in ('Main','A','B')},task_resources=self.resources)
             for key in ('membership','delegations','mailbox','lifecycle','scheduler','budget','sessions'):setattr(self,key,restored[key])
+            self.scheduler.work_available=self._has_pending_work
             self.lifecycle.transition('RUNNING');self._release()
             deadline=min(time.monotonic()+120,self.budget.deadline)
             trigger=None;futures={}

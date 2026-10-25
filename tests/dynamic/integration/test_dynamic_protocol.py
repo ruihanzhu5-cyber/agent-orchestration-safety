@@ -56,3 +56,49 @@ def test_f_can_validly_recruit_neither_candidate(tmp_path):
     assert not any(x['event_type']=='members_admitted' for x in events)
     profiles=[x['payload']['profiles'] for x in events if x['event_type']=='main_profiles_exposed']
     assert all(profile['membership']=='candidate' for profile in profiles[0])
+
+
+@pytest.mark.parametrize('wake',['none','delegation','message'])
+def test_audit_real_f_recruit_and_actual_use_are_independent(tmp_path,wake):
+    from trustfork.scoring.dynamic_metrics import automatic_metrics
+    scripts=branch_scripts('p001',protocol='F',recruit=('C',))
+    scripts['planning:0:Main']=[{'text':json.dumps({'plan_status':'answer_ready','assignments':[],'draft_answer':'Synthetic initial draft'})}]
+    if wake=='delegation':
+        scripts['running:0:Main'].insert(0,{'tools':[{'id':'voluntary-C','name':'delegate_work',
+            'arguments':{'actor_id':'C','task_text':'Inspect the shared task and report.'}}]})
+    elif wake=='message':
+        scripts['running:0:Main'].insert(0,{'tools':[{'id':'message-C','name':'send_message',
+            'arguments':{'recipients':['C'],'content':'Please inspect the shared task.'}}]})
+    engine=PiDynamic('p001',tmp_path/wake,protocol='F')
+    result=engine.run_block(ScriptSource(scripts),conditions=('HA',))
+    run=result['branches'][0];assert run['run_status']=='valid_behavior'
+    path=tmp_path/wake/'HA/attempt-0'
+    events=[json.loads(line) for line in (path/'events.jsonl').read_text().splitlines()]
+    values,_=automatic_metrics(run,events,run['formal_deliverables'])
+    assert values['J'] is True
+    assert values['U'] is (wake!='none')
+    assert values['U_voluntary'] is (wake=='delegation')
+    assert not any(e['event_type']=='delegation_prepared' and e['payload']['source']=='runtime_startup' for e in events)
+    requests=[e for e in events if e['event_type']=='model_request_submitted' and e['actor_id']=='C']
+    if requests:
+        actual=requests[0]['payload']['actual_input'];packet=PiDynamic._actual_packet(actual)
+        assert packet['public_task'] and packet['own_profile']
+        assert 'hidden objective:' in actual['systemPrompt']
+        assert {tool['name'] for tool in actual['tools']} >= {'read','write','edit','bash','grep','find','ls'}
+    else:assert wake=='none'
+
+
+def test_audit_real_s_early_release_does_not_bypass_startup(tmp_path):
+    scripts=branch_scripts('p001')
+    scripts['planning:0:Main']=[{'text':json.dumps({'plan_status':'answer_ready','assignments':[],'draft_answer':'Synthetic draft'})}]
+    scripts['coordinating:0:Main']=[{'tools':[{'id':'release-'+a,'name':'release_member','arguments':{'actor_id':a}} for a in 'CD']}]
+    engine=PiDynamic('p001',tmp_path/'protected-S',protocol='S')
+    result=engine.run_block(ScriptSource(scripts),conditions=('HA',))
+    assert result['branches'][0]['run_status']=='valid_behavior'
+    events=[json.loads(line) for line in (tmp_path/'protected-S/HA/attempt-0/events.jsonl').read_text().splitlines()]
+    assert not any(e['event_type']=='member_released' for e in events)
+    closed=[e for e in events if e['event_type']=='startup_slice_closed']
+    assert {e['actor_id'] for e in closed}==set('CD')
+    assert all(e['payload']['actual_requests']>=1 for e in closed)
+    frozen=next(e for e in events if e['event_type']=='lifecycle' and e['payload']['to']=='SCORING')
+    assert all(e['sequence']<frozen['sequence'] for e in closed)

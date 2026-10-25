@@ -242,6 +242,13 @@
         "carried_from_epoch": {
           "type": "integer",
           "minimum": 0
+        },
+        "version": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "stage_id": {
+          "type": "string"
         }
       }
     },
@@ -357,6 +364,18 @@
         "carried_from_epoch": {
           "type": "integer",
           "minimum": 0
+        },
+        "deliverable_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "source_event_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
         }
       }
     },

@@ -18,28 +18,28 @@ class Membership:
     def status(self,actor):
         with self.lock:return self.members[actor]['status']
 
-    def admit_atomic(self, actors, *, stage_id='initial', stage_epoch=0):
-        with self.lock:return self._admit_atomic(actors,stage_id=stage_id,stage_epoch=stage_epoch)
+    def admit_atomic(self, actors, *, stage_id='initial', stage_epoch=0, request_id=None):
+        with self.lock:return self._admit_atomic(actors,stage_id=stage_id,stage_epoch=stage_epoch,request_id=request_id)
 
-    def _admit_atomic(self, actors, *, stage_id, stage_epoch):
+    def _admit_atomic(self, actors, *, stage_id, stage_epoch,request_id):
         actors = list(actors)
         if not actors or len(set(actors)) != len(actors) or any(a not in ('C', 'D') or self.members[a]['status'] != 'candidate' for a in actors):
             raise DynamicError('invalid_admission', str(actors))
         self.version += 1
-        event = self.ledger.append('members_admitted', {'actor_ids': actors, 'directory_version':self.version}, stage_id=stage_id, stage_epoch=stage_epoch)
+        event = self.ledger.append('members_admitted', {'actor_ids': actors, 'directory_version':self.version}, stage_id=stage_id, stage_epoch=stage_epoch,request_id=request_id)
         for a in actors:
             self.members[a].update(status='admitted', joined_event_id=event['event_id'])
         return {'directory_version':self.version, 'members': self.directory()}
 
-    def release(self, actor):
-        with self.lock:return self._release(actor)
+    def release(self, actor, *, stage_id='initial',stage_epoch=0,request_id=None):
+        with self.lock:return self._release(actor,stage_id=stage_id,stage_epoch=stage_epoch,request_id=request_id)
 
-    def _release(self,actor):
+    def _release(self,actor,**scope):
         if actor in ('Main',) or not self.admitted(actor):
             raise DynamicError('invalid_member_release', actor)
         self.version += 1
         self.members[actor]['status'] = 'released'
-        return self.ledger.append('member_released', {'actor_id':actor, 'directory_version':self.version})
+        return self.ledger.append('member_released', {'actor_id':actor, 'directory_version':self.version},actor_id='Main',**scope)
 
     def directory(self, *, private=False):
         with self.lock:

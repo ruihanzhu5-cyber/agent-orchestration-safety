@@ -11,7 +11,8 @@ class Mailbox:
         self.ledger, self.membership, self.branch_id = ledger, membership, ledger.branch_id
         self.messages, self.lock = [], threading.RLock()
 
-    def enqueue(self, sender, recipients, content, *, branch_id, epoch=0, message_id=None, parent_id=None):
+    def enqueue(self, sender, recipients, content, *, branch_id, epoch=0, message_id=None, parent_id=None,
+                deliverable_id=None,source_event_ref=None):
         recipients = list(recipients)
         if branch_id != self.branch_id:
             raise DynamicError('cross_branch_message', 'Message branch does not match runtime')
@@ -28,7 +29,8 @@ class Mailbox:
                 return copy.deepcopy(existing)
             row = {'message_id':identity, 'sender':sender, 'recipients':recipients, 'content':content,
                    'content_hash':digest(content), 'parent_id':parent_id, 'branch_id':branch_id, 'stage_epoch':epoch,
-                   'delivery':{a:{'status':'queued', 'request_id':None, 'attempts':[]} for a in recipients}, 'terminal_status':None}
+                   'delivery':{a:{'status':'queued', 'request_id':None, 'attempts':[]} for a in recipients}, 'terminal_status':None,
+                   'deliverable_id':deliverable_id,'source_event_ref':source_event_ref}
             event = self.ledger.append('message_enqueued', copy.deepcopy(row), actor_id=sender, stage_epoch=epoch, message_id=identity)
             row['created_event_id'] = event['event_id']
             self.messages.append(row)
@@ -101,3 +103,23 @@ class Mailbox:
                     row['stage_epoch'], row['carried_from_epoch'] = new_epoch, old_epoch
                 if pending:self.ledger.append('message_stage_transition',{'new_epoch':new_epoch,'new_session':new_session,
                     'delivery':row['delivery'],'carried_from_epoch':row.get('carried_from_epoch')},stage_epoch=old_epoch,message_id=row['message_id'])
+
+
+def replay_delivery(events):
+    """Append-only per-recipient state; enqueue is only the initial snapshot."""
+    states={}
+    for event in events:
+        kind=event['event_type'];identity=event.get('message_id');payload=event['payload']
+        if kind=='message_enqueued':
+            for actor,state in payload['delivery'].items():states[(identity,actor)]=copy.deepcopy(state)
+        elif kind=='message_delivery_transition':
+            key=(identity,payload['recipient'])
+            if key not in states:raise DynamicError('missing_message_origin',str(key))
+            states[key].update(status=payload['status'],request_id=event['request_id'])
+        elif kind=='message_exposed':
+            key=(identity,payload.get('recipient',event['actor_id']))
+            if key not in states:raise DynamicError('missing_message_origin',str(key))
+            states[key].update(status='confirmed_exposure',confirmed_request_id=event['request_id'])
+        elif kind=='message_stage_transition':
+            for actor,state in payload['delivery'].items():states[(identity,actor)]=copy.deepcopy(state)
+    return states
