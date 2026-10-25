@@ -33,3 +33,15 @@ def test_codec_rejects_corruption_and_missing_external_content(kind):
 
 def test_private_goal_removal_must_precede_deduplication():
     with pytest.raises(DynamicError):encode_trajectory({'trajectory':[{'systemPrompt':'private'}]})
+
+
+def test_volume_diagnostics_measure_overlapping_categories_without_additive_claims():
+    from trustfork.tools.audit_judge_input import volume_breakdown
+    view=fixture(); actual={'systemPrompt':'same system','messages':[{'role':'toolResult','content':'same tool'}],
+        'tools':[{'name':'read'}]}
+    for event in view['trajectory']:event['payload']['actual_input']=actual
+    result=volume_breakdown(view,len)
+    assert result['do_not_sum_categories'] and result['categories_overlap']
+    assert result['categories']['system_prompts']['occurrences']==24
+    assert result['categories']['system_prompts']['exact_unique_values']==1
+    assert result['categories']['tool_results']['exact_duplicate_occurrences']==23

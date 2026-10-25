@@ -31,18 +31,31 @@ def build_visibility_index(events,deliverables=(),resources=()):
         if event['event_type']!='pi_event':continue
         inner=event['payload']['event']
         if inner.get('type')=='message_end' and inner.get('message',{}).get('role')=='toolResult':
-            tool_sources[(event['actor_id'],inner['message'].get('toolCallId'))]=event
+            tool_sources.setdefault((event['actor_id'],inner['message'].get('toolCallId')),[]).append(event)
     records=[]
     for event in events:
         if event['event_type']!='model_request_submitted':continue
         actual=event['payload']['actual_input'];actor=event['actor_id']
+        occurrences={}
         def add(kind,content,path,source=None,**fields):
-            records.append({'observer_actor':actor,'actual_request_ref':event['request_id'],
+            key=(kind,path,digest(content));source_ref=event_ref(source) if source else event_ref(event)
+            if key in occurrences:
+                old=occurrences[key]
+                old['candidate_source_refs']=sorted(set(old.get('candidate_source_refs',[old['source_event_ref']])+[source_ref]+fields.get('candidate_source_refs',[])))
+                old['source_event_ref']=event_ref(event);old['source_attribution']='ambiguous_identical_sources'
+                if kind=='original_resource':
+                    old['candidate_resource_refs']=sorted(set(old.get('candidate_resource_refs',[old.get('resource_ref')])+[fields.get('resource_ref')])-{None})
+                    paths=set(old.get('candidate_resource_paths',[old.get('resource_path')])+[fields.get('resource_path')])-{None}
+                    old['candidate_resource_paths']=sorted(paths);old['resource_ref']=None
+                    if len(paths)>1:old['resource_path']=None
+                return
+            row={'observer_actor':actor,'actual_request_ref':event['request_id'],
                 'actual_request_event_ref':event_ref(event),'stage_id':event['stage_id'],'stage_epoch':event['stage_epoch'],
                 'source_event_ref':event_ref(source) if source else event_ref(event),'source_kind':kind,
                 'content_hash':digest(content),'input_occurrence':path,'successful_response':event['request_id'] in successful,
                 'visibility_status':'successful_response' if event['request_id'] in successful else 'submitted_input',
-                'monotonic_ns':event['monotonic_ns'],**fields})
+                'monotonic_ns':event['monotonic_ns'],**fields}
+            occurrences[key]=row;records.append(row)
         system=actual.get('systemPrompt','')
         for resource in resources:
             content=resource.get('content')
@@ -74,8 +87,12 @@ def build_visibility_index(events,deliverables=(),resources=()):
                             for number,profile in enumerate(values):
                                 add(kind,profile,path+'/'+field+'/'+str(number),profile_ref=profile.get('candidate_id',profile.get('agent_id',profile.get('subject_agent_id'))))
             if message.get('role')=='toolResult':
-                source=tool_sources.get((actor,message.get('toolCallId')))
-                add('tool_result',text,path,source,tool_call_id=message.get('toolCallId'))
+                sources=[e for e in tool_sources.get((actor,message.get('toolCallId')),[]) if e['monotonic_ns']<event['monotonic_ns'] and
+                    digest(e['payload']['event']['message'].get('content'))==digest(message.get('content'))]
+                source=sources[0] if len(sources)==1 else None
+                add('tool_result',text,path,source,tool_call_id=message.get('toolCallId'),
+                    source_attribution='unique' if len(sources)==1 else 'ambiguous_identical_sources' if sources else 'source_not_observed',
+                    candidate_source_refs=[event_ref(e) for e in sources])
                 try:parsed=json.loads(text)
                 except (ValueError,TypeError):parsed=None
                 matches=[query for query in queries if query['actor_id']==actor and query['monotonic_ns']<event['monotonic_ns'] and parsed==query['payload'].get('result')]

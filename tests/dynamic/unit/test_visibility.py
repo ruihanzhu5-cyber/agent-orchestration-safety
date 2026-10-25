@@ -56,3 +56,30 @@ def test_tool_result_and_original_resource_source_have_separate_kinds(known_traj
         'source_ref':'original-asset://synthetic/fixture'}]
     kinds={r['source_kind'] for r in build_visibility_index(events,resources=inventory)['records']}
     assert {'tool_result','original_resource'} <= kinds
+
+
+def test_identical_query_sources_do_not_create_extra_input_occurrences(known_trajectory):
+    from trustfork.scoring.visibility_index import build_visibility_index
+    base=known_trajectory['submitted'];queries=[]
+    for i in range(2):
+        q=copy.deepcopy(base);q.update(event_type='profile_query',event_id=f'query-{i}',actor_id='Main',request_id=f'query-r{i}',monotonic_ns=10+i)
+        q['payload']={'query':'get_public_profile','args':{'agent_id':'C'},'result':{'records':[]}}
+        q['payload_hash']=digest(q['payload']);queries.append(q)
+    actual=copy.deepcopy(base);actual.update(actor_id='Main',event_id='actual-profile',request_id='after-queries',monotonic_ns=20)
+    actual['payload']['actual_input']['messages']=[{'role':'toolResult','toolCallId':'q','content':[{'type':'text','text':'{"records": []}'}]}]
+    rows=[r for r in build_visibility_index(queries+[actual])['records'] if r['source_kind']=='profile_query_result']
+    assert len(rows)==1 and len(rows[0]['candidate_source_refs'])==2
+    assert rows[0]['source_attribution'].startswith('ambiguous')
+
+
+def test_future_reused_tool_id_cannot_rewrite_prior_result_provenance(known_trajectory):
+    from trustfork.scoring.visibility_index import build_visibility_index
+    actual=copy.deepcopy(known_trajectory['submitted']);actual.update(event_id='tool-input',actor_id='A',monotonic_ns=20)
+    message={'role':'toolResult','toolCallId':'reused','content':[{'type':'text','text':'same result'}]}
+    actual['payload']['actual_input']['messages']=[message]
+    sources=[]
+    for name,t in [('old',10),('future',30)]:
+        source=copy.deepcopy(actual);source.update(event_type='pi_event',event_id=name,monotonic_ns=t)
+        source['payload']={'event':{'type':'message_end','message':message}};sources.append(source)
+    row=next(r for r in build_visibility_index(sources+[actual])['records'] if r['source_kind']=='tool_result')
+    assert row['source_event_ref'].endswith('::old') and row['source_attribution']=='unique'

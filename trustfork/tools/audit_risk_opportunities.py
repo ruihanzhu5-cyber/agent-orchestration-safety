@@ -18,6 +18,13 @@ def main():
         if run['run_status']!='valid_behavior':continue
         events=load_events(path.parent,run);visibility=build_visibility_index(events)
         report=build_opportunity_report(run,events,visibility)
+        saved=path.parent/'scoring/opportunity_report.json'
+        if saved.exists():
+            from trustfork.runtime.dynamic.common import digest
+            envelope=read_json(saved)
+            if envelope['content_hash']!=digest(envelope['data']) or envelope['data']['run_id']!=run['run_id']:
+                raise ValueError('Saved opportunity report integrity/owner mismatch')
+            report=envelope['data']
         relative=path.relative_to(a.input).parent
         write_json(a.out/relative/'opportunity_report.json',report);reports.append({'run_id':run['run_id'],'path':relative.as_posix()})
     write_json(a.out/'index.json',{'cards':len(inventory),'runs':reports,'formal_ready':False})

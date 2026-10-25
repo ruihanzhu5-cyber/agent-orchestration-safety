@@ -257,6 +257,22 @@ def billing_summary(rows):
         'missing_run_billing':missing_runs,'prefix_charged_once':True,'actual_and_equivalent_are_not_added':True}
 
 
+def call_summary(rows):
+    unique={};missing=[]
+    for row in rows:
+        if 'actual_request_records' not in row:missing.append(row.get('run_id'));continue
+        for record in row['actual_request_records']:
+            key=(record['kind'],record['attempt_key'])
+            if key in unique and unique[key]!=record:raise DynamicError('call_lineage_conflict',str(key))
+            unique[key]=record
+    counts=Counter((r['kind'],r['classification']) for r in unique.values())
+    return {'scope':'Actual retained T3 submissions; shared prefix once; H1/H2 history requires its separate receipts',
+        'real_model_requests':None if missing or counts['model','unresolved'] else counts['model','real'],
+        'real_judge_requests':None if missing or counts['judge','unresolved'] else counts['judge','real'],
+        'scripted_model_attempts':counts['model','scripted'],'unresolved_model_attempts':counts['model','unresolved'],
+        'unique_actual_attempt_records':len(unique),'missing_run_call_audits':missing,'metadata_zero_fields_used':False}
+
+
 def select_attempts(rows):
     selected=[];attempts=[]
     for key,group in _groups(rows,('block_id','condition')):
@@ -312,9 +328,11 @@ def main():
     for path in args.input.rglob('block.json'):
         block=read_json(path);key=block.get('checkpoint_id') or str(path.relative_to(args.input))
         prefixes[key]=block.get('prefix_status',block.get('prefix',{}).get('status'))
+    calls=call_summary(attempts)
     metadata={'schema_version':'1.0','mode':args.mode,'synthetic':args.mode=='test-fixtures' or any(r.get('synthetic') for r in rows),
         'purpose':'PIPELINE FIXTURE — NOT RESEARCH RESULTS' if args.mode=='test-fixtures' else 'formal frozen-data analysis',
-        'real_model_requests':0,'real_judge_requests':0,'source_runs':len(paths),'selected_runs':len(selected),
+        'real_model_requests':calls['real_model_requests'],'real_judge_requests':calls['real_judge_requests'],
+        'actual_call_audit':calls,'source_runs':len(paths),'selected_runs':len(selected),
         'run_status_counts_all_attempts':dict(Counter(r['run_status'] for r in attempts)),
         'prefix_coverage':{'N_plan_prefix_attempted':len(prefixes),'N_trigger':sum(x=='triggered' for x in prefixes.values()),
             'fraction':sum(x=='triggered' for x in prefixes.values())/len(prefixes) if prefixes else None},

@@ -79,11 +79,15 @@ def validate_bindings(config: dict, *, formal: bool) -> dict:
         from .model_capabilities import binding_capability
         capacity=binding_capability(binding)
         if capacity['status']!='verified':unresolved.append(alias+'.effective_capacity')
+        for key in ('effective_context_tokens','max_output_tokens','tokenizer','framing_tokens','output_token_parameter'):
+            if capacity[key] is None:unresolved.append(alias+'.capability.'+key)
+        if capacity['output_token_parameter'] and binding['supported_parameters'] is not None and capacity['output_token_parameter'] not in binding['supported_parameters']:
+            unresolved.append(alias+'.capability.unsupported_output_parameter')
     if not isinstance(config['real_api_enabled'],bool):raise DynamicError('invalid_real_api_flag','Expected boolean')
     if formal and (unresolved or config["real_api_enabled"] is not True):
         raise DynamicError("unresolved_formal_bindings", "Formal mode is not enabled or fully bound", evidence=sorted(unresolved))
     if formal and config['mode']!='api':raise DynamicError('invalid_formal_mode','Formal configuration must explicitly select API mode')
-    return {"unresolved": sorted(unresolved), "formal_ready": not unresolved and config["real_api_enabled"] is True}
+    return {"unresolved": sorted(unresolved), "formal_ready": not unresolved and config["real_api_enabled"] is True and config['mode']=='api'}
 
 
 def score_record(metric: str, value: float | None, status: str, reason: str | None = None,

@@ -17,6 +17,7 @@ from .trajectory_codec import encode_trajectory,VERSION as CODEC_VERSION
 from .judge_request import prepare_judge_request,capacity_report
 from trustfork.runtime.dynamic.model_capabilities import binding_capability,unknown_capability
 from .risk_opportunity import build_opportunity_report
+from trustfork.tools.audit_model_calls import audit_request_events
 
 
 def scorer_manifest():
@@ -27,12 +28,12 @@ def scorer_manifest():
         'trustfork/scoring/annotation_contracts.py','trustfork/config/dynamic/annotation.schema.json',
         'trustfork/config/dynamic/contracts.schema.json']
     names+=['trustfork/scoring/trajectory_codec.py','trustfork/scoring/judge_request.py',
-        'trustfork/scoring/risk_opportunity.py',
+        'trustfork/scoring/risk_opportunity.py','trustfork/tools/audit_model_calls.py',
         'trustfork/runtime/dynamic/model_capabilities.py','trustfork/config/dynamic/scorer.example.json',
-        'trustfork/config/dynamic/model_bindings.schema.json']
+        'trustfork/config/dynamic/model_bindings.schema.json','trustfork/runtime/dynamic/schema.py']
     files={name:file_hash(repo_root()/name) for name in names}
-    return {'version':'dynamic-scoring-analysis-v3','file_hashes':files,'manifest_hash':digest(files),
-        'judge_binding_ref':'gpt4o','precise_judge_binding':None,'network_requests':0}
+    return {'version':'dynamic-scoring-analysis-v4','file_hashes':files,'manifest_hash':digest(files),
+        'judge_binding_ref':'gpt4o','precise_judge_binding':None,'network_sender_present':False}
 
 
 def load_events(directory,run):
@@ -256,9 +257,10 @@ def score_run(path,*,mode='formal'):
     prompts=judge_prompts(d['deliverable_id'] for d in deliverables)
     packed=encode_trajectory(trajectory_input)
     config=read_json(repo_root()/'trustfork/config/dynamic/scorer.example.json')
-    capability=binding_capability((manifest.get('resolved_api_bindings') or {}).get('logical_bindings',{}).get('gpt4o',{}))
+    judge_binding=(manifest.get('resolved_api_bindings') or {}).get('logical_bindings',{}).get('gpt4o',{})
+    capability=binding_capability(judge_binding)
     prepared={key:prepare_judge_request(value,rubric=prompts[key],format_instructions='Return original rubric anchors and evidence references as JSON.',
-        output_budget=config.get('judge_output_budget_tokens'),representation=CODEC_VERSION if key=='trajectory' else 'legacy-full')
+        output_budget=config.get('judge_output_budget_tokens'),representation=CODEC_VERSION if key=='trajectory' else 'legacy-full',judge_binding=judge_binding)
         for key,value in [('response',response_input),('trajectory',packed)]}
     capacities={key:capacity_report(value,capability) for key,value in prepared.items()}
     for key,value in prepared.items():_artifact(output,'prepared_'+key+'.json',value)
@@ -299,13 +301,16 @@ def score_run(path,*,mode='formal'):
     from trustfork.tools.generate_dynamic_manifest import MECHANISM_LAYOUTS,MAINS
     mechanism=(run['panel']=='primary' and run['protocol']=='S' and run['case_id'] in MECHANISM_LAYOUTS and
         run['layout']==MECHANISM_LAYOUTS[run['case_id']][MAINS.index(run['main_model'])] and run.get('repeat_id',0)==0)
+    calls=audit_request_events(events)
     summary={**run,'automatic_metrics':auto,'semantic_metrics':semantic,'goal_observations':goal,
         'scores':scores['scores'],'scorer_manifest_hash':score_manifest['manifest_hash'],'score_input_refs':input_refs,
         'scoring_mode':mode,'synthetic':bool(run['synthetic'] or mode=='test-fixtures'),
         'request_billing':request_billing,
         'numeric_fixtures_are_behavior_judgments':False if mode=='test-fixtures' else None,
         'judge_capacity':capacities,'formal_ready':False,
-        'mechanism_sample':mechanism,'real_judge_requests':0,'real_model_requests':run['real_model_requests']}
+        'actual_call_audit':calls,'actual_request_records':calls['request_records'],
+        'mechanism_sample':mechanism,'real_judge_requests':calls['real_judge_calls_in_observed_scope'],
+        'real_model_requests':calls['real_model_calls_in_observed_scope']}
     write_json(output/'run_summary.json',summary)
     freeze_scoring_version(output,{'scorer_manifest_hash':score_manifest['manifest_hash'],'run_manifest_hash':run['run_manifest_hash'],
         'annotations_hash':digest(annotations),'mode':mode})

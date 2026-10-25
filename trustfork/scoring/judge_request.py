@@ -1,7 +1,7 @@
 """Prepare the complete immutable Judge payload and independently preflight it.
 
-This module has no sender and never imports provider SDKs. Local BPE counts of a
-canonical wire payload are diagnostics, not verified provider chat framing.
+This module has no sender and never imports provider SDKs. HTTP JSON escaping
+is decoded before model tokenization: wire size is a separate diagnostic.
 """
 import hashlib
 import importlib.metadata
@@ -32,7 +32,7 @@ def offline_counter():
 
 
 def prepare_judge_request(view,*,rubric,format_instructions,output_budget=None,tools=None,parameters=None,
-                          counter=None,representation='legacy-full',output_token_parameter='max_tokens'):
+                          counter=None,representation='legacy-full',output_token_parameter='max_tokens',judge_binding=None):
     if output_budget is not None and (type(output_budget) is not int or output_budget<=0):
         raise DynamicError('invalid_judge_output_budget','Judge output reserve must be explicit positive integer or unknown')
     params=dict(parameters or {})
@@ -42,17 +42,34 @@ def prepare_judge_request(view,*,rubric,format_instructions,output_budget=None,t
     if representation==VERSION:system+='\n\n'+INSTRUCTIONS
     request={'messages':[{'role':'system','content':system},{'role':'user','content':canonical(view).decode()}],
         'tools':tools or [],'parameters':params}
+    binding=judge_binding or {}
+    if binding.get('model_id'):request['model']=binding['model_id']
+    route=digest({k:binding.get(k) for k in ('provider','base_url','model_id')}) if all(binding.get(k) for k in ('provider','base_url','model_id')) else None
     counter_info={'id':'supplied-test-counter','version':'fixture','count_method':'fixture-exact'}
     if counter is None:
         try:
             counter=offline_counter()
             counter_info={'id':'o200k_base','version':importlib.metadata.version('tiktoken'),
-                'count_method':'local-canonical-payload-bpe-estimate'}
+                'count_method':'local-message-content-and-schema-bpe-estimate'}
         except DynamicError:counter_info={'id':None,'version':None,'count_method':'unavailable'}
-    n=counter(canonical(request).decode()) if counter else None
+    content_tokens=sum(counter(m['content']) for m in request['messages']) if counter else None
+    schema_material=[request['tools']] if request['tools'] else []
+    if 'response_format' in params:schema_material.append(params['response_format'])
+    schema_tokens=sum(counter(canonical(x).decode()) for x in schema_material) if counter else None
+    n=content_tokens+schema_tokens if counter else None
     return {'version':'prepared-judge-request-v1','request':request,'request_hash':digest(request),
+        'judge_model_id':binding.get('model_id'),'route_fingerprint':route,'judge_binding_ref':'gpt4o',
         'representation':representation,'representation_hash':digest(view),'input_tokens':n,
+        'message_content_tokens':content_tokens,'tool_and_format_schema_tokens':schema_tokens,
+        'wire_serialization_tokens':counter(canonical(request).decode()) if counter else None,
+        'wire_tokens_are_model_input_tokens':False,
+        'count_scope':'Decoded message content plus local tool/response schema estimate. Roles, provider transformations/framing remain unknown. Parameters bind the request but are not automatically model text.',
         'tokenizer':counter_info,'output_budget':output_budget,'output_token_parameter':output_token_parameter,
+        'rubric_tokens_separate':counter(rubric) if counter else None,
+        'format_instruction_tokens_separate':counter(format_instructions) if counter else None,
+        'codec_instruction_tokens_separate':counter(INSTRUCTIONS) if counter and representation==VERSION else 0,
+        'system_message_tokens':counter(system) if counter else None,
+        'component_counts_are_nonadditive':True,
         'output_budget_scope':'Judge only; independent of agent 4096 and team 48000',
         'provider_framing_verified':False,'cognitive_equivalence':'not_tested_offline' if representation==VERSION else 'legacy'}
 
@@ -62,7 +79,9 @@ def capacity_report(prepared,capability):
     unknown=(c['status']!='verified' or n is None or output is None or framing is None or
         c['effective_context_tokens'] is None or c['max_output_tokens'] is None or c['tokenizer'] is None or
         c['output_token_parameter']!=prepared['output_token_parameter'])
+    if prepared.get('route_fingerprint')!=c['route_fingerprint'] or not prepared.get('judge_model_id'):unknown=True
     if c['tokenizer'] and prepared['tokenizer']['count_method']!=c['tokenizer']['count_method']:unknown=True
+    if c['tokenizer'] and prepared['tokenizer']['count_method']!='fixture-exact' and prepared['tokenizer']['version']!=c['tokenizer']['version']:unknown=True
     if c['tokenizer'] and prepared['tokenizer']['id']!=c['tokenizer']['id']:
         # Synthetic counters are explicitly declared by unit fixtures only.
         if not (prepared['tokenizer']['count_method']=='fixture-exact' and c['tokenizer']['count_method']=='fixture-exact'):unknown=True
@@ -70,7 +89,14 @@ def capacity_report(prepared,capability):
         n+output+(framing or 0)>c['effective_context_tokens']) or bool(output is not None and c['max_output_tokens'] is not None and output>c['max_output_tokens'])
     fits=None if unknown else not overflow
     return {'version':'capacity-report-v1','request_hash':prepared['request_hash'],'capacity_status':c['status'],
+        'capacity_source':c['source'],'capacity_evidence_hash':c['evidence_hash'],'verified_at':c['verified_at'],
+        'route_fingerprint':c['route_fingerprint'],'tokenizer':prepared['tokenizer'],'applicable_tokenizer':c['tokenizer'],
+        'representation_version':prepared['representation'],
+        'rubric_tokens_separate':prepared['rubric_tokens_separate'],
+        'format_instruction_tokens_separate':prepared['format_instruction_tokens_separate'],
+        'codec_instruction_tokens_separate':prepared['codec_instruction_tokens_separate'],
         'capability_hash':digest(c),'input_tokens':n,'output_reserved':output,'framing_tokens':framing,
+        'wire_serialization_tokens':prepared['wire_serialization_tokens'],'wire_tokens_are_model_input_tokens':False,
         'effective_context_tokens':c['effective_context_tokens'],'fits':fits,'can_send':False,'sender_enabled':False,
         'reason':'capacity_blocked' if overflow else 'capacity_unknown' if unknown else 'sender_disabled',
         'score_status':'judge_error','behavior_run_status':'unchanged','independent_judge_budget':True}

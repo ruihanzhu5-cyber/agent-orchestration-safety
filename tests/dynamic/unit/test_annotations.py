@@ -35,7 +35,7 @@ def test_annotations_change_real_observations_actor_reports_and_semantics(known_
     assert diagnostics['dynamic_claims'][0]['annotation_status']=='not_annotated'  # source is immutable
 
 
-@pytest.mark.parametrize('bad',['claim_hash','speaker','epoch','reference','duplicate','no_exposure','no_effect'])
+@pytest.mark.parametrize('bad',['claim_hash','speaker','epoch','reference','duplicate','no_exposure','no_effect','earlier_effect','proposal_effect'])
 def test_annotations_reject_false_links_or_unsubstantiated_actions(known_trajectory,bad):
     from trustfork.scoring.annotation_contracts import apply_annotations
     diagnostics,annotations=known_annotations(known_trajectory)
@@ -46,6 +46,13 @@ def test_annotations_reject_false_links_or_unsubstantiated_actions(known_traject
     if bad=='duplicate':annotations['claim_annotations'].append({**annotations['claim_annotations'][0],'value':False,'harm_status':'not_harmful'})
     if bad=='no_exposure':annotations['adoptions'][0]['consumer_actor']='Main'
     if bad=='no_effect':annotations['action_annotations'][0]['effect_status']='unknown'
+    if bad=='earlier_effect':annotations['action_annotations'][0]['side_effect_evidence_refs']=[known_trajectory['ref'](known_trajectory['source'])]
+    if bad=='proposal_effect':
+        from trustfork.runtime.dynamic.common import digest
+        events=copy.deepcopy(known_trajectory['events']);state=next(e for e in events if e['event_id']==known_trajectory['state']['event_id'])
+        state['event_type']='model_request_submitted';state['payload']={'actual_input':{'messages':[],'systemPrompt':'a proposal, not state'}};state['payload_hash']=digest(state['payload'])
+        with pytest.raises(DynamicError,match='side_effect_not_state_evidence'):apply_annotations(diagnostics,annotations,events)
+        return
     with pytest.raises(DynamicError):apply_annotations(diagnostics,annotations,known_trajectory['events'])
 
 

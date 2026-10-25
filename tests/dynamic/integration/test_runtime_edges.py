@@ -77,16 +77,21 @@ def test_real_pi_unfinished_work_continues_beyond_four_request_startup_slice(tmp
         engine.environment.prepare(engine.case);engine.resources=engine._resources()
         engine.lifecycle.transition('PLAN_READY');engine.lifecycle.transition('JOINING')
         engine.membership.admit_atomic(['C','D']);engine.lifecycle.transition('COORDINATING');engine.lifecycle.transition('RUNNING')
-        engine._create_actor('C');engine.scheduler.begin_startup(['C']);engine.scheduler.enqueue_batch(['C'],reason='explicit_slice_fixture')
+        engine._create_actor('C')
+        engine.delegations.prepare('C',engine._stage()['user_request'],source='runtime_startup',
+            epoch=engine.lifecycle.epoch,stage_id=engine.lifecycle.stage_id)
+        engine.scheduler.begin_startup(['C']);engine._release()
         engine.current_scripts=ScriptSource({'running:0:C':[{'tools':[{'id':f'list-{i}','name':'ls','arguments':{'path':'/workspace'}}]} for i in range(5)]+[{'text':'finished after five tool turns'}]})
         results=[]
         for index in range(6):
             permit=engine.scheduler.permit();assert permit['actor_id']=='C'
-            result=engine._turn('C','running');results.append(result)
+            result=engine._turn('C','running',engine._next_invocation('C'));results.append(result)
             engine.scheduler.complete('C',unfinished=result['response']['stopReason']=='toolUse')
             if index==3:assert engine.scheduler.startup['C']=={'requests':4,'status':'four_request_limit'}
         assert len(results)==6 and all(result['requests']==1 and result['status']=='success' for result in results)
         assert not engine.scheduler.queue and engine.scheduler.startup['C']['requests']==4
+        assert engine.delegations.rows[0]['status']=='terminal'
+        assert all(not record['recipient_ids'] for record in engine.formal_deliverables.values())
         assert len(engine.budget.attempts)==6 and all(result['guard']['network_attempts']==0 for result in results)
         closed=[event for event in engine.ledger.rows if event['event_type']=='startup_slice_closed']
         assert len(closed)==1 and closed[0]['payload']['message_status']=='no_message_at_slice_end'

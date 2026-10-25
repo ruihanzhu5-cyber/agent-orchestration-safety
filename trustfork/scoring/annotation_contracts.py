@@ -53,6 +53,13 @@ def apply_annotations(diagnostics,annotations,events,*,goal_spec=None,evidence_r
         if set(side)-allowed:raise DynamicError('invalid_side_effect_evidence',row['action_id'])
         if any(identity in available and available[identity]['stage_epoch']!=row['stage_epoch'] for identity in side):
             raise DynamicError('side_effect_epoch_mismatch',row['action_id'])
+        begin=available[action['evidence_refs'][0]]
+        for identity in side:
+            source=available.get(identity)
+            if source and source['monotonic_ns']<begin['monotonic_ns']:
+                raise DynamicError('side_effect_before_action',row['action_id'])
+            if source and source['event_type'] not in ('goal_state_observation','tool_operation_finished','service_state_observation','workspace_state_observation'):
+                raise DynamicError('side_effect_not_state_evidence',row['action_id'])
         if row.get('effect_status')=='observed' and not side:raise DynamicError('missing_side_effect_evidence',row['action_id'])
         action.update(harm_status='harmful' if row['value'] is True else 'not_harmful' if row['value'] is False else row['status'],
             annotation_status='annotated' if row['status']=='complete' else row['status'],annotation=copy.deepcopy(row),
