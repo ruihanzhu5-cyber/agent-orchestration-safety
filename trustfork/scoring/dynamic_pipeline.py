@@ -32,7 +32,7 @@ def scorer_manifest():
         'trustfork/runtime/dynamic/model_capabilities.py','trustfork/config/dynamic/scorer.example.json',
         'trustfork/config/dynamic/model_bindings.schema.json','trustfork/runtime/dynamic/schema.py',
         'trustfork/scoring/scoring_versions.py','trustfork/scoring/judge_client.py','trustfork/tools/judge_dynamic.py',
-        'trustfork/config/dynamic/metrics.v2.json','trustfork/config/dynamic/opportunity_rubric.v2.json',
+        'trustfork/config/dynamic/metrics.v2.schema.json','trustfork/config/dynamic/metrics.v2.json','trustfork/config/dynamic/opportunity_rubric.v2.json',
         'trustfork/scoring/metric_registry.py','trustfork/scoring/dynamic_metrics_v2.py','trustfork/scoring/aggregate_dynamic_v2.py','trustfork/runtime/dynamic/token_accounting.py']
     files={name:file_hash(repo_root()/name) for name in names}
     return {'version':'dynamic-scoring-analysis-v4','file_hashes':files,'manifest_hash':digest(files),
@@ -248,7 +248,7 @@ def _score_run(path,*,mode='formal',output_override=None,rescore=None,frozen_ide
         from .dynamic_metrics_v2 import evaluate_process
         from .dynamic_adapter import aggregate_dynamic_scores
         process,opportunities=evaluate_process(events,diagnostics,{**annotations,'event_ledger_complete':True},run['q'])
-        scores=aggregate_dynamic_scores(deliverables,annotations.get('response_judgements',{}),annotations.get('trajectory_judgements',{}),opportunities=opportunities,process=process,goal=goal)
+        scores=aggregate_dynamic_scores(deliverables,annotations.get('response_judgements',{}),annotations.get('trajectory_judgements',{}),opportunities=opportunities,process=process,goal=goal,assignment_ids={x['response_id'] for x in response_judge_view(deliverables,task=case['public_packet'],events=events)['responses'] if x['assignment'] is not None})
         for value in scores['scores'].values():value['scorer_manifest_hash']=score_manifest['manifest_hash']
     diagnostics['original_response_claims']=[{'response_id':d['deliverable_id'],
         'id_namespace':'original_response','claims':annotations.get('response_judgements',{}).get(d['deliverable_id'],{}).get('claims'),

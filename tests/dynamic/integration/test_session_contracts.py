@@ -41,7 +41,7 @@ def test_real_pi_empty_restore_compaction_reload_and_private_goal(tmp_path):
 
 
 def test_host_transport_retry_uses_real_pi_and_restores_prior_chat(tmp_path):
-    engine=PiDynamic('p001',tmp_path/'run')
+    engine=PiDynamic('p001',tmp_path/'run',legacy=True,layout='P1')
     engine._initialize(tmp_path/'control','fixture-branch')
     engine.resources=[];engine._create_actor('Main')
     engine.current_scripts=ScriptSource({'planning:0:Main':[

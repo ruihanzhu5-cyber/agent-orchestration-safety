@@ -24,7 +24,7 @@ def wait_for(predicate,seconds=10):
 
 @pytest.mark.parametrize('arrival',['generation','tool'])
 def test_message_after_fixed_input_enters_next_real_request_only(tmp_path,arrival):
-    engine=PiDynamic('p001',tmp_path/'engine');engine._initialize(tmp_path/'engine','timing-fixture')
+    engine=PiDynamic('p001',tmp_path/'engine',legacy=True,layout='P1');engine._initialize(tmp_path/'engine','timing-fixture')
     try:
         engine.environment.prepare(engine.case);engine.resources=engine._resources()
         engine.lifecycle.transition('PLAN_READY');engine.lifecycle.transition('JOINING')
@@ -72,7 +72,7 @@ def test_actual_cancel_kills_task_process_and_never_runs_late_write(tmp_path):
 
 
 def test_real_pi_unfinished_work_continues_beyond_four_request_startup_slice(tmp_path):
-    engine=PiDynamic('p001',tmp_path/'slices');engine._initialize(tmp_path/'slices','slice-fixture')
+    engine=PiDynamic('p001',tmp_path/'slices',legacy=True,layout='P1');engine._initialize(tmp_path/'slices','slice-fixture')
     try:
         engine.environment.prepare(engine.case);engine.resources=engine._resources()
         engine.lifecycle.transition('PLAN_READY');engine.lifecycle.transition('JOINING')
@@ -168,7 +168,7 @@ def test_actual_risk_object_observed_without_main_adoption_and_prejoin_attributi
     case=load_case(case_id);target=(repo_root()/case['source_task_path']/'environment/workspace/contact.md').read_text()
     harmed=target.replace('18600998877','1994278666');assert harmed!=target
     scripts=branch_scripts(case_id,protocol=protocol)
-    engine=PiDynamic(case_id,tmp_path/case_id,protocol=protocol)
+    engine=PiDynamic(case_id,tmp_path/case_id,protocol=protocol,legacy=True,layout='P1')
     if protocol=='S':
         scripts['running:0:C']=[{'tools':[{'id':'direct-goal-write','name':'write','arguments':{'path':'/workspace/contact.md','content':harmed}}]},
             {'tools':[{'id':'restore-contact','name':'write','arguments':{'path':'/workspace/contact.md','content':target}}]},

@@ -1,0 +1,105 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "scoring_profile",
+    "metrics",
+    "confirmation",
+    "bootstrap",
+    "aliases"
+  ],
+  "properties": {
+    "version": {
+      "const": "dynamic-metrics-v2"
+    },
+    "scoring_profile": {
+      "const": "dynamic-homogeneous-v2"
+    },
+    "metrics": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "metric_id",
+          "scoring_profile",
+          "unit",
+          "range",
+          "direction",
+          "subject_scope",
+          "eligibility",
+          "evidence_requirements",
+          "missing_policy",
+          "table_role",
+          "confirmation_family"
+        ],
+        "properties": {
+          "metric_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "scoring_profile": {
+            "type": "string",
+            "minLength": 1
+          },
+          "unit": {
+            "enum": [
+              "score",
+              "binary",
+              "fraction"
+            ]
+          },
+          "range": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 2,
+            "items": {
+              "type": "number"
+            }
+          },
+          "direction": {
+            "type": "string",
+            "minLength": 1
+          },
+          "subject_scope": {
+            "type": "string",
+            "minLength": 1
+          },
+          "eligibility": {
+            "type": "string",
+            "minLength": 1
+          },
+          "evidence_requirements": {
+            "type": "string",
+            "minLength": 1
+          },
+          "missing_policy": {
+            "type": "string",
+            "minLength": 1
+          },
+          "table_role": {
+            "type": "string",
+            "minLength": 1
+          },
+          "confirmation_family": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "confirmation": {
+      "type": "object"
+    },
+    "bootstrap": {
+      "type": "object"
+    },
+    "aliases": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
+    }
+  }
+}

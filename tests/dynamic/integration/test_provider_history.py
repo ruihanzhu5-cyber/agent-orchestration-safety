@@ -44,7 +44,7 @@ def test_mock_h1_h2_execute_original_environments_and_all_stages_without_file_ca
         binding['capability']['tokenizer'].update(id='o200k_base',version=importlib.metadata.version('tiktoken'),
             count_method='local-message-content-and-schema-bpe-estimate')
     mock=MockHistory();transport=ProviderTransport(config,mode='mock',journal=tmp_path/'provider-requests.jsonl',http=mock,max_requests=120)
-    runtime=PiDynamic('p001',tmp_path/'history-pair',provider=transport)
+    runtime=PiDynamic('p001',tmp_path/'history-pair',provider=transport,legacy=True,layout='P1')
     history=runtime.run_history(scripts=ProviderSource())
     assert history['synthetic'] is True and history['actual_historical_task_executions']==0
     assert history['mock_environment_task_executions']==2

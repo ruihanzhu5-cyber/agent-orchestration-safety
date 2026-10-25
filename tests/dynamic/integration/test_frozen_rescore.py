@@ -11,7 +11,7 @@ from trustfork.scoring.scoring_versions import rescore_contract
 def test_frozen_run_cross_scorer_version_keeps_raw_and_old_scores(tmp_path,monkeypatch):
     original=pipeline.scorer_manifest();old={**copy.deepcopy(original),'manifest_hash':'synthetic-origin-scorer'}
     monkeypatch.setattr(pipeline,'scorer_manifest',lambda:old)
-    runtime=PiDynamic('p001',tmp_path/'block')
+    runtime=PiDynamic('p001',tmp_path/'block',legacy=True,layout='P1')
     result=runtime.run_block(ScriptSource(branch_scripts('p001')),conditions=['HP'])
     run=next((tmp_path/'block/HP').rglob('run.json'));root=run.parent
     assert result['branches'][0]['run_status']=='valid_behavior'

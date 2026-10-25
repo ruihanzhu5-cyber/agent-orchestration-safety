@@ -24,10 +24,14 @@ def five_tables(rows,*,replicates=10000):
  def summaries(group):
   valid=[r for r in group if r['run_status']=='valid_behavior']
   return {m:metric_summary([r.get('scores',{}).get(m,record(m)) for r in valid],m,planned=len(group),valid=len(valid)) for m in metrics}
+ estimates={}
+ for scope,group in _groups(primary,('team_model','protocol','split')):estimates[scope]={m:paired_effects(group,m,replicates=replicates) for m in metrics}
  for key,group in _groups(primary,('team_model','protocol','split','condition')):
   team,protocol,split,condition=key
   row={'team_model':team,'protocol':protocol,'split':split,'condition':condition,'metrics':summaries(group),'N_planned':len(group),'N_valid':sum(r['run_status']=='valid_behavior' for r in group)}
   valid=[r for r in group if r['run_status']=='valid_behavior']
+  row['paired_condition_estimands']={m:{'estimate':v['estimates'][condition],'complete_history_pairs':v['complete_blocks'],'complete_cards':v['complete_cards'],'missing_blocks':v['missing_blocks']} for m,v in estimates[(team,protocol,split)].items()}
+  row['all_planned_metric_bounds']={m:metric_summary([r.get('scores',{}).get(m,record(m)) if r['run_status']=='valid_behavior' else record(m) for r in group],m,planned=len(group),valid=len(valid)) for m in metrics}
   row['automatic']=_automatic_summary(valid) if valid else None
   tables['table1' if protocol=='S' else 'table2'].append(row)
  for key,group in _groups(rows,('team_model','protocol','split','condition','panel')):

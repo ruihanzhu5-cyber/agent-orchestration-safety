@@ -89,7 +89,19 @@ class PiDynamic:
     def execution_mode(self):return self.provider.mode if getattr(self,'provider',None) else 'scripted-test'
 
     def experiment_metadata(self):
-        return {**self.experiment.export(),'history_bundle_id':(self.history or {}).get('history_bundle_id')} if self.experiment else {'experiment_version':'legacy-mixed-v9'}
+        if not self.experiment:return {'experiment_version':'legacy-mixed-v9'}
+        from trustfork.runtime.dynamic.experiment_config import resolve_experiment,block_id
+        from trustfork.tools.generate_dynamic_manifest import plan_ref
+        cfg=self.experiment;condition=getattr(self,'current_condition',None)
+        base=block_id(self.case['case_id'],resolve_experiment(self.case['case_id'],team_model=cfg.team_model,history_pair_id=cfg.history_pair_id))
+        conditions=('HP','MP') if condition=='normal' else ('HA','MA') if condition=='risk' else (condition,) if condition else ()
+        return {**cfg.export(),'history_bundle_id':(self.history or {}).get('history_bundle_id'),
+            'history_generation_mode':'frozen-bundle' if (self.history or {}).get('history_bundle_id') else 'exploratory-or-fixture',
+            'plan_run_id':plan_ref(self.block_id,condition) if condition else None,
+            'prefix_plan_ref':'prefix-plan_'+digest([cfg.experiment_version,self.case['case_id'],cfg.team_model,cfg.history_pair_id])[:24],
+            'baseline_plan_refs':[plan_ref(base,c) for c in conditions] if cfg.panel!='primary' else [],
+            'matched_S_plan_ref':plan_ref(base,condition) if cfg.protocol=='F' and condition else None}
+
 
     def prefix_identity(self):
         binding=(self.resolved_api_bindings or {}).get('logical_bindings',{}).get(self.main_model)
@@ -477,6 +489,7 @@ class PiDynamic:
         finally:self.client.close();self.environment.close()
 
     def _bind_profiles(self,condition):
+        self.current_condition=condition
         if self.panel in ('no_history','no_external_portfolio'):condition={'normal':'HP','risk':'HA'}.get(condition,condition)
         binding=bind_goals(self.case,self.layout,condition,experiment=self.experiment);self.q,self.r=binding['q'],binding['r'];self.display_order=binding['display_order']
         self.private_goals={**binding['goals'],'Main':NORMAL_GOAL}

@@ -58,6 +58,7 @@ def test_history_bundle_hash_provenance_scope_and_no_new_execution_on_reuse(tmp_
  for task in runtime.history_task_ids:h.add_task(task,{a:{'config':{'actor_id':a,'task_id':task},'messages':[]} for a in ('Main','A','B')},synthetic=True,status='refused')
  runtime.run_history=lambda **kw:h.export()
  path=tmp_path/'bundle.json';bundle=prepare_history(runtime,None,path)
+ assert json.loads(path.read_text())==bundle
  target=PiDynamic('p024',tmp_path/'target',team_model='gpt4o')
  loaded=load_history(target,path,reuse_journal=tmp_path/'reuse.jsonl')
  assert set(loaded['actor_states'])=={'Main','A','B'} and loaded['actor_states']['A'][0]['status']=='refused'

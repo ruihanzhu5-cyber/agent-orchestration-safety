@@ -9,7 +9,7 @@ from trustfork.runtime.dynamic.environment import DockerEnvironment
 
 @pytest.mark.parametrize('case_id',['p004','p006','p008','p028'])
 def test_late_join_restores_actual_old_member_work_in_four_original_cases(tmp_path,case_id):
-    engine=PiDynamic(case_id,tmp_path/case_id,protocol='L')
+    engine=PiDynamic(case_id,tmp_path/case_id,protocol='L',legacy=True,layout='P1')
     result=engine.run_block(ScriptSource(branch_scripts(case_id,protocol='L')),conditions=('HP',))
     assert result['branches'][0]['run_status']=='valid_behavior'
     checkpoint=read_json(tmp_path/case_id/'late-prefix/checkpoint.json')

@@ -88,7 +88,11 @@ def paired_effects(rows,metric,*,universe=None,replicates=BOOTSTRAPS,planned_blo
             'ci95':[quantile(boot,.025),quantile(boot,.975)],
             'bootstrap_usable':len(boot),'bootstrap_no_observed_card':len(draws)-len(boot)}
         if confirmation and name=='interaction':
-            if homogeneous:estimates[name]['ci98_75_family4']=[quantile(boot,p) for p in family['quantiles']]
+            if homogeneous:
+                interval=[quantile(boot,p) for p in family['quantiles']]
+                label='ci'+format(family['confidence']*100,'.8g').replace('.','_')+'_family'+str(family['size'])
+                estimates[name][label]=interval
+                estimates[name]['confirmation_interval']={'bounds':interval,'confidence':family['confidence'],'family_size':family['size'],'quantiles':family['quantiles']}
             else:estimates[name]['ci99_375_family8']=[quantile(boot,.003125),quantile(boot,.996875)]
     # Complete blocks produce an observed point estimate. These separate bounds
     # assign every missing source-card/layout cell its allowed scale endpoints.
@@ -110,7 +114,7 @@ def paired_effects(rows,metric,*,universe=None,replicates=BOOTSTRAPS,planned_blo
                 else:lo+=sign*value;hi+=sign*value
             bounds.append((lo,hi))
         interaction_bounds.append((mean(x[0] for x in bounds),mean(x[1] for x in bounds)))
-    return {'metric':metric,'estimates':estimates,'complete_blocks':sum(map(len,per_card.values())),
+    result={'metric':metric,'estimates':estimates,'complete_blocks':sum(map(len,per_card.values())),
         'planned_observed_blocks':len(blocks),'complete_cards':len(card_values),'bootstrap_universe_cards':list(cards),
         'missing_blocks':missing,'per_card_layout_counts':{c:len(v) for c,v in per_card.items()},
         'missing_sensitivity_interaction':[mean(x[0] for x in interaction_bounds),mean(x[1] for x in interaction_bounds)] if interaction_bounds else [None,None],
@@ -118,6 +122,11 @@ def paired_effects(rows,metric,*,universe=None,replicates=BOOTSTRAPS,planned_blo
         'bootstrap_replicates':replicates,'bootstrap_seed':SEED,'quantile_method':'linear interpolation',
         'ci95_endpoints':[.025,.975],'family8_endpoints':[.003125,.996875] if confirmation else None,
         'confirmation_family':family if homogeneous else None,'family8_applies':confirmation and not homogeneous,'small_sample_approximation':True,'base_task_family_sensitivity':'blocked_until_source_family_mapping_is_resolved'}
+    if homogeneous:
+        result.pop('family8_endpoints');result.pop('family8_applies')
+        result['per_card_history_pair_counts']=result.pop('per_card_layout_counts')
+        result['method']='Complete history-pair contrasts averaged within source card; equal cards; fixed shared histories are conditional'
+    return result
 
 
 def card_equal_estimates(rows,metric,*,replicates=BOOTSTRAPS,universe=None):

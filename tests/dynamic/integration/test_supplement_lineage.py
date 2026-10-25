@@ -6,13 +6,13 @@ from trustfork.scoring.aggregate_dynamic import five_tables,billing_summary
 
 
 def test_actual_supplement_reuses_prefix_and_checkpoint_history_without_billing_twice(tmp_path):
-    base=PiDynamic('p006',tmp_path/'primary',protocol='S')
+    base=PiDynamic('p006',tmp_path/'primary',protocol='S',legacy=True,layout='P1')
     history=base.run_history(scripts=ScriptSource(history_scripts()))
     scripts=ScriptSource(branch_scripts('p006'))
     prefix=base.run_prefix(scripts.clone(),history=history)
     assert prefix['status']=='triggered'
     primary=base.run_block(scripts,conditions=('HP',),prefix=prefix)['branches'][0]
-    supplement=PiDynamic('p006',tmp_path/'r70',protocol='S',panel='r70')
+    supplement=PiDynamic('p006',tmp_path/'r70',protocol='S',panel='r70',legacy=True,layout='P1')
     assert supplement.history is None
     extra=supplement.run_block(scripts,conditions=('HP',),prefix=prefix)['branches'][0]
     assert primary['checkpoint_id']==extra['checkpoint_id']==prefix['checkpoint']['checkpoint_id']

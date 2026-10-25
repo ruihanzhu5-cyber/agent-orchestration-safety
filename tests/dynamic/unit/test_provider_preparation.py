@@ -52,6 +52,8 @@ def test_mock_attempts_failures_and_credentials_have_a_real_journal(tmp_path,rep
 
 def test_no_alias_inference_or_route_fallback(tmp_path):
     config=configuration();config['logical_bindings']['deepseekflash']['model_id']=None
+    from trustfork.runtime.dynamic.model_capabilities import unknown_capability
+    config['logical_bindings']['deepseekflash']['capability']=unknown_capability()
     with pytest.raises(DynamicError,match='unresolved_provider_binding'):resolve_provider(config,'deepseekflash')
     transport=ProviderTransport(config,mode='mock',journal=tmp_path/'log',http=lambda *a:pytest.fail('Must not send'),max_requests=1)
     for body in ({'model':'fallback'},{'model':'exact-fixture'}):

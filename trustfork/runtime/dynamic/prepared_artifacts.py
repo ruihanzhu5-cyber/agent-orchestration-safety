@@ -10,16 +10,20 @@ def binding_hash(runtime):
 def history_contract(runtime):
  return {'experiment_version':runtime.experiment.experiment_version,'team_model':runtime.main_model,
   'history_pair_id':runtime.experiment.history_pair_id,'task_ids':runtime.history_task_ids,
-  'team_binding_hash':binding_hash(runtime),'source_asset_hashes':{c:load_case(c)['deployed_asset_hash'] for c in runtime.history_task_ids},
+  'execution_backend':runtime.execution_mode,'team_binding_hash':binding_hash(runtime),'source_asset_hashes':{c:load_case(c)['deployed_asset_hash'] for c in runtime.history_task_ids},
   'generation_config_hash':digest({'normal_goal':__import__('trustfork.runtime.dynamic.goals',fromlist=['NORMAL_GOAL']).NORMAL_GOAL,
    'budget':[120,48000,4096,1200],'temperature':0.2,'controller':file_hash(repo_root()/'trustfork/agents/pi_dynamic.py'),
    'history_executor':file_hash(repo_root()/'trustfork/runtime/dynamic/history_execution.py')})}
 def prepare_history(runtime,source,path):
  path=Path(path)
  if path.exists():raise DynamicError('history_bundle_exists','Immutable history cannot be replaced')
- contract=history_contract(runtime);history=runtime.run_history(scripts=source)
+ contract=history_contract(runtime)
+ try:history=runtime.run_history(scripts=source)
+ except (DynamicError,OSError) as error:
+  write_json(path.with_suffix('.blocked.json'),{'version':'prepared-history-blocked-v1','contract':contract,'status':'blocked','reason':getattr(error,'code',type(error).__name__),'task_attempt_directories':[p.name for p in (path.parent/'history').glob('*') if (p/'events.jsonl').exists()],'synthetic':runtime.synthetic})
+  raise
  records=history.get('execution_records',[])
- value={'version':'prepared-history-v1','contract':contract,'history':history,'synthetic':runtime.synthetic,
+ value={'version':'prepared-history-v2','contract':contract,'history':copy.deepcopy(history),'synthetic':runtime.synthetic,
   'generation_commit':subprocess.check_output(['git','rev-parse','HEAD'],cwd=repo_root(),text=True).strip(),
   'task_statuses':{c:history['actor_states']['Main'][i]['status'] for i,c in enumerate(history['tasks'])},
   'session_hashes':{a:[digest(x['session']) for x in states] for a,states in history['actor_states'].items()},
@@ -27,14 +31,29 @@ def prepare_history(runtime,source,path):
   'accounting':{'generated_bundles':1,'task_attempts':len(records),'completed_histories':sum(x['status']=='completed_unjudged' for x in records),
    'failed_histories':sum(x['status']=='failed_history_retained' for x in records),'fixture_history_tasks':len(history['tasks']) if not records else 0,
    'real_history_task_attempts':len(records) if not runtime.synthetic else 0,'mock_environment_task_attempts':len(records) if runtime.synthetic else 0}}
+ import hashlib,os
+ files=set(path.parent.glob('**/events.jsonl'))|set(path.parent.glob('**/network-guard.jsonl'))
+ if runtime.provider is not None and runtime.provider.journal.exists():files.add(runtime.provider.journal)
+ value['request_ledger_prefixes']=[{'path':os.path.relpath(p,path.parent),'bytes':p.stat().st_size,'sha256':hashlib.sha256(p.read_bytes()).hexdigest()} for p in sorted(files)]
+ from trustfork.tools.audit_model_calls import audit_request_events
+ import json
+ audits=[audit_request_events([json.loads(line) for line in p.read_text().splitlines()]) for p in path.parent.glob('**/events.jsonl')]
+ value['accounting']['actual_provider_calls']={'real':sum(a['real_model_calls_in_observed_scope'] or 0 for a in audits),'submitted':sum(len(a['request_records']) for a in audits),'source':'actual bridge request submissions; no summary constants'}
  value['bundle_id']='history_bundle_'+digest(value);write_json(path,value)
  history['history_bundle_id']=value['bundle_id'];runtime.history=history
  return value
 def load_history(runtime,path,*,reuse_journal=None):
  value=read_json(Path(path));content=copy.deepcopy(value);identity=content.pop('bundle_id',None)
- if value.get('version')!='prepared-history-v1' or identity!='history_bundle_'+digest(content):raise DynamicError('history_bundle_hash_mismatch','History bundle changed')
+ if value.get('version')!='prepared-history-v2' or identity!='history_bundle_'+digest(content):raise DynamicError('history_bundle_hash_mismatch','History bundle changed')
  if value['contract']!=history_contract(runtime):raise DynamicError('history_bundle_target_mismatch','Wrong model, tasks, assets or generation contract')
  if value['synthetic']!=runtime.synthetic:raise DynamicError('history_provenance_mismatch','Synthetic and real history cannot mix')
+ import hashlib
+ for ref in value.get('request_ledger_prefixes',[]):
+  log=(Path(path).parent/ref['path']).resolve()
+  try:
+   with log.open('rb') as stream:data=stream.read(ref['bytes'])
+  except OSError:raise DynamicError('history_ledger_unavailable','Retained request evidence missing') from None
+  if len(data)!=ref['bytes'] or hashlib.sha256(data).hexdigest()!=ref['sha256']:raise DynamicError('history_ledger_prefix_changed','Original request evidence changed')
  h=copy.deepcopy(value['history'])
  if h['tasks']!=runtime.history_task_ids or h.get('environment_carry') is not False or set(h['actor_states'])!={'Main','A','B'}:raise DynamicError('history_scope_mismatch','Only complete actor-scoped sessions may carry')
  for actor,states in h['actor_states'].items():

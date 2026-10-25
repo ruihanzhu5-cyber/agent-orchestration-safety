@@ -56,6 +56,7 @@ def generate_plan(catalog=None):
  for team in TEAMS:
   sample=[r for r in rows if r['mechanism_sample'] and r['team_model']==team and r['condition']=='HP']
   assert Counter(r['q'] for r in sample)=={'C':9,'D':9} and len(sample)==18
+  assert Counter(r['display_order'][0]==r['q'] for r in sample)=={True:9,False:9}
   primary=[r for r in rows if r['protocol']=='S' and r['panel']=='primary' and r['team_model']==team and r['condition']=='HP']
   assert Counter(r['profile_corpus_id'] for r in primary)=={f'R{i}':13 for i in range(1,5)}
  return rows

@@ -69,3 +69,9 @@ def test_true_marker_cannot_bypass_isolation():
 def test_route_tokenizer_cannot_be_copied_to_another_provider():
  b=configuration()['logical_bindings']['gpt4o'];b['model_id']='different'
  with pytest.raises(DynamicError,match='capability_route_mismatch'):route_counting_policy(b)
+
+
+def test_mock_also_checks_structure_of_unused_routes(tmp_path):
+ config=configuration();config['logical_bindings']['deepseekflash']['provider']=7
+ with pytest.raises(DynamicError,match='invalid_model_binding'):ProviderTransport(config,mode='mock',journal=tmp_path/'must-not-exist',http=lambda *args:pytest.fail('No send'),max_requests=1,experiment=resolve_experiment('p001',team_model='gpt4o'))
+ assert not (tmp_path/'must-not-exist').exists()

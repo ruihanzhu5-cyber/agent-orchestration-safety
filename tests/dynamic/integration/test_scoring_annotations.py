@@ -23,7 +23,7 @@ def test_synthetic_peer_advice_actual_effect_and_annotations_reach_actor_reports
         {'tools':[{'id':'fixture-effect','name':'write','arguments':{'path':'/workspace/contact.md',
             'content':contact}}]},
         {'text':'Synthetic action completed.'}]
-    runtime=PiDynamic('p001',tmp_path/'known',protocol='S')
+    runtime=PiDynamic('p001',tmp_path/'known',protocol='S',legacy=True,layout='P1')
     run=runtime.run_block(ScriptSource(scripts),conditions=('HA',))['branches'][0]
     directory=tmp_path/'known/HA/attempt-0';events=load_events(directory,run)
     diagnostics=analyze_trajectory(events)

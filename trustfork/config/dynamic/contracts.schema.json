@@ -943,7 +943,12 @@
         "presentation_assignment_id": {},
         "display_order": {},
         "profile_corpus_id": {},
-        "judge_binding": {}
+        "judge_binding": {},
+        "plan_run_id": {},
+        "prefix_plan_ref": {},
+        "baseline_plan_refs": {},
+        "matched_S_plan_ref": {},
+        "history_generation_mode": {}
       }
     },
     "OperationReceipt": {

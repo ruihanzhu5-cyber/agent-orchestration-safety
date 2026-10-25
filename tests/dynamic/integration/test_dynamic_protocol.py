@@ -7,7 +7,7 @@ from trustfork.runtime.dynamic.common import read_json, DynamicError
 
 
 def test_actual_common_prefix_independent_four_branches_and_goals(tmp_path):
-    engine=PiDynamic('p001',tmp_path/'s',protocol='S')
+    engine=PiDynamic('p001',tmp_path/'s',protocol='S',legacy=True,layout='P1')
     result=engine.run_block(ScriptSource(branch_scripts('p001',peer=True)))
     assert len(result['branches'])==4 and len({x['checkpoint_id'] for x in result['branches']})==1
     assert all(x['run_status']=='valid_behavior' and x['synthetic'] for x in result['branches'])
@@ -48,7 +48,7 @@ def test_actual_common_prefix_independent_four_branches_and_goals(tmp_path):
 
 
 def test_f_can_validly_recruit_neither_candidate(tmp_path):
-    engine=PiDynamic('p001',tmp_path/'f',protocol='F')
+    engine=PiDynamic('p001',tmp_path/'f',protocol='F',legacy=True,layout='P1')
     result=engine.run_block(ScriptSource(branch_scripts('p001',protocol='F',recruit=())),conditions=('HP',))
     assert result['branches'][0]['run_status']=='valid_behavior'
     events=[json.loads(x) for x in (tmp_path/'f/HP/attempt-0/events.jsonl').read_text().splitlines()]
@@ -69,7 +69,7 @@ def test_audit_real_f_recruit_and_actual_use_are_independent(tmp_path,wake):
     elif wake=='message':
         scripts['running:0:Main'].insert(0,{'tools':[{'id':'message-C','name':'send_message',
             'arguments':{'recipients':['C'],'content':'Please inspect the shared task.'}}]})
-    engine=PiDynamic('p001',tmp_path/wake,protocol='F')
+    engine=PiDynamic('p001',tmp_path/wake,protocol='F',legacy=True,layout='P1')
     result=engine.run_block(ScriptSource(scripts),conditions=('HA',))
     run=result['branches'][0];assert run['run_status']=='valid_behavior'
     path=tmp_path/wake/'HA/attempt-0'
@@ -92,7 +92,7 @@ def test_audit_real_s_early_release_does_not_bypass_startup(tmp_path):
     scripts=branch_scripts('p001')
     scripts['planning:0:Main']=[{'text':json.dumps({'plan_status':'answer_ready','assignments':[],'draft_answer':'Synthetic draft'})}]
     scripts['coordinating:0:Main']=[{'tools':[{'id':'release-'+a,'name':'release_member','arguments':{'actor_id':a}} for a in 'CD']}]
-    engine=PiDynamic('p001',tmp_path/'protected-S',protocol='S')
+    engine=PiDynamic('p001',tmp_path/'protected-S',protocol='S',legacy=True,layout='P1')
     result=engine.run_block(ScriptSource(scripts),conditions=('HA',))
     assert result['branches'][0]['run_status']=='valid_behavior'
     events=[json.loads(line) for line in (tmp_path/'protected-S/HA/attempt-0/events.jsonl').read_text().splitlines()]

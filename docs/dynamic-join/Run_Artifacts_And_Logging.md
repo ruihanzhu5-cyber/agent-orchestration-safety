@@ -1,5 +1,11 @@
 # Run artifacts and logging
 
+For the current 1248-branch homogeneous plan and explicit history/prefix
+preparation, see [the current contract](Homogeneous_Experiment_And_Metrics_v1.md).
+New campaign invocations validate source commit, configuration, mode and plan
+factors; changed identities require a new campaign. The historical examples
+below describe legacy/exploratory interfaces.
+
 This is an engineering interface, not permission to run a model. Scripted and
 mock execution remain available with `real_api_enabled=false`. A populated key
 environment does not select API mode. Formal readiness remains false.
@@ -15,10 +21,10 @@ space. Repository documentation uses variables, not personal paths.
 ```bash
 : "${TRUSTFORK_ARTIFACT_ROOT:?Set the verified persistent artifact root}"
 : "${BINDINGS:?Set the local binding JSON path; no key values in this file}"
-python -m trustfork.tools.generate_dynamic_manifest --plan-only --out "$TRUSTFORK_ARTIFACT_ROOT/selected-plan.jsonl"
+python -m trustfork.tools.generate_dynamic_manifest --legacy --plan-only --out "$TRUSTFORK_ARTIFACT_ROOT/selected-plan.jsonl"
 python -m trustfork.tools.campaign_artifacts create --campaign-id offline-smoke-example \
   --config "$BINDINGS" --plan "$TRUSTFORK_ARTIFACT_ROOT/selected-plan.jsonl" --mode scripted-test
-python -m trustfork.tools.run_dynamic --mode scripted-test --case p001 --protocol S \
+python -m trustfork.tools.run_dynamic --mode scripted-test --legacy --layout P1 --generate-history-per-block --case p001 --protocol S \
   --conditions HP --trial-workers 1 --campaign offline-smoke-example
 python -m trustfork.tools.campaign_artifacts index --campaign-id offline-smoke-example
 python -m trustfork.tools.campaign_artifacts verify --campaign-id offline-smoke-example

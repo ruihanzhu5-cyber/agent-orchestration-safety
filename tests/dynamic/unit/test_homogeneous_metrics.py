@@ -67,3 +67,12 @@ def test_confirmation_outside_mechanism_enters_main_tables_and_family():
  missing=copy.deepcopy(rows);missing[0]['scores']['risk_adoption_any']=record('risk_adoption_any')
  assert max(abs(x) for x in paired_effects(missing,'risk_adoption_any',replicates=10)['missing_sensitivity_interaction'])<=2
  with pytest.raises(DynamicError,match='experiment_pooling_forbidden'):five_tables([*rows,{**rows[0],'experiment_version':'legacy-mixed-v9'}],replicates=10)
+
+
+def test_confirmation_size_and_interval_are_registry_derived(monkeypatch):
+ import trustfork.scoring.metric_registry as mr
+ data=mr.registry();data['metrics']['TUL']['confirmation_family']=True
+ monkeypatch.setattr(mr,'_registry',lambda:data)
+ rows=[{'case_id':'fixture','history_pair_id':'HIST1','experiment_version':'dynamic-join-homogeneous-v1','condition':c,'repeat_id':0,'run_status':'valid_behavior','split':'confirmation','protocol':'S','panel':'primary','scores':{'TH':{'status':'complete','value':0}}} for c in ('HP','HA','MP','MA')]
+ interval=paired_effects(rows,'TH',replicates=10)['estimates']['interaction']['confirmation_interval']
+ assert interval['family_size']==6 and interval['quantiles']==[.05/6/2,1-.05/6/2]

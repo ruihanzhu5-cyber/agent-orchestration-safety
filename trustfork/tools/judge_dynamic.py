@@ -8,7 +8,7 @@ from trustfork.scoring.judge_client import JudgeClient
 from trustfork.scoring.judge_request import build_judge_bundle,prepare_judge_pass
 from trustfork.scoring.dynamic_pipeline import load_events,scorer_manifest
 from trustfork.scoring.dynamic_adapter import extract_formal_deliverables
-def run_judge_attempt(run_path,out,config,*,mode,scorer_config,semantic_goals=False,representation=None,mock_replies=None,max_requests=2,authorize_real=False,passes=('response','trajectory'),prior_attempt=None):
+def run_judge_attempt(run_path,out,config,*,mode,scorer_config,semantic_goals=False,representation=None,mock_replies=None,max_requests=2,authorize_real=False,passes=('response','trajectory'),prior_attempt=None,trajectory_view_override=None):
  out=Path(out);run_path=Path(run_path)
  if out.exists():raise DynamicError('judge_output_exists','Choose a new attempt; team remains frozen')
  run=read_json(run_path);events=load_events(run_path.parent,run);refs={e['branch_id']+'::'+e['event_id'] for e in events}
@@ -18,14 +18,27 @@ def run_judge_attempt(run_path,out,config,*,mode,scorer_config,semantic_goals=Fa
  deliveries=extract_formal_deliverables(events,task_id=run['case_id'],allowed_branch_ids={e['branch_id'] for e in events});ids=[d['deliverable_id'] for d in deliveries];refs.update('response://'+d for d in ids)
  profile=scorer_config.get('scoring_profile') or ('dynamic-homogeneous-v2' if run.get('experiment_version')=='dynamic-join-homogeneous-v1' else 'legacy-eight-v1')
  response=read_json(run_path.parent/'scoring/response_input.json')['data'];trajectory=read_json(run_path.parent/'scoring/trajectory_input.json')['data']
+ if trajectory_view_override is not None:
+  trajectory=trajectory_view_override
+  if trajectory.get('_sanitizer',{}).get('source_events_hash')!=digest(events):raise DynamicError('judge_view_source_mismatch','Derived view must bind the same frozen raw events')
  semantic=semantic_goals or profile=='dynamic-homogeneous-v2'
  bundle=build_judge_bundle(response,trajectory,scoring_profile=profile,goal_spec=load_case(run['case_id'])['goal_spec'] if semantic else None,annotation_schema=read_json(config_dir()/'annotation.schema.json') if semantic else None)
  binding=config['logical_bindings'][config['judge_binding']]
  prepared={key:prepare_judge_pass(bundle,key,binding=binding,scorer_config=scorer_config,representation=representation) for key in ('response','trajectory')}
  current=[None]
  transport=ProviderTransport(config,mode=mode,journal=out/'judge-requests.jsonl',authorize_real=authorize_real,http=(lambda *unused:mock_replies[current[0]]) if mode=='mock' else None,max_requests=max_requests,kind='judge')
+ if scorer_config.get('judge_binding',config['judge_binding'])!=config['judge_binding']:raise DynamicError('judge_binding_mismatch','Scorer and frozen Judge binding must agree')
  client=JudgeClient(transport);annotation={'response_judgements':{},'trajectory_judgements':{},'scorer_manifest_hash':scorer_manifest()['manifest_hash'],'synthetic':transport.synthetic,'scoring_profile':profile,'judge_passes':{}}
  for key,value in prepared.items():write_json(out/(key+'-prepared.json'),value)
+ pending=[k for k,v in prepared.items() if k in passes and not v['not_applicable']]
+ if len(pending)>max_requests:raise DynamicError('judge_request_budget_blocked','All pending passes must fit the independent request ceiling')
+ for key,value in prepared.items():
+  if key not in passes and not value['not_applicable']:
+   if prior_attempt is None:raise DynamicError('judge_prior_pass_required','Explicit prior successful pass required')
+   prior=Path(prior_attempt);old=read_json(prior/(key+'-prepared.json'));saved=read_json(prior/(key+'-result.json'))
+   if old['request_hash']!=value['request_hash'] or old['wire_payload_hash']!=value['wire_payload_hash'] or saved['request_hash']!=value['request_hash'] or saved['synthetic']!=transport.synthetic:raise DynamicError('judge_prior_pass_mismatch','Prior pass differs from exact frozen request')
+   from trustfork.scoring.judge_client import validate_judge_result
+   validate_judge_result(saved['result'],pass_name=key,response_ids=ids,evidence_refs=refs,scoring_profile=profile)
  try:
   for key,value in prepared.items():
    if key in passes:client.preflight(value)
@@ -61,10 +74,10 @@ def run_judge_attempt(run_path,out,config,*,mode,scorer_config,semantic_goals=Fa
  write_json(out/'scoring_annotations.json',annotation)
  return {'judge_attempts':transport.count,'synthetic':transport.synthetic,'formal_ready':False,'annotations':'scoring_annotations.json'}
 def main():
- p=argparse.ArgumentParser(description=__doc__);p.add_argument('--mode',choices=['mock','api'],default='mock');p.add_argument('--run',type=Path,required=True);p.add_argument('--bindings',type=Path,required=True);p.add_argument('--out',type=Path,required=True);p.add_argument('--scorer-config',type=Path);p.add_argument('--judge-output-budget',type=int);p.add_argument('--request-ceiling',type=int,required=True);p.add_argument('--allow-real-api',action='store_true');p.add_argument('--mock-responses',type=Path);p.add_argument('--semantic-goals',action='store_true');p.add_argument('--passes',nargs='+',choices=['response','trajectory'],default=['response','trajectory']);p.add_argument('--prior-attempt',type=Path);p.add_argument('--trajectory-representation',choices=['legacy-full','trajectory-lossless-v1']);a=p.parse_args()
+ p=argparse.ArgumentParser(description=__doc__);p.add_argument('--mode',choices=['mock','api'],default='mock');p.add_argument('--run',type=Path,required=True);p.add_argument('--bindings',type=Path,required=True);p.add_argument('--out',type=Path,required=True);p.add_argument('--scorer-config',type=Path);p.add_argument('--judge-output-budget',type=int);p.add_argument('--request-ceiling',type=int,required=True);p.add_argument('--allow-real-api',action='store_true');p.add_argument('--mock-responses',type=Path);p.add_argument('--semantic-goals',action='store_true');p.add_argument('--passes',nargs='+',choices=['response','trajectory'],default=['response','trajectory']);p.add_argument('--prior-attempt',type=Path);p.add_argument('--trajectory-view',type=Path,help='Explicit source-bound derived view for an audited migration');p.add_argument('--trajectory-representation',choices=['legacy-full','trajectory-lossless-v1']);a=p.parse_args()
  if a.mode=='mock' and not a.mock_responses:p.error('--mock-responses required')
  s=read_json(a.scorer_config or config_dir()/'scorer.example.json')
  if not a.scorer_config:s['scoring_profile']='dynamic-homogeneous-v2' if read_json(a.run).get('experiment_version')=='dynamic-join-homogeneous-v1' else 'legacy-eight-v1'
  if a.judge_output_budget is not None:s.update(response_output_budget_tokens=a.judge_output_budget,trajectory_output_budget_tokens=a.judge_output_budget)
- print(json.dumps(run_judge_attempt(a.run,a.out,read_json(a.bindings),mode=a.mode,scorer_config=s,semantic_goals=a.semantic_goals,representation=a.trajectory_representation,mock_replies=read_json(a.mock_responses) if a.mock_responses else None,max_requests=a.request_ceiling,authorize_real=a.allow_real_api,passes=tuple(a.passes),prior_attempt=a.prior_attempt)))
+ print(json.dumps(run_judge_attempt(a.run,a.out,read_json(a.bindings),mode=a.mode,scorer_config=s,semantic_goals=a.semantic_goals,representation=a.trajectory_representation,mock_replies=read_json(a.mock_responses) if a.mock_responses else None,max_requests=a.request_ceiling,authorize_real=a.allow_real_api,passes=tuple(a.passes),prior_attempt=a.prior_attempt,trajectory_view_override=read_json(a.trajectory_view) if a.trajectory_view else None)))
 if __name__=='__main__':main()

@@ -20,7 +20,7 @@ def audit_request_events(events):
             response=responses.get((event['branch_id'],event['request_id']),{})
             provider=response.get('provider');provider_counts[provider or 'unresolved']+=1
             backend=event['payload'].get('execution_backend')
-            classification='scripted' if (provider=='scripted' or backend=='mock') and event['payload'].get('synthetic') is True else 'real' if provider and provider!='scripted' else 'unresolved'
+            classification='scripted' if (provider=='scripted' or backend in ('mock','scripted-test')) and event['payload'].get('synthetic') is True else 'real' if provider and provider!='scripted' else 'unresolved'
             counts[classification+'_model_attempts']+=1
             request_records.append({'attempt_key':event['branch_id']+'::'+(event['request_id'] or event['event_id']),
                 'kind':'model','classification':classification,'provider':provider,'evidence_ref':event['branch_id']+'::'+event['event_id']})

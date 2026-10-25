@@ -40,7 +40,24 @@ def main():
     if args.campaign:
         campaign=Campaign(artifact_root()/'campaigns'/args.campaign);campaign.verify()
         from trustfork.runtime.dynamic.artifacts import safe_slug
-        logical='|'.join((args.case,args.main_model,args.layout,args.protocol,args.panel,str(args.repeat_id),args.strategy or 'default'))
+        from trustfork.runtime.dynamic.common import read_json,repo_root,digest
+        import subprocess
+        identity=read_json(campaign.path/'campaign.json')['identity']
+        current_commit=subprocess.check_output(['git','rev-parse','HEAD'],cwd=repo_root(),text=True).strip()
+        selected_config=read_json(args.bindings) if args.bindings else {}
+        if identity['commit']!=current_commit or identity['mode']!=args.mode or identity['config_hash']!=digest(selected_config):raise DynamicError('campaign_invocation_mismatch','Source/config/mode changed; create a new campaign')
+        if args.legacy:
+            if args.layout is None:parser.error('--legacy requires an explicit --layout')
+            logical='|'.join((args.case,args.main_model,args.layout,args.protocol,args.panel,str(args.repeat_id),args.strategy or 'default'))
+        else:
+            from trustfork.runtime.dynamic.experiment_config import resolve_experiment,block_id
+            cfg=resolve_experiment(args.case,team_model=args.team_model or args.main_model,history_pair_id=args.history_pair_id,protocol=args.protocol,panel='late_join' if args.protocol=='L' and args.panel=='primary' else args.panel,repeat_id=args.repeat_id)
+            logical=block_id(args.case,cfg,args.strategy)
+            planned=[json.loads(line) for line in (campaign.path/'plan.jsonl').read_text().splitlines()]
+            if planned:
+                if args.generate_history_per_block:raise DynamicError('exploration_in_frozen_campaign','Frozen plans require explicit bundles')
+                matches=[p for p in planned if p['block_id']==logical]
+                if not set(args.conditions)<={p['condition'] for p in matches}:raise DynamicError('campaign_plan_scope_mismatch','Block/conditions are outside the frozen plan')
         args.out=campaign.block(logical)
     else:args.out=resolve_output(args.out)
     if args.out.exists():raise DynamicError('run_output_exists','Select a new output or reconcile the existing frozen block; never overwrite')

@@ -1,4 +1,14 @@
-# Dynamic join v9: offline implementation
+# Dynamic join: homogeneous offline implementation
+
+The [homogeneous experiment and metric contract](Homogeneous_Experiment_And_Metrics_v1.md)
+defines the current 1248-branch plan, four explicit history bundles, shared
+prefixes, v2 metrics and independent Judge preparation. Real API execution stays
+disabled; no smoke or formal matrix is started. The commands and eight-score
+discussion below describe the retained legacy implementation unless explicitly
+using the new profile. For new work, use the linked current contract and
+`--team-model`, `--history-pair-id`, `--history-bundle` and `--prefix-artifact`.
+Old P-layout execution requires `--legacy`; per-block history generation is
+explicit exploration via `--generate-history-per-block`, not the frozen plan.
 
 The [2026-10-25 framework repair report](Framework_Repair_Report_20261025.md)
 records the pre-repair and final implementation commits, reversible restore
@@ -45,12 +55,12 @@ or install another environment. Keep both active for the commands below.
 ```bash
 python -m trustfork.tools.preflight_dynamic --mode offline --out build/dynamic/preflight.json
 python -m trustfork.tools.materialize_dynamic --all-cases --out build/dynamic/cases
-python -m trustfork.tools.generate_dynamic_manifest --plan-only --out build/dynamic/plan.jsonl
+python -m trustfork.tools.generate_dynamic_manifest --legacy --plan-only --out build/dynamic/plan.jsonl
 python -m pytest tests/dynamic/unit tests/dynamic/integration -q
 npm --prefix trustfork/runtime/dynamic run typecheck
 npm --prefix trustfork/runtime/dynamic run test:contract
-python -m trustfork.tools.run_dynamic --mode scripted-test --case p001 --protocol S --conditions HP HA MP MA --trial-workers 1 --out build/dynamic/scripted/p001
-python -m trustfork.tools.run_dynamic --mode scripted-test --case p024 --protocol F --conditions HP HA MP MA --trial-workers 1 --out build/dynamic/scripted/p024
+python -m trustfork.tools.run_dynamic --mode scripted-test --legacy --layout P1 --generate-history-per-block --case p001 --protocol S --conditions HP HA MP MA --trial-workers 1 --out build/dynamic/scripted/p001
+python -m trustfork.tools.run_dynamic --mode scripted-test --legacy --layout P1 --generate-history-per-block --case p024 --protocol F --conditions HP HA MP MA --trial-workers 1 --out build/dynamic/scripted/p024
 python -m trustfork.scoring.aggregate_dynamic --mode test-fixtures --input build/dynamic/scripted --out build/dynamic/tables-fixture
 ```
 

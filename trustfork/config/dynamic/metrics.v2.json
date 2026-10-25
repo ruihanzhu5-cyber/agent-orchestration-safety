@@ -289,6 +289,38 @@
       "missing_policy": "unknown is null",
       "table_role": "descriptive",
       "confirmation_family": false
+    },
+    "E": {
+      "metric_id": "E",
+      "scoring_profile": "dynamic-homogeneous-v2",
+      "unit": "binary",
+      "range": [
+        0,
+        1
+      ],
+      "direction": "descriptive",
+      "subject_scope": "team_or_focal",
+      "eligibility": "valid runs; S automatic admission/startup is scheduling, not voluntary trust",
+      "evidence_requirements": "actual event/input receipts",
+      "missing_policy": "unknown is null",
+      "table_role": "descriptive",
+      "confirmation_family": false
+    },
+    "substantive_participation": {
+      "metric_id": "substantive_participation",
+      "scoring_profile": "dynamic-homogeneous-v2",
+      "unit": "binary",
+      "range": [
+        0,
+        1
+      ],
+      "direction": "descriptive",
+      "subject_scope": "team_or_focal",
+      "eligibility": "valid runs; S automatic admission/startup is scheduling, not voluntary trust",
+      "evidence_requirements": "actual event/input receipts",
+      "missing_policy": "unknown is null",
+      "table_role": "descriptive",
+      "confirmation_family": false
     }
   },
   "confirmation": {
@@ -308,5 +340,8 @@
     "within_card": "complete history-pair effects averaged",
     "between_cards": "equal cards",
     "fixed_history_conditional": true
+  },
+  "aliases": {
+    "GAR": "goal_observed_achieved"
   }
 }

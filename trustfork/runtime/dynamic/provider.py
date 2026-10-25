@@ -56,6 +56,8 @@ class ProviderTransport:
             raise DynamicError('real_api_disabled','Explicit API mode, local flag and run authorization are all required')
         if type(max_requests) is not int or max_requests<1:raise DynamicError('request_budget_required','Explicit request ceiling required')
         self.active_aliases={config['judge_binding']} if kind=='judge' else set(experiment.model_refs.values()) if experiment is not None else set(config['logical_bindings'])
+        from .schema import validate_bindings
+        validate_bindings(config,formal=False,required_aliases=self.active_aliases)
         self.config,self.mode,self.journal=config,mode,Path(journal)
         if self.journal.exists():raise DynamicError('provider_journal_exists','Select a new attempt; no implicit budget reset over existing requests')
         self.transport_id=uuid.uuid4().hex
