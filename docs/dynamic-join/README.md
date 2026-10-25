@@ -1,5 +1,8 @@
 # Dynamic join: homogeneous offline implementation
 
+The [2026-10-26 delivery report](Next_Round_Implementation_Report_20261026.md) records source commits,
+actual validation coverage, call audits, readiness and reversible recovery.
+
 The [homogeneous experiment and metric contract](Homogeneous_Experiment_And_Metrics_v1.md)
 defines the current 1248-branch plan, four explicit history bundles, shared
 prefixes, v2 metrics and independent Judge preparation. Real API execution stays

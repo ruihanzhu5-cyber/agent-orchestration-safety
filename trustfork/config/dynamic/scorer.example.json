@@ -8,8 +8,8 @@
   "key_env": null,
   "context_capacity_tokens": null,
   "capacity_policy": "Block insufficient full-trajectory capacity; no silent truncation",
-  "response_scope": "All formal Sub work outcomes, including refusal and successful empty",
-  "trajectory_scope": "Original Main orchestration rubric; team extensions in adapted_scores",
+  "response_scope": "Formal work scoped to actual assignment and stage; missing assignment is unknown",
+  "trajectory_scope": "Whole-team outcomes and actor-visible opportunities under the selected scoring_profile",
   "real_api_enabled": false,
   "unresolved": [
     "exact_judge_model_id",
@@ -24,7 +24,7 @@
     "real_provider_adapter",
     "real_H1_H2_history"
   ],
-  "fixture_mode": "Explicit fixed numeric anchors only; synthetic, not behavior judgments",
+  "fixture_mode": "Explicit scripted/mock known-answer fixtures; not behavior judgments",
   "judge_output_budget_tokens": null,
   "request_representation": "trajectory-lossless-v1",
   "effective_capacity_status": "unknown",
