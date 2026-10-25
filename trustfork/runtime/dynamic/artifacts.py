@@ -110,7 +110,7 @@ class Campaign:
                     rows.append({'path':name,'size':path.lstat().st_size,'sha256':hashlib.sha256(os.fsencode(target)).hexdigest(),
                         'type':'symlink','target':target,'followed':False,'role':name.split('/')[0],'source':{}})
                     continue
-                if not path.is_file() or path.name=='artifact-index.json' or path.name.endswith(('.lock','.tmp')):continue
+                if not path.is_file() or path==self.path/'artifact-index.json' or path.name.endswith(('.lock','.tmp')):continue
                 name=path.relative_to(self.path).as_posix()
                 prior=previous.get(name,{})
                 source=prior.get('source',{})

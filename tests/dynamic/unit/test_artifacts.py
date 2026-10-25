@@ -2,7 +2,7 @@ import concurrent.futures
 import json
 import pytest
 from trustfork.runtime.dynamic.artifacts import Campaign,append_jsonl,safe_slug
-from trustfork.runtime.dynamic.common import DynamicError,read_json
+from trustfork.runtime.dynamic.common import DynamicError,read_json,write_json
 
 
 def test_campaign_conflict_verified_resume_and_tamper(tmp_path,monkeypatch):
@@ -49,10 +49,12 @@ def test_index_preserves_alias_metadata_without_reading_or_recursing_into_target
     outside=tmp_path/'outside';outside.mkdir();(outside/'canary.txt').write_text('DO_NOT_INDEX_EXTERNAL_CONTENT')
     external=campaign.path/'external-alias';external.symlink_to(outside,target_is_directory=True)
     internal=campaign.path/'test-current';internal.symlink_to('diagnostics',target_is_directory=True)
+    write_json(campaign.path/'diagnostics/nested/artifact-index.json',{'synthetic_nested_index':True})
     rows=campaign.index();campaign.verify()
     links=[r for r in rows if r.get('type')=='symlink']
     assert len(links)==2 and all(r['followed'] is False for r in links)
     assert not any('canary' in r['path'] or r['path'].startswith('external-alias/') for r in rows)
+    assert any(r['path']=='diagnostics/nested/artifact-index.json' for r in rows)
     (outside/'canary.txt').write_text('External contents are not claimed as indexed evidence')
     campaign.verify()
     external.unlink();external.symlink_to(tmp_path/'different-target',target_is_directory=True)
