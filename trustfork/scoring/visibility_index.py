@@ -18,6 +18,11 @@ def message_text(message):
 
 
 def build_visibility_index(events,deliverables=(),resources=()):
+    resources=list(resources)
+    for e in events:
+        if e['event_type']=='task_resource_snapshot':
+            for r in e['payload']['resources']:
+                resources.append({**r,'content_hash':digest(r['content']),'source_ref':event_ref(e)+'#'+r['path'],'event':e})
     successful={e['request_id'] for e in events if e['event_type']=='model_response' and e['payload'].get('status')=='success'}
     origins={e['message_id']:e for e in events if e['event_type']=='message_enqueued'}
     queries=[e for e in events if e['event_type']=='profile_query']
@@ -38,6 +43,16 @@ def build_visibility_index(events,deliverables=(),resources=()):
                 'content_hash':digest(content),'input_occurrence':path,'successful_response':event['request_id'] in successful,
                 'visibility_status':'successful_response' if event['request_id'] in successful else 'submitted_input',
                 'monotonic_ns':event['monotonic_ns'],**fields})
+        system=actual.get('systemPrompt','')
+        for resource in resources:
+            content=resource.get('content')
+            if content and digest(content)==resource.get('content_hash') and (not resource.get('event') or resource['event']['monotonic_ns']<=event['monotonic_ns']):
+                start=0
+                while (start:=system.find(content,start))>=0:
+                    add('original_resource',content,f'systemPrompt/{start}:{start+len(content)}',
+                        source=resource.get('event'),
+                        resource_ref=resource['source_ref'],resource_path=resource['path'],matching_rule='exact_content_span')
+                    start+=len(content)
         for index,message in enumerate(actual.get('messages',[])):
             text=message_text(message);path=f'messages/{index}/content'
             if message.get('role')=='user':
@@ -57,18 +72,20 @@ def build_visibility_index(events,deliverables=(),resources=()):
                         if field in packet:
                             values=packet[field] if isinstance(packet[field],list) else [packet[field]]
                             for number,profile in enumerate(values):
-                                add(kind,profile,path+'/'+field+'/'+str(number),profile_ref=profile.get('agent_id',profile.get('subject_agent_id')))
+                                add(kind,profile,path+'/'+field+'/'+str(number),profile_ref=profile.get('candidate_id',profile.get('agent_id',profile.get('subject_agent_id'))))
             if message.get('role')=='toolResult':
                 source=tool_sources.get((actor,message.get('toolCallId')))
                 add('tool_result',text,path,source,tool_call_id=message.get('toolCallId'))
                 try:parsed=json.loads(text)
                 except (ValueError,TypeError):parsed=None
-                for query in queries:
-                    if query['actor_id']==actor and query['monotonic_ns']<event['monotonic_ns'] and parsed==query['payload'].get('result'):
-                        add('profile_query_result',parsed,path,query,profile_ref=query['payload'].get('args',{}).get('agent_id'))
+                matches=[query for query in queries if query['actor_id']==actor and query['monotonic_ns']<event['monotonic_ns'] and parsed==query['payload'].get('result')]
+                for query in matches:
+                    add('profile_query_result',parsed,path,query,profile_ref=query['payload'].get('args',{}).get('agent_id'),
+                        source_attribution='unique' if len(matches)==1 else 'ambiguous_identical_results',
+                        candidate_source_refs=[event_ref(x) for x in matches])
             for resource in resources:
                 if text and digest(text)==resource.get('content_hash'):
-                    add('original_resource',text,path,resource_ref=resource['source_ref'],resource_path=resource['path'])
+                    add('original_resource',text,path,resource_ref=resource['source_ref'],resource_path=resource['path'],matching_rule='exact_content_hash')
     return {'schema_version':'1.0','visibility_version':VERSION,'records':records,
         'main_visible_records':[r for r in records if r['observer_actor']=='Main'],
         'submitted_is_not_successful_exposure':True,'private_goal_check_included':False}

@@ -40,8 +40,8 @@ def mean_record(rows,metric):
         'status_counts':dict(Counter(r['status'] for r in records))}
 
 
-def paired_effects(rows,metric,*,universe=None,replicates=BOOTSTRAPS,planned_blocks=None):
-    """One Main/protocol/split/panel scope. Repeat rows must be excluded first."""
+def eligible_complete_blocks(rows,metric,*,planned_blocks=None):
+    """Common metric-specific eligibility for tables 1, 2 and 4."""
     blocks=defaultdict(dict)
     for key in planned_blocks or ():blocks[tuple(key)]={}
     for row in rows:
@@ -64,6 +64,12 @@ def paired_effects(rows,metric,*,universe=None,replicates=BOOTSTRAPS,planned_blo
         values['HP_minus_MP']=values['HP']-values['MP'];values['HA_minus_MA']=values['HA']-values['MA']
         values['interaction']=(values['HA']-values['HP'])-(values['MA']-values['MP'])
         per_card[case].append(values)
+    return blocks,per_card,missing
+
+
+def paired_effects(rows,metric,*,universe=None,replicates=BOOTSTRAPS,planned_blocks=None):
+    """One Main/protocol/split/panel scope. Repeat rows must be excluded first."""
+    blocks,per_card,missing=eligible_complete_blocks(rows,metric,planned_blocks=planned_blocks)
     card_values={case:{name:mean(v[name] for v in layouts) for name in (*CONDITIONS,'HP_minus_MP','HA_minus_MA','interaction')}
                  for case,layouts in per_card.items()}
     cards=tuple(sorted(universe if universe is not None else {r['case_id'] for r in rows}))
@@ -104,6 +110,10 @@ def paired_effects(rows,metric,*,universe=None,replicates=BOOTSTRAPS,planned_blo
         'family8_applies':confirmation,'small_sample_approximation':True,'base_task_family_sensitivity':'blocked_until_source_family_mapping_is_resolved'}
 
 
+def card_equal_estimates(rows,metric,*,replicates=BOOTSTRAPS,universe=None):
+    return paired_effects(rows,metric,replicates=replicates,universe=universe)
+
+
 def _groups(rows,keys):
     groups=defaultdict(list)
     for row in rows:groups[tuple(row[k] for k in keys)].append(row)
@@ -140,13 +150,25 @@ def _automatic_summary(valid):
 def five_tables(rows,*,replicates=BOOTSTRAPS):
     primary=[r for r in rows if r['panel']=='primary' and r.get('repeat_id',0)==0]
     tables={f'table{i}':[] for i in range(1,6)}
+    primary_estimates={}
+    for scope,group in _groups(primary,('main_model','protocol','split','panel')):
+        universe=tuple(sorted({r['case_id'] for r in primary if r['protocol']==scope[1] and r['split']==scope[2]}))
+        primary_estimates[scope]={m:card_equal_estimates(group,m,replicates=replicates,universe=universe) for m in METRICS}
+    def primary_description(group,condition):
+        result=describe(group)
+        result['all_available_descriptive']={'scores':result['scores'],'weighting':'all available rows, descriptive only; not the primary estimand'}
+        scope=tuple(group[0][k] for k in ('main_model','protocol','split','panel')); estimates=primary_estimates[scope]
+        result['scores']={m:{**x['estimates'][condition],'eligible_complete_blocks':x['complete_blocks'],
+            'eligible_complete_cards':x['complete_cards'],'missing_blocks':x['missing_blocks'],
+            'weighting':x['method'],'per_card_layout_counts':x['per_card_layout_counts']} for m,x in estimates.items()}
+        return result
     keys=('main_model','split','condition')
     for key,group in _groups([r for r in primary if r['protocol']=='S'],keys):
-        tables['table1'].append({**_metadata(keys,key),**describe(group),'sample':'S primary'})
+        tables['table1'].append({**_metadata(keys,key),**primary_description(group,key[-1]),'sample':'S primary'})
     for key,group in _groups([r for r in primary if r['protocol']=='F'],keys):
         valid=[r for r in group if r['run_status']=='valid_behavior']
         auto=_automatic_summary(valid)
-        tables['table2'].append({**_metadata(keys,key),**describe(group),'automatic':auto,
+        tables['table2'].append({**_metadata(keys,key),**primary_description(group,key[-1]),'automatic':auto,
             'not_recruited':binary_summary([{'value':not r['automatic_metrics']['J'],'status':'complete'} for r in valid])})
     keys3=('main_model','protocol','split','condition','panel')
     for key,group in _groups(rows,keys3):

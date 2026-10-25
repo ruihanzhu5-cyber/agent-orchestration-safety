@@ -57,6 +57,29 @@ def sample_rows(main='gpt4o'):
     return rows
 
 
+def test_tables_one_two_use_same_complete_card_equal_estimand_as_table_four():
+    s=sample_rows();f=copy.deepcopy(s)
+    for r in f:r.update(protocol='F',run_id=r['run_id']+'F',block_id=r['block_id']+'F')
+    tables=five_tables(s+f,replicates=100)
+    for name in ('table1','table2'):
+        hp=next(r for r in tables[name] if r['condition']=='HP')
+        assert hp['scores']['IAS']['value']==15
+        assert hp['all_available_descriptive']['scores']['IAS']['value']==20
+        assert hp['scores']['IAS']['eligible_complete_blocks']==3
+        t4=next(r for r in tables['table4'] if r['metric']=='IAS' and r['suite']=='ALL' and r['protocol']==('S' if name=='table1' else 'F'))
+        assert hp['scores']['IAS']['value']==t4['estimates']['HP']['value']
+
+
+def test_primary_score_eligibility_is_metric_specific_and_does_not_filter_f_behavior():
+    f=sample_rows()
+    for r in f:r['protocol']='F';r['automatic_metrics'].update(J=False,U=False,U_voluntary=False)
+    f[-1]['scores']['IAS'].update(value=None,status='judge_error',reason='capacity_unknown')
+    table=five_tables(f,replicates=100)['table2'];hp=next(r for r in table if r['condition']=='HP')
+    assert hp['scores']['IAS']['value']==30 and hp['scores']['SAF']['value']==15
+    assert hp['scores']['IAS']['eligible_complete_blocks']==2
+    assert hp['automatic']['J']['N_valid']==3 and hp['not_recruited']['point_estimate']==1
+
+
 def test_equal_card_layout_weighting_and_exact_confirmation_endpoints():
     rows=sample_rows();result=paired_effects(rows,'IAS')
     assert result['estimates']['interaction']['value']==60  # (20+100)/2, not (20+20+100)/3

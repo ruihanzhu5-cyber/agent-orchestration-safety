@@ -14,8 +14,8 @@ from pathlib import Path
 
 from trustfork.runtime.dynamic.budget import Budget
 from trustfork.runtime.dynamic.case_loader import load_case
-from trustfork.runtime.dynamic.checkpoints import save_checkpoint, restore_checkpoint
-from trustfork.runtime.dynamic.common import DynamicError, canonical, digest, write_json,BASE_COMMIT,WORK_TOOLS
+from trustfork.runtime.dynamic.checkpoints import save_checkpoint, restore_checkpoint,validate_checkpoint
+from trustfork.runtime.dynamic.common import DynamicError, canonical, digest, write_json,BASE_COMMIT,WORK_TOOLS,file_hash,config_dir
 from trustfork.runtime.dynamic.schema import validate_contract
 from trustfork.runtime.dynamic.delegations import Delegations
 from trustfork.runtime.dynamic.environment import DockerEnvironment
@@ -134,7 +134,10 @@ class PiDynamic:
             stage_epoch=scope['stage_epoch'],request_id=scope['request_id'],tool_call_id=operation_id,invocation_id=scope['invocation_id'])
 
     def _resources(self):
-        return self.environment._worker('resource.snapshot',{},'task-resources')['resources']
+        resources=self.environment._worker('resource.snapshot',{},'task-resources')['resources']
+        self.ledger.append('task_resource_snapshot',{'resources':resources,'resources_hash':digest(resources)},
+            stage_id=self.lifecycle.stage_id,stage_epoch=self.lifecycle.epoch)
+        return resources
 
     def _create_actor(self, actor, snapshot=None):
         identity,result=self.client.create_session(actor,branch_id=self.ledger.branch_id,task_id=self.case['case_id'],
@@ -322,11 +325,11 @@ class PiDynamic:
         exposed=self.mailbox.confirm(actor,request_id,actual,successful=success,actual_request_id=actual_request_id)
         if success and actor=='Main' and 'newcomer_profiles' in actual:
             self.main_profile_introduced=True
-            self.ledger.append('main_profiles_exposed',{'profiles':actual['newcomer_profiles']},actor_id=actor,
+            self.ledger.append('main_profiles_exposed',{'profiles':actual['newcomer_profiles'],'profile_metadata':self.profile_metadata},actor_id=actor,
                 stage_id=self.lifecycle.stage_id,stage_epoch=self.lifecycle.epoch,request_id=actual_request_id)
         if success and 'own_profile' in actual:
             self.self_profile_sessions.add(self.sessions[actor])
-            self.ledger.append('self_summary_exposed',{'profile_hash':digest(actual['own_profile'])},actor_id=actor,stage_id=self.lifecycle.stage_id,stage_epoch=self.lifecycle.epoch,request_id=actual_request_id)
+            self.ledger.append('self_summary_exposed',{'profile_hash':digest(actual['own_profile']),'profile_metadata':self.profile_metadata},actor_id=actor,stage_id=self.lifecycle.stage_id,stage_epoch=self.lifecycle.epoch,request_id=actual_request_id)
         self.ledger.append('model_response',{'status':result['status'],'response':response,'confirmed_message_ids':exposed,'synthetic':True},
             actor_id=actor,stage_id=self.lifecycle.stage_id,stage_epoch=self.lifecycle.epoch,request_id=actual_request_id,
             invocation_id=invocation['invocation_id'] if invocation else None)
@@ -426,6 +429,25 @@ class PiDynamic:
         if self.panel=='no_history':level='none'
         peer_corpus='R'+str(int(corpus[1])%4+1)
         bundles={self.q:build_profile(self.q,level,corpus=corpus),self.r:build_profile(self.r,'M' if self.panel=='r70' else 'none',corpus=peer_corpus)}
+        model_bindings=(getattr(self,'resolved_api_bindings',None) or {}).get('logical_bindings',{})
+        for actor in 'ABCD':
+            if actor in 'AB':
+                states=(self.history or {}).get('actor_states',{}).get(actor,[])
+                eligible=[x for x in states if isinstance(x.get('synthetic'),bool) and x.get('task_id')]
+                if len({x['task_id'] for x in eligible})!=len(eligible):raise DynamicError('duplicate_direct_history',actor)
+                bundles[actor]=build_profile(actor,'none',direct_team_tasks=len(eligible))
+                bundles[actor]['history_provenance']={'task_ids':[x['task_id'] for x in eligible],
+                    'synthetic':any(x['synthetic'] for x in eligible),'successful_tasks':None,
+                    'meaning':'Observed HistoryBundle task occurrences, not successful completions',
+                    'unresolved_entries':len(states)-len(eligible)}
+            precise=model_bindings.get(LAYOUTS[self.layout][actor],{}).get('model_id')
+            bundles[actor]['profile']['actual_model_label']=precise
+            bundles[actor]['public_hash']=digest(bundles[actor]['profile'])
+        self.profile_metadata={'profile_schema_version':'portfolio-v1','renderer_version':'canonical-json-v1',
+            'profile_corpus_hash':file_hash(config_dir()/'profile_templates.v1.json'),'display_order':self.display_order,
+            'actual_model_bindings':{a:bundles[a]['profile']['actual_model_label'] for a in 'ABCD'},
+            'model_binding_resolution':'precise_config' if model_bindings else 'unknown_offline',
+            'history_outcomes':'synthetic reported fixtures; not 20 measured deployments'}
         self.profile_service=ProfileService(self.ledger.branch_id,bundles,reminder=self.panel=='reminder',
             membership=lambda actor:self.membership.status(actor))
 
@@ -487,6 +509,8 @@ class PiDynamic:
                 for future in done:self._settle(future,futures)
 
     def run_branch(self,snapshot,condition,scripts,*,attempt=0):
+        validate_checkpoint(snapshot)
+        self.history=copy.deepcopy(snapshot['history'])
         branch='branch_'+uuid.uuid4().hex
         self._initialize(self.out/condition/f'attempt-{attempt}',branch);self._bind_profiles(condition)
         self.current_scripts=scripts
@@ -554,6 +578,7 @@ class PiDynamic:
             validate_contract('RunManifest',manifest)
             write_json(self.directory/'run_manifest.json',manifest)
             write_json(self.directory/'private_bindings.json',{'goals':self.private_goals,'goal_spec':self.case['goal_spec']})
+            write_json(self.directory/'profile_metadata.json',self.profile_metadata)
             write_json(self.directory/'delivery_receipts.json',{'messages':self.mailbox.messages,'delegations':self.delegations.rows,
                 'membership':self.membership.directory(private=True),'startup':self.scheduler.startup,'queue':list(self.scheduler.queue)})
             result={'schema_version':'1.0','protocol_version':'dynamic-join-v9-trajectory-portfolio','run_id':branch,'block_id':self.block_id,

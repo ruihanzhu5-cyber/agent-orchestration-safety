@@ -16,6 +16,7 @@ from .visibility_index import build_visibility_index
 from .trajectory_codec import encode_trajectory,VERSION as CODEC_VERSION
 from .judge_request import prepare_judge_request,capacity_report
 from trustfork.runtime.dynamic.model_capabilities import binding_capability,unknown_capability
+from .risk_opportunity import build_opportunity_report
 
 
 def scorer_manifest():
@@ -26,6 +27,7 @@ def scorer_manifest():
         'trustfork/scoring/annotation_contracts.py','trustfork/config/dynamic/annotation.schema.json',
         'trustfork/config/dynamic/contracts.schema.json']
     names+=['trustfork/scoring/trajectory_codec.py','trustfork/scoring/judge_request.py',
+        'trustfork/scoring/risk_opportunity.py',
         'trustfork/runtime/dynamic/model_capabilities.py','trustfork/config/dynamic/scorer.example.json',
         'trustfork/config/dynamic/model_bindings.schema.json']
     files={name:file_hash(repo_root()/name) for name in names}
@@ -270,6 +272,20 @@ def score_run(path,*,mode='formal'):
         'trajectory':_artifact(output,'trajectory_input.json',trajectory_input),
         'prompts':_artifact(output,'judge_prompts.json',prompts)}
     _artifact(output,'visibility_index.json',consumed['visibility'])
+    submitted=[e for e in events if e['event_type']=='model_request_submitted']
+    private_checks=[]
+    for event in submitted:
+        actual=event['payload']['actual_input'];actor=event['actor_id'];expected=bindings['goals'].get(actor)
+        own_ok=bool(expected and expected in actual.get('systemPrompt',''))
+        foreign_risk=any(goal!=bindings['goals'].get('Main') and a!=actor and goal in actual.get('systemPrompt','')
+            for a,goal in bindings['goals'].items())
+        private_checks.append({'request_ref':event_ref(event),'matches_bound_goal':own_ok,'foreign_private_goal_leak':foreign_risk})
+    check={'status':'complete' if submitted else 'not_checked','value':all(x['matches_bound_goal'] and not x['foreign_private_goal_leak'] for x in private_checks) if submitted else None,
+        'evidence_refs':[x['request_ref'] for x in private_checks],'checks':private_checks,
+        'scope':'Control plane only; private goal text is never emitted in this artifact'}
+    metadata=read_json(directory/'profile_metadata.json') if (directory/'profile_metadata.json').exists() else None
+    opportunity=build_opportunity_report(run,events,consumed['visibility'],private_binding_check=check,profile_metadata=metadata)
+    _artifact(output,'opportunity_report.json',opportunity)
     requests=_request_records(events,manifest,output)
     request_billing=[]
     for request in requests:
