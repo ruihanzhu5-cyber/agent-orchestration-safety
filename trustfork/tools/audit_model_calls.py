@@ -19,7 +19,8 @@ def audit_request_events(events):
         if kind=='model_request_submitted':
             response=responses.get((event['branch_id'],event['request_id']),{})
             provider=response.get('provider');provider_counts[provider or 'unresolved']+=1
-            classification='scripted' if provider=='scripted' and event['payload'].get('synthetic') is True else 'real' if provider and provider!='scripted' else 'unresolved'
+            backend=event['payload'].get('execution_backend')
+            classification='scripted' if (provider=='scripted' or backend=='mock') and event['payload'].get('synthetic') is True else 'real' if provider and provider!='scripted' else 'unresolved'
             counts[classification+'_model_attempts']+=1
             request_records.append({'attempt_key':event['branch_id']+'::'+(event['request_id'] or event['event_id']),
                 'kind':'model','classification':classification,'provider':provider,'evidence_ref':event['branch_id']+'::'+event['event_id']})
@@ -55,11 +56,34 @@ def audit_guard_records(records):
         'note':'Guard real_model_requests/real_judge_requests are initialization fields; use actual provider events. Network counters are cumulative; positive receipt count is not a unique request count.'}
 
 
+def audit_transport_journals(paths):
+    """Count host HTTP attempts, including failures and independent Judge passes."""
+    attempts={};conflicts=[];errors=[];hashes={}
+    for path in sorted(set(paths)):
+        try:
+            hashes[str(path)]=file_hash(path)
+            for line in path.read_text().splitlines():
+                row=json.loads(line)
+                if row.get('status')!='submitted':continue
+                identity=(row.get('transport_id',str(path)),row.get('kind'),row.get('request_id'),row.get('attempt_number'))
+                if identity in attempts and attempts[identity]!=row:conflicts.append(list(identity))
+                attempts[identity]=row
+        except (ValueError,OSError):errors.append(str(path))
+    values=list(attempts.values())
+    unresolved=sum(row.get('source') not in ('api','mock') or not isinstance(row.get('synthetic'),bool)
+        or (row.get('source')=='api')==row.get('synthetic') for row in values)
+    return {'unique_http_attempts':len(values),'real_model_requests':None if unresolved or conflicts or errors else
+        sum(r['source']=='api' and r['kind']=='model' for r in values),
+        'real_judge_requests':None if unresolved or conflicts or errors else sum(r['source']=='api' and r['kind']=='judge' for r in values),
+        'mock_attempts':sum(r['source']=='mock' for r in values),'conflicts':conflicts,'unresolved':unresolved,
+        'errors':errors,'source_file_hashes':hashes,'counted_from_submissions_not_initialized_counters':True}
+
+
 def main():
     p=argparse.ArgumentParser(description=__doc__);p.add_argument('--root',type=Path,action='append',required=True)
     p.add_argument('--guard-archive',type=Path,action='append',default=[]);p.add_argument('--coverage-gap',action='append',default=[])
     p.add_argument('--out',type=Path,required=True);a=p.parse_args()
-    events=[];guards=[];sources={};errors=[];actual_runs=0;seen_paths=set()
+    events=[];guards=[];sources={};errors=[];actual_runs=0;seen_paths=set();journals=[]
     def read_lines(path):
         sources[str(path)]=file_hash(path)
         return [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
@@ -80,9 +104,11 @@ def main():
         for path in sorted(root.rglob('network-guard.jsonl')):
             if path in seen_paths:continue
             seen_paths.add(path);guards.extend(read_lines(path))
+        for name in ('provider-requests.jsonl','judge-requests.jsonl'):journals.extend(root.rglob(name))
     for path in a.guard_archive:guards.extend(read_lines(path))
     calls=audit_request_events(events);guard=audit_guard_records(guards)
-    report={'version':'actual-request-call-audit-v1','actual_run_records':actual_runs,'calls':calls,'guard_receipts':guard,
+    report={'version':'actual-request-call-audit-v2','actual_run_records':actual_runs,'calls':calls,'guard_receipts':guard,
+        'transport_call_audit':audit_transport_journals(journals),
         'source_file_hashes':sources,'coverage_gaps':a.coverage_gap,'log_errors':errors,
         'complete_historical_model_call_total':None if a.coverage_gap or errors else calls['real_model_calls_in_observed_scope'],
         'complete_historical_judge_call_total':None if a.coverage_gap or errors else calls['real_judge_calls_in_observed_scope'],

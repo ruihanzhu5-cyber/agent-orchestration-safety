@@ -14,6 +14,7 @@ import {
 import {createRemoteTools, type RemoteTransport, type Frame} from './remote_tools.ts';
 import {installGuards} from './io_guard.ts';
 import {assertBridgeEnvelope} from './contracts.ts';
+import {providerModel,providerStream} from './provider_adapter.ts';
 
 export type Envelope={rpc_id:string;actor_id:string;opaque_session_id:string;request_id:string|null;
   branch_id:string;task_id:string;stage_id:string;stage_epoch:number;invocation_id:string|null;operation:string;payload:any};
@@ -98,7 +99,8 @@ function coordinateDefinitions(owned:()=>OwnedSession):ToolDefinition<any,any,an
 }
 async function create(e:Envelope,restore?:any){
   if(sessions.has(e.opaque_session_id)) throw Error('Session already exists');
-  if(e.payload.mode!=='scripted-test') throw Error('Only explicit scripted-test mode is enabled in the offline bridge');
+  if(!['scripted-test','mock','api'].includes(e.payload.mode)) throw Error('Explicit execution backend required');
+  if(e.payload.mode!=='scripted-test'&&!e.payload.provider_binding)throw Error('Missing exact provider binding');
   const directory=path.resolve(e.payload.control_dir);
   await mkdir(directory,{recursive:true});await writeFile(path.join(directory,'auth.json'),'{}\n');
   const resources=new TaskResources(e.payload.task_resources??[],e.payload.system_prompt);
@@ -123,7 +125,8 @@ async function create(e:Envelope,restore?:any){
   const config={...e.payload,actor_id:e.actor_id,branch_id:e.branch_id,task_id:e.task_id};
   s={session:undefined as unknown as AgentSession,manager,resources,config,active:null,scripts:[],requests:0,actualInputs:[],events:[],transport,lastResponse:null,abortRequested:false};
   const tools=[...work,...coordinateDefinitions(()=>s)];
-  const created=await createAgentSession({cwd:'/workspace',agentDir:directory,modelRuntime:runtime,model:scriptedModel,
+  const model=e.payload.mode==='scripted-test'?scriptedModel:providerModel(e.payload.provider_binding);
+  const created=await createAgentSession({cwd:'/workspace',agentDir:directory,modelRuntime:runtime,model,
     thinkingLevel:'off',resourceLoader:resources,sessionManager:manager,settingsManager:settings,
     noTools:'builtin',tools:tools.map(x=>x.name),customTools:tools});
   if(created.modelFallbackMessage)throw Error('Unexpected model fallback');
@@ -137,9 +140,13 @@ async function create(e:Envelope,restore?:any){
     s.requests++;
     const actual={systemPrompt:context.systemPrompt,messages:context.messages,
       tools:(context.tools??[]).map(t=>({name:t.name,description:t.description,parameters:t.parameters})),
-      provider_parameters:{maxRetries:0,maxTokens:active.payload.max_output_tokens??4096}};
+      provider_parameters:{maxRetries:0,maxTokens:active.payload.max_output_tokens??4096,
+        ...(s.config.mode==='scripted-test'?{}:{temperature:0.2})}};
     s.actualInputs.push(structuredClone(actual));
-    send({...active,kind:'event',rpc_id:randomUUID(),operation:'model_request_submitted',payload:{actual_input:actual,synthetic:true}});
+    send({...active,kind:'event',rpc_id:randomUUID(),operation:'model_request_submitted',payload:{actual_input:actual,synthetic:s.config.mode!=='api',execution_backend:s.config.mode}});
+    if(s.config.mode!=='scripted-test')return providerStream(s.config.provider_binding,context,active.payload.max_output_tokens??4096,
+      value=>callHost(active,'provider_http',value),payload=>send({...active,kind:'event',rpc_id:randomUUID(),
+        operation:'provider_payload',payload:{request:payload,execution_backend:s.config.mode,synthetic:s.config.mode!=='api'}}),options?.signal);
     const script=s.scripts.shift();
     const produce=()=>{
       const failure=!script;
@@ -170,7 +177,7 @@ async function create(e:Envelope,restore?:any){
     s.session.setActiveToolsByName(restore.active_tool_names);
   }
   sessions.set(e.opaque_session_id,s);
-  return {status:'created',registry:actual,synthetic:true,pi_version:'0.84.1'};
+  return {status:'created',registry:actual,synthetic:s.config.mode!=='api',execution_backend:s.config.mode,pi_version:'0.84.1'};
 }
 async function dispatch(e:Envelope){
   if(e.operation==='create_session')return create(e);
@@ -197,17 +204,18 @@ async function dispatch(e:Envelope){
       return {status,response,termination_status:s.abortRequested?'cancelled':status==='success'?'completed':'provider_error',events:s.events.slice(start),requests:s.requests-before,
         transport_failure:transport?{code:transport,generation_received:generated,tool_effects_started:effects}:null,
         actual_input:s.actualInputs.at(-1),entries:s.manager.getEntries(),leaf_id:s.manager.getLeafId(),
-        registry:s.session.getActiveToolNames(),guard:{...guard.counters},synthetic:true};
+        registry:s.session.getActiveToolNames(),guard:{...guard.counters},synthetic:s.config.mode!=='api',execution_backend:s.config.mode};
     }finally{s.active=null;s.scripts=[];}
   }
   if(s.active)throw Error('Session maintenance requires an idle turn boundary');
   if(e.operation==='export_session')return{header:s.manager.getHeader(),entries:s.manager.getEntries(),leaf_id:s.manager.getLeafId(),
     config:s.config,empty:s.session.agent.state.messages.length===0,messages:s.session.agent.state.messages,
-    active_tool_names:s.session.getActiveToolNames(),synthetic:true};
+    active_tool_names:s.session.getActiveToolNames(),synthetic:s.config.mode!=='api'};
   if(e.operation==='set_coordination_phase'){
-    if(e.actor_id!=='Main'||!['planning','collaboration'].includes(e.payload.phase))throw Error('Invalid coordination phase');
+    if(e.actor_id!=='Main'||!['planning','collaboration','history'].includes(e.payload.phase))throw Error('Invalid coordination phase');
     const names=coordinateDefinitions(()=>s).map(x=>x.name);
-    s.session.setActiveToolsByName(e.payload.phase==='planning'?names.filter(x=>['delegate_work','update_delegation','cancel_delegation'].includes(x)):names);
+    s.session.setActiveToolsByName(e.payload.phase==='planning'?names.filter(x=>['delegate_work','update_delegation','cancel_delegation'].includes(x)):
+      e.payload.phase==='history'?names.filter(x=>!['recruit','release_member'].includes(x)&&!x.startsWith('get_public_profile')&&!['get_profile_record','get_work_sample','get_profile_statistics','get_historical_config'].includes(x)):names);
     return{status:'phase_set',registry:s.session.getActiveToolNames()};
   }
   if(e.operation==='reload_resources'){

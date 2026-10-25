@@ -44,12 +44,18 @@ class ScriptSource:
     def clone(self):return copy.deepcopy(self)
 
 
+class ProviderSource:
+    """No scripted answers exist for this backend; transport determines provenance."""
+    def take(self,*args):return None
+    def clone(self):return ProviderSource()
+
+
 def text_of(response):
     return ''.join(x['text'] for x in response['content'] if x['type']=='text')
 
 
 class PiDynamic:
-    def __init__(self, case_id, out, *, layout='P1', main_model='gpt4o', protocol='S', panel='primary',strategy=None,repeat_id=0):
+    def __init__(self, case_id, out, *, layout='P1', main_model='gpt4o', protocol='S', panel='primary',strategy=None,repeat_id=0,provider=None):
         if layout not in LAYOUTS or main_model not in ('gpt4o','deepseekflash') or protocol not in ('S','F','L'):
             raise DynamicError('invalid_dynamic_configuration', str((layout,main_model,protocol)))
         self.case=load_case(case_id);self.out=Path(out).resolve();self.out.mkdir(parents=True,exist_ok=True)
@@ -63,9 +69,21 @@ class PiDynamic:
         self.strategy,self.repeat_id=strategy,repeat_id
         self.block_id='|'.join((case_id,main_model,layout,protocol,panel,str(repeat_id),strategy or 'default'))
         self.history=None
+        self.provider=provider
+        self.resolved_api_bindings=copy.deepcopy(provider.config) if provider else None
 
-    def run_history(self, *, scripts):
+    @property
+    def synthetic(self):return not (getattr(self,'provider',None) and self.provider.mode=='api')
+
+    @property
+    def execution_mode(self):return self.provider.mode if getattr(self,'provider',None) else 'scripted-test'
+
+    def run_history(self, *, scripts=None):
         """Real Pi transcripts with explicitly synthetic H1/H2 outcomes, no files carried."""
+        if getattr(self,'provider',None):
+            from trustfork.runtime.dynamic.history_execution import execute_history
+            return execute_history(self,scripts or ProviderSource())
+        if scripts is None:raise DynamicError('history_fixture_required','Scripted history needs an explicit source')
         history=History();previous={}
         for index,case_id in enumerate(LAYOUTS[self.layout]['history']):
             if case_id==self.case['case_id']:raise DynamicError('history_task_overlap',case_id)
@@ -104,7 +122,8 @@ class PiDynamic:
         self.main_profile_introduced=False
         self.self_profile_sessions=set()
         self.confirming_final=False
-        self.client=PiClient(self.directory/'control',self.environment,ledger=self.ledger,coordination=self._coordinate,observer=self._observe_goal)
+        self.client=PiClient(self.directory/'control',self.environment,ledger=self.ledger,coordination=self._coordinate,observer=self._observe_goal,
+            provider=getattr(self,'provider',None),model_refs={**{a:LAYOUTS[self.layout][a] for a in 'ABCD'},'Main':self.main_model})
         self.private_goals={a:NORMAL_GOAL for a in ('Main','A','B','C','D')}
         self.formal_deliverables={}
 
@@ -305,8 +324,17 @@ class PiDynamic:
             response=value.get('response')
             if failure:raise TransportFailure(failure['code'],generation_received=failure['generation_received'],
                 tool_effects_started=failure['tool_effects_started'],output_tokens=0 if not failure['generation_received'] else response['usage']['output'])
-            return {'payload':value,'output_tokens':response['usage']['output'] if response else 0,
-                'status':'success' if value['status']=='success' else 'infra_error','cost':0,'actual_request_id':actual_request_id}
+            tokens=response['usage']['output'] if response else 0
+            if getattr(self,'provider',None):
+                accounting=self.provider.results.get(actual_request_id,{})
+                reported=(accounting.get('usage') or {}).get('completion_tokens')
+                tokens=reported if type(reported) is int else record['max_output_tokens']
+                self.ledger.append('provider_accounting',{'output_tokens':reported,'usage':accounting.get('usage'),
+                    'cost':None,'budget_charge':tokens,'charge_basis':'reported_usage' if type(reported) is int else 'conservative_output_reservation',
+                    'execution_backend':self.execution_mode},actor_id=actor,stage_id=self.lifecycle.stage_id,
+                    stage_epoch=self.lifecycle.epoch,request_id=actual_request_id)
+            return {'payload':value,'output_tokens':tokens,
+                'status':'success' if value['status']=='success' else 'infra_error','cost':0 if self.execution_mode=='scripted-test' else None,'actual_request_id':actual_request_id}
         def retry(record,error):
             self.ledger.append('transport_retry',{'attempt_id':record['attempt_id'],'reason':str(error)},
                 actor_id=actor,stage_id=self.lifecycle.stage_id,stage_epoch=self.lifecycle.epoch,request_id=request_id)
@@ -331,7 +359,8 @@ class PiDynamic:
         if success and 'own_profile' in actual:
             self.self_profile_sessions.add(self.sessions[actor])
             self.ledger.append('self_summary_exposed',{'profile_hash':digest(actual['own_profile']),'profile_metadata':self.profile_metadata},actor_id=actor,stage_id=self.lifecycle.stage_id,stage_epoch=self.lifecycle.epoch,request_id=actual_request_id)
-        self.ledger.append('model_response',{'status':result['status'],'response':response,'confirmed_message_ids':exposed,'synthetic':True},
+        self.ledger.append('model_response',{'status':result['status'],'response':response,'confirmed_message_ids':exposed,'synthetic':self.synthetic,
+            'execution_backend':self.execution_mode},
             actor_id=actor,stage_id=self.lifecycle.stage_id,stage_epoch=self.lifecycle.epoch,request_id=actual_request_id,
             invocation_id=invocation['invocation_id'] if invocation else None)
         if not success:raise DynamicError('pi_generation_failed',response.get('errorMessage','Provider failed') if response else 'No completion')
@@ -411,7 +440,7 @@ class PiDynamic:
                 lifecycle=self.lifecycle,history=self.history,bindings={'layout':self.layout,'main_model':self.main_model,'initial_plan':plan})
             return {'status':'triggered','checkpoint':snapshot,'scripts_after_prefix':scripts.clone()}
         except DynamicError as error:
-            value={'status':'untriggered','reason':error.record(),'synthetic':True}
+            value={'status':'untriggered','reason':error.record(),'synthetic':self.synthetic}
             write_json(self.directory/'prefix-outcome.json',value)
             if error.code.startswith(('initial_plan','invalid_initial','script_fixture')):return value
             raise
@@ -570,12 +599,13 @@ class PiDynamic:
                 'source_task_path':self.case['source_task_path'],'asset_hash':self.case['deployed_asset_hash'],
                 'case_id':self.case['case_id'],'split':self.case['split'],'layout':self.layout,'main_model':self.main_model,
                 'q':self.q,'r':self.r,'condition':condition,'protocol':self.protocol,'panel':self.panel,
-                'mode':'scripted-test','synthetic':True,'model_refs':{**{a:LAYOUTS[self.layout][a] for a in 'ABCD'},'Main':self.main_model},
-                'resolved_api_bindings':None,'profile_hashes':{a:digest(self.profile_service.bundles[a]) for a in ('C','D')},
+                'mode':self.execution_mode,'synthetic':self.synthetic,'model_refs':{**{a:LAYOUTS[self.layout][a] for a in 'ABCD'},'Main':self.main_model},
+                'resolved_api_bindings':self.resolved_api_bindings,'profile_hashes':{a:digest(self.profile_service.bundles[a]) for a in ('C','D')},
                 'goal_hashes':{a:digest(g) for a,g in self.private_goals.items()},
                 'prompt_hashes':{a:digest(system_prompt(a,self.private_goals[a],task_resources=[])) for a in self.private_goals},
                 'tool_manifest_hash':digest({'Sub':WORK_TOOLS,'Main':'coordination-only','pi':'0.84.1'}),
                 'scorer_hash':scorer_manifest()['manifest_hash'],'budget':self.budget.snapshot(),'comparison_set_id':self.panel,
+                'history_id':(self.history or {}).get('history_id'),
                 'baseline_run_id':None,'repeat_id':self.repeat_id,'strategy':self.strategy,'formal_ready':False}
             validate_contract('RunManifest',manifest)
             write_json(self.directory/'run_manifest.json',manifest)
@@ -583,16 +613,20 @@ class PiDynamic:
             write_json(self.directory/'profile_metadata.json',self.profile_metadata)
             write_json(self.directory/'delivery_receipts.json',{'messages':self.mailbox.messages,'delegations':self.delegations.rows,
                 'membership':self.membership.directory(private=True),'startup':self.scheduler.startup,'queue':list(self.scheduler.queue)})
+            from trustfork.tools.audit_model_calls import audit_request_events
+            actual_calls=audit_request_events(snapshot['prefix_events']+self.ledger.rows)
             result={'schema_version':'1.0','protocol_version':'dynamic-join-v9-trajectory-portfolio','run_id':branch,'block_id':self.block_id,
                 'checkpoint_id':snapshot['checkpoint_id'],'case_id':self.case['case_id'],'layout':self.layout,'main_model':self.main_model,
                 'protocol':self.protocol,'panel':self.panel,'condition':condition,'q':self.q,'r':self.r,'split':self.case['split'],'suite':self.case['suite'],
                 'strategy':self.strategy,'repeat_id':self.repeat_id,'comparison_set_id':self.panel,'branch_attempt':attempt,
                 'baseline_run_id':None,'baseline_status':'resolve_from_primary_run_index',
-                'run_status':'valid_behavior','mode':'scripted-test','synthetic':True,'final_text':self.final_text,'budget':self.budget.snapshot(),
+                'run_status':'valid_behavior','mode':self.execution_mode,'synthetic':self.synthetic,'final_text':self.final_text,'budget':self.budget.snapshot(),
                 'events_path':'events.jsonl','prefix_events_path':'prefix-events.json','prefix_export':snapshot['environment']['workspace_export'],
                 'formal_deliverables':list(self.formal_deliverables.values()),'frozen_export':exported,
                 'environment_verification':restored['environment_verification'],'duration_sec':time.monotonic()-started,
-                'real_model_requests':0,'real_judge_requests':0,'scores_status':'not_annotated',
+                'real_model_requests':actual_calls['real_model_calls_in_observed_scope'],
+                'real_judge_requests':actual_calls['real_judge_calls_in_observed_scope'],
+                'call_count_source':'actual_request_events','scores_status':'not_annotated',
                 'run_manifest_path':'run_manifest.json','run_manifest_hash':digest(manifest),'model_refs':manifest['model_refs']}
             write_json(self.directory/'run.json',result);return result
         except (DynamicError,OSError,concurrent.futures.TimeoutError) as error:
@@ -604,7 +638,7 @@ class PiDynamic:
                 'repeat_id':self.repeat_id,'strategy':self.strategy,'comparison_set_id':self.panel,
                 'q':self.q,'r':self.r,'split':self.case['split'],'suite':self.case['suite'],'branch_attempt':attempt,
                 'condition':condition,'run_status':'protocol_error' if protocol_error else 'infra_error','reason':str(error),
-                'synthetic':True,'real_model_requests':0,'real_judge_requests':0}
+                'synthetic':self.synthetic,'real_model_requests':None,'real_judge_requests':None}
             write_json(self.directory/'run.json',failure);raise
         finally:self.client.close();self.environment.close()
 
@@ -672,9 +706,9 @@ class PiDynamic:
 
     def run_block(self, scripts, *, conditions=('HP','HA','MP','MA'),history=None,prefix=None):
         prefix=prefix or self.run_prefix(scripts.clone(),history=history)
-        if prefix['status']!='triggered':return {'prefix':prefix,'branches':[],'synthetic':True}
+        if prefix['status']!='triggered':return {'prefix':prefix,'branches':[],'synthetic':self.synthetic}
         if self.protocol=='L':prefix=self.run_late_prefix(prefix,prefix['scripts_after_prefix'])
-        if prefix['status']!='triggered':return {'prefix':prefix,'branches':[],'synthetic':True}
+        if prefix['status']!='triggered':return {'prefix':prefix,'branches':[],'synthetic':self.synthetic}
         order=sorted(conditions,key=lambda c:(hashlib.sha256((self.block_id+'|'+c).encode()).hexdigest(),c))
         results=[]
         failures=[]
@@ -683,4 +717,5 @@ class PiDynamic:
                 retryable_codes={'docker_command_failed','service_not_ready','bridge_transport_closed'},failures=failures)
             results.append(result)
         return {'prefix_status':'triggered','checkpoint_id':prefix['checkpoint']['checkpoint_id'],'branches':results,
-                'infra_failures':failures,'synthetic':True,'real_model_requests':0,'real_judge_requests':0}
+                'infra_failures':failures,'synthetic':self.synthetic,
+                'real_model_requests':self.provider.count if getattr(self,'provider',None) and self.provider.mode=='api' else 0,'real_judge_requests':0}

@@ -2,7 +2,7 @@
 import argparse
 import json
 from pathlib import Path
-from trustfork.agents.pi_dynamic import PiDynamic, ScriptSource
+from trustfork.agents.pi_dynamic import PiDynamic, ScriptSource,ProviderSource
 from trustfork.runtime.dynamic.common import write_json
 from trustfork.runtime.dynamic.scripted_fixtures import branch_scripts, history_scripts
 from trustfork.runtime.dynamic.artifacts import resolve_output,Campaign,artifact_root
@@ -11,7 +11,11 @@ from trustfork.runtime.dynamic.common import DynamicError
 
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--mode',choices=['scripted-test'],required=True)
+    parser.add_argument('--mode',choices=['scripted-test','mock','api'],required=True,help='New: mock/API provider paths; default never inferred from credentials')
+    parser.add_argument('--bindings',type=Path,help='New: exact provider binding file (no key values)')
+    parser.add_argument('--allow-real-api',action='store_true',help='New: future per-run authorization; local real_api_enabled must also be true')
+    parser.add_argument('--request-ceiling',type=int,help='New: campaign-wide provider attempt ceiling, including H1/H2')
+    parser.add_argument('--mock-responses',type=Path,help='New: local HTTP reply array; mock has no external transport')
     parser.add_argument('--case',required=True)
     parser.add_argument('--protocol',choices=['S','F','L'],required=True)
     parser.add_argument('--conditions',nargs='+',choices=['HP','HA','MP','MA','normal','risk'],default=['HP','HA','MP','MA'])
@@ -32,15 +36,32 @@ def main():
         args.out=campaign.block(logical)
     else:args.out=resolve_output(args.out)
     if args.out.exists():raise DynamicError('run_output_exists','Select a new output or reconcile the existing frozen block; never overwrite')
+    provider=None
+    if args.mode!='scripted-test':
+        if not args.bindings:parser.error('--bindings required for mock/api; aliases never imply precise model IDs')
+        from trustfork.runtime.dynamic.provider import ProviderTransport
+        from trustfork.runtime.dynamic.common import read_json
+        mock=None
+        if args.mode=='mock':
+            if not args.mock_responses:parser.error('--mock-responses required; mock cannot use network')
+            from collections import deque
+            import threading
+            replies=deque(read_json(args.mock_responses));lock=threading.Lock()
+            def mock(*unused):
+                with lock:
+                    if not replies:raise DynamicError('mock_reply_exhausted','No fallback response')
+                    return replies.popleft()
+        provider=ProviderTransport(read_json(args.bindings),mode=args.mode,journal=args.out/'provider-requests.jsonl',
+            authorize_real=args.allow_real_api,http=mock,max_requests=args.request_ceiling)
     runtime=PiDynamic(args.case,args.out,protocol=args.protocol,layout=args.layout,main_model=args.main_model,
-        panel=args.panel,strategy=args.strategy,repeat_id=args.repeat_id)
-    history=runtime.run_history(scripts=ScriptSource(history_scripts()))
-    result=runtime.run_block(ScriptSource(branch_scripts(args.case,protocol=args.protocol,recruit=args.recruit)),conditions=args.conditions,history=history)
+        panel=args.panel,strategy=args.strategy,repeat_id=args.repeat_id,provider=provider)
+    history=runtime.run_history(scripts=ScriptSource(history_scripts()) if provider is None else ProviderSource())
+    result=runtime.run_block(ScriptSource(branch_scripts(args.case,protocol=args.protocol,recruit=args.recruit)) if provider is None else ProviderSource(),conditions=args.conditions,history=history)
     write_json(args.out/'block.json',result)
     if args.campaign:campaign.index()
-    print(json.dumps({'synthetic':True,'prefix_status':result.get('prefix_status',result.get('prefix',{}).get('status')),
+    print(json.dumps({'synthetic':runtime.synthetic,'mode':args.mode,'prefix_status':result.get('prefix_status',result.get('prefix',{}).get('status')),
         'branches':len(result['branches']),'run_statuses':[x['run_status'] for x in result['branches']],
-        'real_model_requests':0,'real_judge_requests':0},indent=2))
+        'real_model_requests':provider.count if provider and provider.mode=='api' else 0,'real_judge_requests':0},indent=2))
 
 
 if __name__=='__main__':main()

@@ -52,7 +52,7 @@ def validate_schema(value: dict, schema: dict) -> dict:
 
 
 def validate_bindings(config: dict, *, formal: bool) -> dict:
-    strict_keys(config, {"protocol_version", "mode", "real_api_enabled", "logical_bindings", "judge_binding"}, {"note"})
+    strict_keys(config, {"protocol_version", "mode", "real_api_enabled", "logical_bindings", "judge_binding"}, {"note","execution_limits"})
     if config["protocol_version"] != PROTOCOL_VERSION:
         raise DynamicError("wrong_protocol", config["protocol_version"])
     if config["mode"] not in {"offline", "scripted-test", "api"}:
@@ -62,8 +62,10 @@ def validate_bindings(config: dict, *, formal: bool) -> dict:
     required = {"provider", "base_url", "model_id", "key_env", "context_window", "max_output_tokens", "supported_parameters"}
     unresolved = []
     for alias, binding in config["logical_bindings"].items():
-        strict_keys(binding, required, {'capability'})
+        strict_keys(binding, required, {'capability','api','compat','output_token_parameter'})
         unresolved += [f"{alias}.{key}" for key in required if binding[key] is None]
+        for key in ('api','compat','output_token_parameter'):
+            if binding.get(key) is None:unresolved.append(alias+'.'+key)
         for key in ('provider','base_url','model_id','key_env'):
             if binding[key] is not None and (not isinstance(binding[key],str) or not binding[key].strip()):
                 raise DynamicError('invalid_model_binding',alias+'.'+key)

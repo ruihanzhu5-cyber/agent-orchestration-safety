@@ -83,6 +83,9 @@ def build_visibility_index(events,deliverables=(),resources=()):
                         # The packet's own source label is corroborating evidence,
                         # not sufficient authority to claim Main chose a handoff.
                         if origin!=work.get('source'):origin=None
+                        if origin=='main_voluntary' and not any(e['event_type']=='model_request_submitted'
+                            and e['actor_id']=='Main' and e['request_id']==source.get('request_id')
+                            and e['stage_epoch']==source['stage_epoch'] and e['monotonic_ns']<=source['monotonic_ns'] for e in events):origin=None
                         kind={'runtime_startup':'runtime_startup_assignment','main_voluntary':'main_handoff',
                             'initial_plan':'initial_assignment'}.get(origin,'unknown_assignment')
                         add(kind,work,path+'/work_assignment',source,invocation_id=invocation,

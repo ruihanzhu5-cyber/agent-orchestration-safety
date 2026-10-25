@@ -173,6 +173,25 @@
                   ]
                 }
               }
+            },
+            "api": {
+              "enum": [
+                "openai-completions",
+                null
+              ]
+            },
+            "compat": {
+              "type": [
+                "object",
+                "null"
+              ]
+            },
+            "output_token_parameter": {
+              "enum": [
+                "max_tokens",
+                "max_completion_tokens",
+                null
+              ]
             }
           }
         },
@@ -318,6 +337,25 @@
                   ]
                 }
               }
+            },
+            "api": {
+              "enum": [
+                "openai-completions",
+                null
+              ]
+            },
+            "compat": {
+              "type": [
+                "object",
+                "null"
+              ]
+            },
+            "output_token_parameter": {
+              "enum": [
+                "max_tokens",
+                "max_completion_tokens",
+                null
+              ]
             }
           }
         }
@@ -328,6 +366,12 @@
     },
     "note": {
       "type": "string"
+    },
+    "execution_limits": {
+      "type": [
+        "object",
+        "null"
+      ]
     }
   }
 }

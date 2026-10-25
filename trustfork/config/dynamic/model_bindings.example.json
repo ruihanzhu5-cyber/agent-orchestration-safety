@@ -22,7 +22,10 @@
         "tokenizer": null,
         "framing_tokens": null,
         "output_token_parameter": null
-      }
+      },
+      "api": null,
+      "compat": null,
+      "output_token_parameter": null
     },
     "deepseekflash": {
       "provider": null,
@@ -43,9 +46,13 @@
         "tokenizer": null,
         "framing_tokens": null,
         "output_token_parameter": null
-      }
+      },
+      "api": null,
+      "compat": null,
+      "output_token_parameter": null
     }
   },
   "judge_binding": "gpt4o",
-  "note": "Aliases are user labels. Do not infer provider/version; real mode rejects null fields. No key values are stored here."
+  "note": "Aliases are user labels. Do not infer provider/version; real mode rejects null fields. No key values are stored here.",
+  "execution_limits": null
 }

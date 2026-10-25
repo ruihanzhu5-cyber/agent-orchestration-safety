@@ -15,11 +15,13 @@ from .schema import validate_contract
 
 
 class PiClient:
-    def __init__(self, root, environment, *, ledger=None, coordination=None, observer=None):
+    def __init__(self, root, environment, *, ledger=None, coordination=None, observer=None,provider=None,model_refs=None):
         self.root, self.environment = Path(root).resolve(), environment
         self.root.mkdir(parents=True, exist_ok=True)
         self.ledger, self.coordination = ledger, coordination
         self.observer=observer
+        self.provider=provider;self.model_refs=model_refs or {}
+        self.mode=provider.mode if provider else 'scripted-test'
         runtime = Path(__file__).parent
         node = Path(os.environ.get('TRUSTFORK_NODE_BIN', str(Path.home()/'.local/share/trustfork-env/node-v24.15.0-linux-x64/bin/node')))
         if not node.is_file():
@@ -60,7 +62,7 @@ class PiClient:
                     else:
                         future.set_result(row['payload'])
                 elif row.get('kind') == 'event':
-                    if row.get('operation') in ('model_request_submitted','pi_event'):
+                    if row.get('operation') in ('model_request_submitted','pi_event','provider_payload'):
                         self._handle_event(row)
                     else:
                         self.executor.submit(self._handle_event, row)
@@ -89,7 +91,7 @@ class PiClient:
         try:
             self._validate_scope(row)
             operation, payload = row['operation'], row['payload']
-            if operation in ('model_request_submitted','pi_event'):
+            if operation in ('model_request_submitted','pi_event','provider_payload'):
                 if operation=='model_request_submitted':self.actual_inputs[row['request_id']] = copy.deepcopy(payload['actual_input'])
                 if self.ledger:
                     self.ledger.append(operation, payload, actor_id=row['actor_id'], stage_id=row['stage_id'],
@@ -97,7 +99,11 @@ class PiClient:
                 return
             identity = 'op_' + digest({'session':row['opaque_session_id'],'request':row['request_id'],'op':payload.get('op_id')})
             scope={k:row[k] for k in ('actor_id','stage_id','stage_epoch','request_id','invocation_id')}
-            if operation == 'tool_operation':
+            if operation=='provider_http':
+                if self.provider is None:raise DynamicError('real_api_disabled','No explicit provider backend')
+                alias=self.model_refs[row['actor_id']]
+                result=self.provider.request(alias,payload,request_id=row['request_id'])
+            elif operation == 'tool_operation':
                 try:result = self.environment.exec_work_operation(payload['operation'],payload['args'],identity,scope=scope)
                 finally:self._observe_operation(row,identity,payload['operation'],payload['args'])
             elif operation == 'tool_stream':
@@ -116,7 +122,7 @@ class PiClient:
                 raise DynamicError('unknown_bridge_event', operation)
             self._write({'kind':'host_response','rpc_id':row['rpc_id'],'payload':result})
         except (OSError, ValueError, DynamicError, subprocess.SubprocessError) as error:
-            if row['operation'] in ('model_request_submitted','pi_event'):
+            if row['operation'] in ('model_request_submitted','pi_event','provider_payload'):
                 self._fail_pending(error)
             else:
                 number = error.evidence.get('errno') if isinstance(error,DynamicError) and isinstance(error.evidence,dict) else None
@@ -155,7 +161,7 @@ class PiClient:
         if isinstance(result,dict) and 'guard' in result:
             with (self.root/'network-guard.jsonl').open('ab') as receipts:
                 receipts.write(canonical({'rpc_id':envelope['rpc_id'],'operation':operation,'actor_id':config['actor_id'],
-                    'request_id':request_id,'guard':result['guard'],'mode':'scripted-test'})+b'\n')
+                    'request_id':request_id,'guard':result['guard'],'mode':self.mode})+b'\n')
             if any(result['guard'][k] for k in ('network_attempts','blocked_host_fs','blocked_host_exec')):
                 raise DynamicError('isolation_trap_failed', 'A host task IO or network attempt was trapped', evidence=result['guard'])
         if operation=='close':self.sessions.pop(session_id,None)
@@ -164,8 +170,12 @@ class PiClient:
     def create_session(self, actor_id, *, branch_id, task_id, system_prompt, task_resources=None, task_home='/root', snapshot=None):
         identity = uuid.uuid4().hex
         self.sessions[identity]={'actor_id':actor_id,'branch_id':branch_id,'task_id':task_id}
-        payload = {'mode':'scripted-test','system_prompt':system_prompt,'task_resources':task_resources or [],
+        payload = {'mode':self.mode,'system_prompt':system_prompt,'task_resources':task_resources or [],
                    'task_home':task_home,'control_dir':str(self.root/'sessions'/identity)}
+        if self.provider:
+            from .provider import resolve_provider
+            binding=resolve_provider(self.provider.config,self.model_refs[actor_id])
+            payload['provider_binding']={k:v for k,v in binding.items() if k!='key_env'}
         if snapshot is not None: payload['snapshot']=snapshot
         return identity,self.call(identity,'restore_session' if snapshot else 'create_session',payload)
 

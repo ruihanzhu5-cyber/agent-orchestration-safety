@@ -866,7 +866,8 @@
         "mode": {
           "enum": [
             "scripted-test",
-            "api"
+            "api",
+            "mock"
           ]
         },
         "synthetic": {
@@ -923,6 +924,12 @@
         },
         "formal_ready": {
           "type": "boolean"
+        },
+        "history_id": {
+          "type": [
+            "string",
+            "null"
+          ]
         }
       }
     },

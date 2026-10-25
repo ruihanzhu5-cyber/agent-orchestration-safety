@@ -14,7 +14,7 @@ from .trajectory_observer import analyze_trajectory,recovery_observation,event_r
 from .annotation_contracts import apply_annotations,enrich_actor_reports
 from .visibility_index import build_visibility_index
 from .trajectory_codec import encode_trajectory,VERSION as CODEC_VERSION
-from .judge_request import prepare_judge_request,capacity_report
+from .judge_request import prepare_judge_request,capacity_report,FORMAT_INSTRUCTIONS
 from trustfork.runtime.dynamic.model_capabilities import binding_capability,unknown_capability
 from .risk_opportunity import build_opportunity_report
 from trustfork.tools.audit_model_calls import audit_request_events
@@ -30,10 +30,11 @@ def scorer_manifest():
     names+=['trustfork/scoring/trajectory_codec.py','trustfork/scoring/judge_request.py',
         'trustfork/scoring/risk_opportunity.py','trustfork/tools/audit_model_calls.py',
         'trustfork/runtime/dynamic/model_capabilities.py','trustfork/config/dynamic/scorer.example.json',
-        'trustfork/config/dynamic/model_bindings.schema.json','trustfork/runtime/dynamic/schema.py']
+        'trustfork/config/dynamic/model_bindings.schema.json','trustfork/runtime/dynamic/schema.py',
+        'trustfork/scoring/scoring_versions.py','trustfork/scoring/judge_client.py','trustfork/tools/judge_dynamic.py']
     files={name:file_hash(repo_root()/name) for name in names}
     return {'version':'dynamic-scoring-analysis-v4','file_hashes':files,'manifest_hash':digest(files),
-        'judge_binding_ref':'gpt4o','precise_judge_binding':None,'network_sender_present':False}
+        'judge_binding_ref':'gpt4o','precise_judge_binding':None,'network_sender_present':True,'network_sender_default_enabled':False}
 
 
 def load_events(directory,run):
@@ -90,7 +91,7 @@ def freeze_scoring_version(output,identity):
 
 def _validate_judgements(value,refs,deliverables):
     strict_keys(value,{'response_judgements','trajectory_judgements','scorer_manifest_hash'},
-        {'semantic_metrics','goal_attempted','adoptions','claim_annotations','action_annotations','goal_state_annotations','annotation_version','synthetic'})
+        {'semantic_metrics','goal_attempted','adoptions','claim_annotations','action_annotations','goal_state_annotations','annotation_version','synthetic','judge_passes'})
     expected={x['deliverable_id'] for x in deliverables}
     if set(value['response_judgements'])-expected:raise DynamicError('unknown_judged_response','Unexpected deliverable ID')
     for item in list(value['response_judgements'].values())+list(value['trajectory_judgements'].values()):
@@ -146,7 +147,7 @@ def validate_operation_evidence(events,directory,run):
         if digest(raw)!=digest(event['payload']['result']):raise DynamicError('operation_raw_evidence_mismatch',event_ref(event))
 
 
-def _score_run(path,*,mode='formal',output_override=None,rescore=None):
+def _score_run(path,*,mode='formal',output_override=None,rescore=None,frozen_identity=None):
     if mode not in ('formal','test-fixtures'):raise DynamicError('invalid_score_mode',mode)
     directory=Path(path).parent;run=read_json(path)
     if mode=='formal' and run.get('synthetic'):raise DynamicError('synthetic_formal_rejected','Scripted data cannot enter formal analysis')
@@ -187,13 +188,18 @@ def _score_run(path,*,mode='formal',output_override=None,rescore=None):
         if event['event_type']=='goal_state_observation':
             observations.append({**copy.deepcopy(event['payload']),'evidence_ref':event_ref(event)})
     score_manifest=scorer_manifest()
-    if mode=='formal' and not rescore and manifest['scorer_hash']!=score_manifest['manifest_hash']:
-        raise DynamicError('run_scorer_hash_mismatch','Formal run is bound to another scorer version')
+    if mode=='formal':
+        from .scoring_versions import validate_scorer_lineage
+        validate_scorer_lineage(manifest['scorer_hash'],score_manifest['manifest_hash'],rescore=rescore)
     annotations_path=directory/'scoring_annotations.json'
+    if rescore and rescore['annotation_policy']=='new':
+        annotations_path=Path(rescore['new_annotation_path'])
+        if file_hash(annotations_path)!=rescore['new_annotation_hash']:
+            raise DynamicError('new_annotation_hash_mismatch','New annotation input changed')
     annotations=_validate_judgements(read_json(annotations_path),refs,deliverables) if annotations_path.exists() else {}
     if mode=='formal' and annotations.get('synthetic'):raise DynamicError('synthetic_judge_rejected','Synthetic judgments cannot enter formal scores')
     if rescore and rescore['annotation_policy']=='pending':annotations={}
-    if annotations and annotations['scorer_manifest_hash']!=score_manifest['manifest_hash'] and not rescore:
+    if annotations and annotations['scorer_manifest_hash']!=score_manifest['manifest_hash'] and (not rescore or rescore['annotation_policy']=='new'):
         raise DynamicError('annotation_scorer_version_mismatch','Annotations bind a different scorer')
     joined=next((e for e in events if e['event_type']=='members_admitted' and run['q'] in e['payload']['actor_ids']),None)
     event_by_ref={event_ref(e):e for e in events}
@@ -263,6 +269,19 @@ def _score_run(path,*,mode='formal',output_override=None,rescore=None):
     prepared={key:prepare_judge_request(value,rubric=prompts[key],format_instructions='Return original rubric anchors and evidence references as JSON.',
         output_budget=config.get('judge_output_budget_tokens'),representation=CODEC_VERSION if key=='trajectory' else 'legacy-full',judge_binding=judge_binding)
         for key,value in [('response',response_input),('trajectory',packed)]}
+    for key,metadata in annotations.get('judge_passes',{}).items():
+        if key not in ('response','trajectory'):raise DynamicError('unknown_judge_pass',key)
+        stored=metadata['prepared'];view=response_input if key=='response' else trajectory_input
+        if metadata.get('semantic_goals'):
+            view={'trajectory_view':view,'original_evaluation_goal_spec':case['goal_spec'],
+                'annotation_contract':read_json(repo_root()/'trustfork/config/dynamic/annotation.schema.json')}
+        expected=prepare_judge_request(encode_trajectory(view) if key=='trajectory' else view,rubric=prompts[key],
+            format_instructions=FORMAT_INSTRUCTIONS[key],output_budget=stored['output_budget'],
+            representation=CODEC_VERSION if key=='trajectory' else 'legacy-full',judge_binding=judge_binding,
+            output_token_parameter=judge_binding.get('output_token_parameter') or 'max_tokens')
+        if digest(expected['request'])!=stored['request_hash'] or digest(expected['wire_payload'])!=stored['wire_payload_hash']:
+            raise DynamicError('annotation_judge_request_mismatch','Judge output does not bind this exact frozen view/rubric/parameters')
+        prepared[key]=expected
     capacities={key:capacity_report(value,capability) for key,value in prepared.items()}
     for key,value in prepared.items():_artifact(output,'prepared_'+key+'.json',value)
     _artifact(output,'capacity_reports.json',capacities)
@@ -270,7 +289,7 @@ def _score_run(path,*,mode='formal',output_override=None,rescore=None):
     if mode=='formal':
         for metric,record in scores['scores'].items():
             report=capacities['response' if metric in ('RTF','RSR') else 'trajectory']
-            if not report['can_send']:record.update(value=None,status='judge_error',reason=report['reason'],eligible_for_primary=False)
+            if report['fits'] is not True:record.update(value=None,status='judge_error',reason=report['reason'],eligible_for_primary=False)
     input_refs={'response':_artifact(output,'response_input.json',response_input),
         'trajectory':_artifact(output,'trajectory_input.json',trajectory_input),
         'prompts':_artifact(output,'judge_prompts.json',prompts)}
@@ -315,6 +334,7 @@ def _score_run(path,*,mode='formal',output_override=None,rescore=None):
     write_json(output/'run_summary.json',summary)
     identity={'scorer_manifest_hash':score_manifest['manifest_hash'],'run_manifest_hash':run['run_manifest_hash'],
         'annotations_hash':digest(annotations),'mode':mode,
+        'frozen_identity':frozen_identity,
         'judge_request_hashes':{k:v['request_hash'] for k,v in prepared.items()}}
     if rescore:identity['rescore']=rescore
     freeze_scoring_version(output,identity)
