@@ -47,7 +47,7 @@ def eligible_complete_blocks(rows,metric,*,planned_blocks=None):
     for row in rows:
         if row.get('repeat_id',0)!=0:raise DynamicError('repeat_in_primary','Additional repeats are a separate panel')
         if row['condition'] not in CONDITIONS:raise DynamicError('nonfactorial_pair','Four-condition interaction is undefined for this panel')
-        block=(row['case_id'],row['layout'])
+        block=(row['case_id'],row.get('history_pair_id') if row.get('experiment_version')=='dynamic-join-homogeneous-v1' else row['layout'])
         if row['condition'] in blocks[block]:raise DynamicError('duplicate_paired_cell',str((block,row['condition'])))
         blocks[block][row['condition']]=row
     per_card=defaultdict(list);missing=[]
@@ -75,6 +75,10 @@ def paired_effects(rows,metric,*,universe=None,replicates=BOOTSTRAPS,planned_blo
     cards=tuple(sorted(universe if universe is not None else {r['case_id'] for r in rows}))
     draws=card_resamples(cards,replicates)
     estimates={};confirmation=bool(rows and all(r['split']=='confirmation' and r['protocol']=='S' for r in rows) and metric in PRIMARY_METRICS)
+    homogeneous=bool(rows and rows[0].get('experiment_version')=='dynamic-join-homogeneous-v1')
+    if homogeneous:
+        from .metric_registry import confirmation_family
+        family=confirmation_family();confirmation=all(r['split']=='confirmation' and r['protocol']=='S' and r['panel']=='primary' for r in rows) and any(m==metric for _,m,_ in family['members'])
     for name in (*CONDITIONS,'HP_minus_MP','HA_minus_MA','interaction'):
         values=[v[name] for v in card_values.values()];boot=[]
         for sample in draws:
@@ -84,7 +88,8 @@ def paired_effects(rows,metric,*,universe=None,replicates=BOOTSTRAPS,planned_blo
             'ci95':[quantile(boot,.025),quantile(boot,.975)],
             'bootstrap_usable':len(boot),'bootstrap_no_observed_card':len(draws)-len(boot)}
         if confirmation and name=='interaction':
-            estimates[name]['ci99_375_family8']=[quantile(boot,.003125),quantile(boot,.996875)]
+            if homogeneous:estimates[name]['ci98_75_family4']=[quantile(boot,p) for p in family['quantiles']]
+            else:estimates[name]['ci99_375_family8']=[quantile(boot,.003125),quantile(boot,.996875)]
     # Complete blocks produce an observed point estimate. These separate bounds
     # assign every missing source-card/layout cell its allowed scale endpoints.
     interaction_bounds=[]
@@ -96,7 +101,12 @@ def paired_effects(rows,metric,*,universe=None,replicates=BOOTSTRAPS,planned_blo
             for condition,sign in (('HA',1),('HP',-1),('MA',-1),('MP',1)):
                 row=group.get(condition);record=row.get('scores',{}).get(metric) if row and row['run_status']=='valid_behavior' else None
                 value=record['value'] if record and record['status']=='complete' else None
-                if value is None:lo+=0 if sign>0 else -100;hi+=100 if sign>0 else 0
+                if value is None:
+                    if homogeneous:
+                        from .metric_registry import bounds as metric_bounds
+                        lower,upper=metric_bounds(metric)
+                    else:lower,upper=0,100
+                    lo+=sign*(lower if sign>0 else upper);hi+=sign*(upper if sign>0 else lower)
                 else:lo+=sign*value;hi+=sign*value
             bounds.append((lo,hi))
         interaction_bounds.append((mean(x[0] for x in bounds),mean(x[1] for x in bounds)))
@@ -107,7 +117,7 @@ def paired_effects(rows,metric,*,universe=None,replicates=BOOTSTRAPS,planned_blo
         'method':'Complete four-condition blocks; mean layouts within card, equal-weight cards; resample source cards',
         'bootstrap_replicates':replicates,'bootstrap_seed':SEED,'quantile_method':'linear interpolation',
         'ci95_endpoints':[.025,.975],'family8_endpoints':[.003125,.996875] if confirmation else None,
-        'family8_applies':confirmation,'small_sample_approximation':True,'base_task_family_sensitivity':'blocked_until_source_family_mapping_is_resolved'}
+        'confirmation_family':family if homogeneous else None,'family8_applies':confirmation and not homogeneous,'small_sample_approximation':True,'base_task_family_sensitivity':'blocked_until_source_family_mapping_is_resolved'}
 
 
 def card_equal_estimates(rows,metric,*,replicates=BOOTSTRAPS,universe=None):
@@ -163,6 +173,9 @@ def counterevidence_summary(rows, *, planned=None):
 
 
 def five_tables(rows,*,replicates=BOOTSTRAPS):
+    if any(r.get('experiment_version')=='dynamic-join-homogeneous-v1' for r in rows):
+        from .aggregate_dynamic_v2 import five_tables as homogeneous_tables
+        return homogeneous_tables(rows,replicates=replicates)
     primary=[r for r in rows if r['panel']=='primary' and r.get('repeat_id',0)==0]
     tables={f'table{i}':[] for i in range(1,6)}
     primary_estimates={}
@@ -302,6 +315,9 @@ def select_attempts(rows):
 
 def join_plan(rows,planned):
     """Represent absent plans as not_run, never infrastructure or safe results."""
+    if any(r.get('experiment_version')=='dynamic-join-homogeneous-v1' for r in rows+planned):
+        from .aggregate_dynamic_v2 import join_plan as homogeneous_join
+        return homogeneous_join(rows,planned)
     keys=('case_id','main_model','layout','protocol','panel','condition','repeat_id','strategy')
     actual={tuple(row.get(key) for key in keys):row for row in rows}
     result=[]
@@ -358,6 +374,9 @@ def main():
             'protocol':'S','split':'confirmation','interval_level':.99375,'quantiles':[.003125,.996875]},
         'billing':'Shared prefix attempts must be counted once; equivalent per-branch costs are separate from actual billing',
         'scorer_manifest':scorer_manifest(),'table_row_counts':{k:len(v) for k,v in tables.items()}}
+    if any(r.get('experiment_version')=='dynamic-join-homogeneous-v1' for r in analysis_rows):
+        from .metric_registry import confirmation_family
+        metadata['confirmation_family']=confirmation_family()
     metadata['planned_scope']='supplied frozen plan with explicit not_run rows' if args.plan else 'input subset only; no global completion claim'
     metadata['billing']=billing_summary(attempts)
     if args.mode=='formal' and metadata['synthetic']:raise DynamicError('synthetic_formal_rejected','Synthetic records cannot enter formal five tables')

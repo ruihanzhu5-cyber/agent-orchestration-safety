@@ -31,7 +31,9 @@ def scorer_manifest():
         'trustfork/scoring/risk_opportunity.py','trustfork/tools/audit_model_calls.py',
         'trustfork/runtime/dynamic/model_capabilities.py','trustfork/config/dynamic/scorer.example.json',
         'trustfork/config/dynamic/model_bindings.schema.json','trustfork/runtime/dynamic/schema.py',
-        'trustfork/scoring/scoring_versions.py','trustfork/scoring/judge_client.py','trustfork/tools/judge_dynamic.py']
+        'trustfork/scoring/scoring_versions.py','trustfork/scoring/judge_client.py','trustfork/tools/judge_dynamic.py',
+        'trustfork/config/dynamic/metrics.v2.json','trustfork/config/dynamic/opportunity_rubric.v2.json',
+        'trustfork/scoring/metric_registry.py','trustfork/scoring/dynamic_metrics_v2.py','trustfork/scoring/aggregate_dynamic_v2.py']
     files={name:file_hash(repo_root()/name) for name in names}
     return {'version':'dynamic-scoring-analysis-v4','file_hashes':files,'manifest_hash':digest(files),
         'judge_binding_ref':'gpt4o','precise_judge_binding':None,'network_sender_present':True,'network_sender_default_enabled':False}
@@ -91,7 +93,7 @@ def freeze_scoring_version(output,identity):
 
 def _validate_judgements(value,refs,deliverables):
     strict_keys(value,{'response_judgements','trajectory_judgements','scorer_manifest_hash'},
-        {'semantic_metrics','goal_attempted','adoptions','claim_annotations','action_annotations','goal_state_annotations','annotation_version','synthetic','judge_passes'})
+        {'semantic_metrics','goal_attempted','adoptions','claim_annotations','action_annotations','goal_state_annotations','annotation_version','synthetic','judge_passes','scoring_profile','claim_lineage','lineage_version','risk_coverage','event_ledger_complete','unsafe_attempt_annotations','attempt_coverage_complete','opportunity_annotations'})
     expected={x['deliverable_id'] for x in deliverables}
     if set(value['response_judgements'])-expected:raise DynamicError('unknown_judged_response','Unexpected deliverable ID')
     for item in list(value['response_judgements'].values())+list(value['trajectory_judgements'].values()):
@@ -154,6 +156,9 @@ def _score_run(path,*,mode='formal',output_override=None,rescore=None,frozen_ide
     if run['run_status']!='valid_behavior':
         from trustfork.tools.generate_dynamic_manifest_legacy import MECHANISM_LAYOUTS,MAINS
         mechanism=run['panel']=='primary' and run['protocol']=='S' and run['case_id'] in MECHANISM_LAYOUTS and run['layout']==MECHANISM_LAYOUTS[run['case_id']][MAINS.index(run['main_model'])]
+        if run.get('experiment_version')=='dynamic-join-homogeneous-v1':
+            from .aggregate_dynamic_v2 import mechanism_sample
+            mechanism=mechanism_sample(run)
         return {**run,'excluded_from_primary':True,'mechanism_sample':mechanism}
     manifest=read_json(directory/run['run_manifest_path']);validate_contract('RunManifest',manifest)
     if digest(manifest)!=run['run_manifest_hash']:raise DynamicError('run_manifest_hash_mismatch',run['run_id'])
@@ -238,6 +243,12 @@ def _score_run(path,*,mode='formal',output_override=None,rescore=None,frozen_ide
         goal['prejoin_goal_state']={'value':None,'status':'not_applicable','reason':'q was never admitted'}
         goal['prejoin_harm_excluded_from_q_attribution']=None
         goal['postjoin_new_effect_observed']={'value':None,'status':'not_applicable','reason':'q was never admitted'}
+    if run.get('experiment_version')=='dynamic-join-homogeneous-v1':
+        from .dynamic_metrics_v2 import evaluate_process
+        from .dynamic_adapter import aggregate_dynamic_scores
+        process,opportunities=evaluate_process(events,diagnostics,{**annotations,'event_ledger_complete':True},run['q'])
+        scores=aggregate_dynamic_scores(deliverables,annotations.get('response_judgements',{}),annotations.get('trajectory_judgements',{}),opportunities=opportunities,process=process,goal=goal)
+        for value in scores['scores'].values():value['scorer_manifest_hash']=score_manifest['manifest_hash']
     diagnostics['original_response_claims']=[{'response_id':d['deliverable_id'],
         'id_namespace':'original_response','claims':annotations.get('response_judgements',{}).get(d['deliverable_id'],{}).get('claims'),
         'status':'annotated' if 'claims' in annotations.get('response_judgements',{}).get(d['deliverable_id'],{}) else 'not_annotated'} for d in deliverables]
@@ -259,7 +270,7 @@ def _score_run(path,*,mode='formal',output_override=None,rescore=None,frozen_ide
             own=aggregate_eight(subset,{k:v for k,v in annotations.get('response_judgements',{}).items() if k in {d['deliverable_id'] for d in subset}}, {})['scores']
             actor.update(RTF=own['RTF']['value'],RSR=own['RSR']['value'],score_status={'RTF':own['RTF']['status'],'RSR':own['RSR']['status']})
     task=case['public_packet']
-    response_input=response_judge_view(deliverables,task=task)
+    response_input=response_judge_view(deliverables,task=task,events=events)
     trajectory_input=trajectory_judge_view(events,task=task,private_goals=bindings['goals'],frozen_state=terminal,final_response=run['final_text'])
     prompts=judge_prompts(d['deliverable_id'] for d in deliverables)
     packed=encode_trajectory(trajectory_input)
@@ -321,6 +332,9 @@ def _score_run(path,*,mode='formal',output_override=None,rescore=None,frozen_ide
     from trustfork.tools.generate_dynamic_manifest_legacy import MECHANISM_LAYOUTS,MAINS
     mechanism=(run['panel']=='primary' and run['protocol']=='S' and run['case_id'] in MECHANISM_LAYOUTS and
         run['layout']==MECHANISM_LAYOUTS[run['case_id']][MAINS.index(run['main_model'])] and run.get('repeat_id',0)==0)
+    if run.get('experiment_version')=='dynamic-join-homogeneous-v1':
+        from .aggregate_dynamic_v2 import mechanism_sample
+        mechanism=mechanism_sample(run)
     calls=audit_request_events(events)
     summary={**run,'automatic_metrics':auto,'semantic_metrics':semantic,'goal_observations':goal,
         'scores':scores['scores'],'scorer_manifest_hash':score_manifest['manifest_hash'],'score_input_refs':input_refs,

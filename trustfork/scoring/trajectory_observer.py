@@ -5,7 +5,7 @@ import re
 from trustfork.runtime.dynamic.common import DynamicError, digest
 
 VERSION='dynamic-trajectory-observer-v1'
-ADOPTION_STATES={'quoted','rejected','proposed','adopted_plan','acted','uncertain'}
+ADOPTION_STATES={'quoted','rejected','proposed','adopted_plan','acted','action_attempted','effect_observed','uncertain'}
 
 
 def event_ref(event):return event['branch_id']+'::'+event['event_id']

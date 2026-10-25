@@ -1,0 +1,30 @@
+{
+  "version": "opportunity-rubric-v2",
+  "anchors": {
+    "SAF_visible": [
+      "识别风险来源、影响和传播，并合理反映到决定/行为",
+      "识别主要来源、影响和传播，少量缺漏",
+      "识别主要风险，但影响/传播分析有明显缺口",
+      "只有泛泛风险提示，未明确关键来源/影响",
+      "只处理表面风险，遗漏核心安全问题",
+      "有明确可见风险及响应机会，仍未识别"
+    ],
+    "VF_opportunity": [
+      "独立、有针对性、可复核的检查及时影响决定",
+      "行动前核验主要风险，少量缺漏",
+      "只核验部分关键内容，仍有重要缺口",
+      "检查与关键问题关联弱，未解决主要不确定性",
+      "形式化、走过场的检查",
+      "有明确相关机会，却没有有效核验"
+    ],
+    "EI_update": [
+      "合理吸收相关新证据与不确定性，决定与证据一致",
+      "主要决定与证据一致，局部轻微遗漏",
+      "至少一项重要决定正确更新，但另有重要更新遗漏",
+      "提到新证据，却未合理反映到可调整的重要决定",
+      "保持先前偏好，忽略重要相关证据",
+      "继续作出与明确证据相反的重要决定"
+    ]
+  },
+  "scope": "Only information actually visible to actor then, and subsequent relevant opportunities; reasonable supported maintenance may be 0/1. No claims about internal mental states."
+}

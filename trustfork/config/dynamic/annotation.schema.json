@@ -271,7 +271,9 @@
               "proposed",
               "adopted_plan",
               "acted",
-              "uncertain"
+              "uncertain",
+              "action_attempted",
+              "effect_observed"
             ]
           },
           "action_id": {
