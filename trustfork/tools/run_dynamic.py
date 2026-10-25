@@ -19,16 +19,24 @@ def main():
     parser.add_argument('--case',required=True)
     parser.add_argument('--protocol',choices=['S','F','L'],required=True)
     parser.add_argument('--conditions',nargs='+',choices=['HP','HA','MP','MA','normal','risk'],default=['HP','HA','MP','MA'])
-    parser.add_argument('--layout',choices=['P1','P2','P3','P4'],default='P1')
+    parser.add_argument('--layout',choices=['P1','P2','P3','P4'],default=None)
     parser.add_argument('--main-model',choices=['gpt4o','deepseekflash'],default='gpt4o')
-    parser.add_argument('--panel',choices=['primary','80_60','no_history','r70','self_on_request','reminder','strategy','repeat','late_join'],default='primary')
+    parser.add_argument('--panel',choices=['primary','80_60','no_history','no_external_portfolio','r70','self_on_request','reminder','strategy','repeat','late_join'],default='primary')
     parser.add_argument('--strategy',choices=['context_negotiation','peer_collaboration'])
     parser.add_argument('--repeat-id',type=int,choices=[0,1,2],default=0)
     parser.add_argument('--trial-workers',type=int,choices=[1],default=1)
     parser.add_argument('--out',type=Path)
     parser.add_argument('--campaign',help='New: existing verified campaign ID; block directory uses a safe slug')
     parser.add_argument('--recruit',nargs='*',choices=['C','D'],default=['C','D'])
+    parser.add_argument('--team-model',choices=['gpt4o','deepseekflash'])
+    parser.add_argument('--history-pair-id',choices=['HIST1','HIST2'],default='HIST1')
+    parser.add_argument('--history-bundle',type=Path)
+    parser.add_argument('--prefix-artifact',type=Path)
+    parser.add_argument('--generate-history-per-block',action='store_true',help='Exploration only; not a frozen campaign')
+    parser.add_argument('--legacy',action='store_true',help='Explicit mixed-layout compatibility')
     args=parser.parse_args()
+    if not args.history_bundle and not args.generate_history_per_block:parser.error('--history-bundle required; exploration must explicitly select --generate-history-per-block')
+    if args.history_bundle and args.generate_history_per_block:parser.error('Select frozen bundle or exploration, never both')
     if args.campaign:
         campaign=Campaign(artifact_root()/'campaigns'/args.campaign);campaign.verify()
         from trustfork.runtime.dynamic.artifacts import safe_slug
@@ -54,9 +62,11 @@ def main():
         provider=ProviderTransport(read_json(args.bindings),mode=args.mode,journal=args.out/'provider-requests.jsonl',
             authorize_real=args.allow_real_api,http=mock,max_requests=args.request_ceiling)
     runtime=PiDynamic(args.case,args.out,protocol=args.protocol,layout=args.layout,main_model=args.main_model,
-        panel=args.panel,strategy=args.strategy,repeat_id=args.repeat_id,provider=provider)
-    history=runtime.run_history(scripts=ScriptSource(history_scripts()) if provider is None else ProviderSource())
-    result=runtime.run_block(ScriptSource(branch_scripts(args.case,protocol=args.protocol,recruit=args.recruit)) if provider is None else ProviderSource(),conditions=args.conditions,history=history)
+        panel=args.panel,strategy=args.strategy,repeat_id=args.repeat_id,provider=provider,team_model=args.team_model,history_pair_id=args.history_pair_id,legacy=args.legacy)
+    from trustfork.runtime.dynamic.prepared_artifacts import load_history,load_prefix
+    history=load_history(runtime,args.history_bundle,reuse_journal=args.out/'history-reuse.jsonl') if args.history_bundle else runtime.run_history(scripts=ScriptSource(history_scripts()) if provider is None else ProviderSource())
+    prefix=load_prefix(runtime,args.prefix_artifact) if args.prefix_artifact else None
+    result=runtime.run_block(ScriptSource(branch_scripts(args.case,protocol=args.protocol,recruit=args.recruit)) if provider is None else ProviderSource(),conditions=args.conditions,history=history,prefix=prefix)
     write_json(args.out/'block.json',result)
     if args.campaign:campaign.index()
     print(json.dumps({'synthetic':runtime.synthetic,'mode':args.mode,'prefix_status':result.get('prefix_status',result.get('prefix',{}).get('status')),

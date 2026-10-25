@@ -92,10 +92,10 @@ def execute_task(runtime,source,previous):
 def execute_history(parent,source):
     from trustfork.agents.pi_dynamic import PiDynamic
     history=History();records=[]
-    for index,case_id in enumerate(LAYOUTS[parent.layout]['history']):
+    for index,case_id in enumerate(parent.history_task_ids):
         if case_id==parent.case['case_id']:raise DynamicError('history_task_overlap',case_id)
         runtime=PiDynamic(case_id,parent.out/'history'/str(index),layout=parent.layout,main_model=parent.main_model,
-            protocol='F',provider=parent.provider)
+            protocol='F',provider=parent.provider,legacy=parent.experiment is None,team_model=parent.main_model,history_pair_id=parent.experiment.history_pair_id if parent.experiment else 'HIST1',history_task=True)
         sessions,record=execute_task(runtime,source.clone(),history.export() if history.tasks else None)
         history.add_task(case_id,sessions,synthetic=parent.synthetic,status=record['status']);records.append(record)
     parent.history=history.export();parent.history.update(execution_records=records,

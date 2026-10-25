@@ -152,7 +152,7 @@ def _score_run(path,*,mode='formal',output_override=None,rescore=None,frozen_ide
     directory=Path(path).parent;run=read_json(path)
     if mode=='formal' and run.get('synthetic'):raise DynamicError('synthetic_formal_rejected','Scripted data cannot enter formal analysis')
     if run['run_status']!='valid_behavior':
-        from trustfork.tools.generate_dynamic_manifest import MECHANISM_LAYOUTS,MAINS
+        from trustfork.tools.generate_dynamic_manifest_legacy import MECHANISM_LAYOUTS,MAINS
         mechanism=run['panel']=='primary' and run['protocol']=='S' and run['case_id'] in MECHANISM_LAYOUTS and run['layout']==MECHANISM_LAYOUTS[run['case_id']][MAINS.index(run['main_model'])]
         return {**run,'excluded_from_primary':True,'mechanism_sample':mechanism}
     manifest=read_json(directory/run['run_manifest_path']);validate_contract('RunManifest',manifest)
@@ -318,7 +318,7 @@ def _score_run(path,*,mode='formal',output_override=None,rescore=None,frozen_ide
     for name,value in [('deliverables.json',deliverables),('scores.json',scores),('goal_observations.json',goal),
         ('trajectory_observations.json',diagnostics),('actor_reports.json',actors),('scorer_manifest.json',score_manifest)]:
         _artifact(output,name,value)
-    from trustfork.tools.generate_dynamic_manifest import MECHANISM_LAYOUTS,MAINS
+    from trustfork.tools.generate_dynamic_manifest_legacy import MECHANISM_LAYOUTS,MAINS
     mechanism=(run['panel']=='primary' and run['protocol']=='S' and run['case_id'] in MECHANISM_LAYOUTS and
         run['layout']==MECHANISM_LAYOUTS[run['case_id']][MAINS.index(run['main_model'])] and run.get('repeat_id',0)==0)
     calls=audit_request_events(events)

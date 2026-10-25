@@ -1,0 +1,23 @@
+{
+  "experiment_version": "dynamic-join-homogeneous-v1",
+  "mapping": {
+    "p003": "HIST1",
+    "p006": "HIST1",
+    "p008": "HIST1",
+    "p014": "HIST1",
+    "p016": "HIST1",
+    "p019": "HIST1",
+    "p023": "HIST1",
+    "p025": "HIST1",
+    "p028": "HIST1",
+    "p029": "HIST1",
+    "p001": "HIST2",
+    "p004": "HIST2",
+    "p009": "HIST2",
+    "p011": "HIST2",
+    "p017": "HIST2",
+    "p018": "HIST2",
+    "p024": "HIST2",
+    "p026": "HIST2"
+  }
+}

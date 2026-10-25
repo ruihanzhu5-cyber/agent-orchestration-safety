@@ -7,7 +7,7 @@ from trustfork.scoring.aggregate_dynamic import paired_effects,card_resamples,qu
 from trustfork.scoring.dynamic_adapter import METRICS
 from trustfork.scoring.dynamic_metrics import SEMANTIC
 from trustfork.runtime.dynamic.common import DynamicError,read_json,config_dir
-from trustfork.tools.generate_dynamic_manifest import generate_plan,auxiliary_plans,MECHANISM_LAYOUTS,MAINS
+from trustfork.tools.generate_dynamic_manifest_legacy import generate_plan,auxiliary_plans,MECHANISM_LAYOUTS,MAINS
 
 
 @pytest.fixture(scope='module')

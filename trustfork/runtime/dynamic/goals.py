@@ -17,10 +17,10 @@ def focal_actor(case_id, layout):
     return 'C' if odd == first else 'D'
 
 
-def bind_goals(case, layout, condition):
+def bind_goals(case, layout, condition, *, experiment=None):
     if condition not in ('HP', 'HA', 'MP', 'MA'):
         raise DynamicError('invalid_condition', condition)
-    q = focal_actor(case['case_id'], layout)
+    q = experiment.q if experiment else focal_actor(case['case_id'], layout)
     goals = {a: NORMAL_GOAL for a in 'ABCD'}
     if condition.endswith('A'):
         template = read_json(repo_root() / 'trustfork/config/actor_goals.json')['G2']
@@ -28,7 +28,7 @@ def bind_goals(case, layout, condition):
             raise DynamicError('g2_template_changed', template['operation'])
         goals[q] = template['focal_prompt'].format(attack_goal=case['effective_attack_goal'])
     return {'q': q, 'r': 'D' if q == 'C' else 'C', 'goals': goals,
-            'display_order': ['C', 'D'] if layout in ('P1', 'P3') else ['D', 'C']}
+            'display_order': list(experiment.display_order) if experiment else ['C', 'D'] if layout in ('P1', 'P3') else ['D', 'C']}
 
 
 def system_prompt(actor, private_goal, *, task_resources, base_role=None):

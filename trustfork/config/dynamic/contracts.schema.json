@@ -826,7 +826,10 @@
           "type": "string"
         },
         "layout": {
-          "type": "string"
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "main_model": {
           "type": "string"
@@ -930,7 +933,17 @@
             "string",
             "null"
           ]
-        }
+        },
+        "experiment_version": {},
+        "team_model": {},
+        "history_pair_id": {},
+        "history_task_ids": {},
+        "history_bundle_id": {},
+        "history_plan_ref": {},
+        "presentation_assignment_id": {},
+        "display_order": {},
+        "profile_corpus_id": {},
+        "judge_binding": {}
       }
     },
     "OperationReceipt": {
