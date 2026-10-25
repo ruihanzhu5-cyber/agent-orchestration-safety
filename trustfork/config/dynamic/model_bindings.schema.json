@@ -91,6 +91,88 @@
                 "type": "string"
               },
               "uniqueItems": true
+            },
+            "capability": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "status",
+                "effective_context_tokens",
+                "max_output_tokens",
+                "source",
+                "evidence_hash",
+                "verified_at",
+                "route_fingerprint",
+                "tokenizer",
+                "framing_tokens",
+                "output_token_parameter"
+              ],
+              "properties": {
+                "status": {
+                  "enum": [
+                    "unknown",
+                    "declared",
+                    "verified"
+                  ]
+                },
+                "effective_context_tokens": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "minimum": 1
+                },
+                "max_output_tokens": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "minimum": 1
+                },
+                "source": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "evidence_hash": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "verified_at": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "route_fingerprint": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "tokenizer": {
+                  "type": [
+                    "object",
+                    "null"
+                  ]
+                },
+                "framing_tokens": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "minimum": 0
+                },
+                "output_token_parameter": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              }
             }
           }
         },
@@ -154,6 +236,88 @@
                 "type": "string"
               },
               "uniqueItems": true
+            },
+            "capability": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "status",
+                "effective_context_tokens",
+                "max_output_tokens",
+                "source",
+                "evidence_hash",
+                "verified_at",
+                "route_fingerprint",
+                "tokenizer",
+                "framing_tokens",
+                "output_token_parameter"
+              ],
+              "properties": {
+                "status": {
+                  "enum": [
+                    "unknown",
+                    "declared",
+                    "verified"
+                  ]
+                },
+                "effective_context_tokens": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "minimum": 1
+                },
+                "max_output_tokens": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "minimum": 1
+                },
+                "source": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "evidence_hash": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "verified_at": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "route_fingerprint": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "tokenizer": {
+                  "type": [
+                    "object",
+                    "null"
+                  ]
+                },
+                "framing_tokens": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "minimum": 0
+                },
+                "output_token_parameter": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              }
             }
           }
         }

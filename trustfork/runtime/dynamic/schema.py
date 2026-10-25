@@ -62,7 +62,7 @@ def validate_bindings(config: dict, *, formal: bool) -> dict:
     required = {"provider", "base_url", "model_id", "key_env", "context_window", "max_output_tokens", "supported_parameters"}
     unresolved = []
     for alias, binding in config["logical_bindings"].items():
-        strict_keys(binding, required)
+        strict_keys(binding, required, {'capability'})
         unresolved += [f"{alias}.{key}" for key in required if binding[key] is None]
         for key in ('provider','base_url','model_id','key_env'):
             if binding[key] is not None and (not isinstance(binding[key],str) or not binding[key].strip()):
@@ -76,6 +76,9 @@ def validate_bindings(config: dict, *, formal: bool) -> dict:
         if binding['supported_parameters'] is not None and (any(not isinstance(x,str) for x in binding['supported_parameters']) or
                 len(set(binding['supported_parameters']))!=len(binding['supported_parameters'])):
             raise DynamicError('invalid_supported_parameters',alias)
+        from .model_capabilities import binding_capability
+        capacity=binding_capability(binding)
+        if capacity['status']!='verified':unresolved.append(alias+'.effective_capacity')
     if not isinstance(config['real_api_enabled'],bool):raise DynamicError('invalid_real_api_flag','Expected boolean')
     if formal and (unresolved or config["real_api_enabled"] is not True):
         raise DynamicError("unresolved_formal_bindings", "Formal mode is not enabled or fully bound", evidence=sorted(unresolved))

@@ -10,7 +10,19 @@
       "key_env": null,
       "context_window": null,
       "max_output_tokens": null,
-      "supported_parameters": null
+      "supported_parameters": null,
+      "capability": {
+        "status": "unknown",
+        "effective_context_tokens": null,
+        "max_output_tokens": null,
+        "source": null,
+        "evidence_hash": null,
+        "verified_at": null,
+        "route_fingerprint": null,
+        "tokenizer": null,
+        "framing_tokens": null,
+        "output_token_parameter": null
+      }
     },
     "deepseekflash": {
       "provider": null,
@@ -19,7 +31,19 @@
       "key_env": null,
       "context_window": null,
       "max_output_tokens": null,
-      "supported_parameters": null
+      "supported_parameters": null,
+      "capability": {
+        "status": "unknown",
+        "effective_context_tokens": null,
+        "max_output_tokens": null,
+        "source": null,
+        "evidence_hash": null,
+        "verified_at": null,
+        "route_fingerprint": null,
+        "tokenizer": null,
+        "framing_tokens": null,
+        "output_token_parameter": null
+      }
     }
   },
   "judge_binding": "gpt4o",

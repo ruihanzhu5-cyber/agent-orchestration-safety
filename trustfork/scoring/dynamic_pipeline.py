@@ -13,6 +13,9 @@ from .goal_observer import frozen_workspace,observe_goal,predicate_state
 from .trajectory_observer import analyze_trajectory,recovery_observation,event_ref,annotate_adoption
 from .annotation_contracts import apply_annotations,enrich_actor_reports
 from .visibility_index import build_visibility_index
+from .trajectory_codec import encode_trajectory,VERSION as CODEC_VERSION
+from .judge_request import prepare_judge_request,capacity_report
+from trustfork.runtime.dynamic.model_capabilities import binding_capability,unknown_capability
 
 
 def scorer_manifest():
@@ -22,8 +25,11 @@ def scorer_manifest():
         'trustfork/runtime/dynamic/operation_receipts.py','trustfork/scoring/visibility_index.py',
         'trustfork/scoring/annotation_contracts.py','trustfork/config/dynamic/annotation.schema.json',
         'trustfork/config/dynamic/contracts.schema.json']
+    names+=['trustfork/scoring/trajectory_codec.py','trustfork/scoring/judge_request.py',
+        'trustfork/runtime/dynamic/model_capabilities.py','trustfork/config/dynamic/scorer.example.json',
+        'trustfork/config/dynamic/model_bindings.schema.json']
     files={name:file_hash(repo_root()/name) for name in names}
-    return {'version':'dynamic-scoring-analysis-v2','file_hashes':files,'manifest_hash':digest(files),
+    return {'version':'dynamic-scoring-analysis-v3','file_hashes':files,'manifest_hash':digest(files),
         'judge_binding_ref':'gpt4o','precise_judge_binding':None,'network_requests':0}
 
 
@@ -50,6 +56,33 @@ def _artifact(directory,name,value):
     envelope={'schema_version':'1.0','content_hash':digest(value),'data':value}
     write_json(directory/name,envelope)
     return 'score-input://sha256/'+envelope['content_hash']
+
+
+def preserve_scoring_outputs(output):
+    """Preserve prior flat outputs before rescoring; never alter original runs."""
+    import shutil
+    files=[p for p in output.rglob('*') if p.is_file() and p.relative_to(output).parts[0] not in ('versions','legacy')]
+    if not files or (output/'legacy').exists():return
+    snapshot=digest({p.relative_to(output).as_posix():file_hash(p) for p in files})
+    for p in files:
+        dest=output/'legacy'/snapshot/p.relative_to(output);dest.parent.mkdir(parents=True,exist_ok=True);shutil.copyfile(p,dest)
+
+
+def freeze_scoring_version(output,identity):
+    import shutil
+    version=digest(identity); files=[p for p in output.rglob('*') if p.is_file() and
+        p.relative_to(output).parts[0] not in ('versions','legacy','current_version.json')]
+    hashes={p.relative_to(output).as_posix():file_hash(p) for p in files}; target=output/'versions'/version
+    if target.exists():
+        previous=read_json(target/'version.json')
+        if previous['files']!=hashes:raise DynamicError('immutable_scoring_conflict','Same scoring identity produced different artifacts')
+        if any(file_hash(target/name)!=h for name,h in hashes.items()):raise DynamicError('scoring_version_corrupt','Archived artifact changed')
+    else:
+        for p in files:
+            dest=target/p.relative_to(output);dest.parent.mkdir(parents=True,exist_ok=True);shutil.copyfile(p,dest)
+        write_json(target/'version.json',{'version_id':version,'identity':identity,'files':hashes})
+    write_json(output/'current_version.json',{'version_id':version,'path':'versions/'+version})
+    return version
 
 
 def _validate_judgements(value,refs,deliverables):
@@ -139,7 +172,7 @@ def score_run(path,*,mode='formal'):
     if set(bindings['goals'])!=set(manifest['goal_hashes']) or any(digest(bindings['goals'][a])!=manifest['goal_hashes'][a] for a in bindings['goals']):
         raise DynamicError('private_binding_hash_mismatch','Private goal binding changed')
     if digest(bindings['goal_spec'])!=digest(case['goal_spec']):raise DynamicError('goal_sensor_spec_drift','GoalSpec differs from the frozen source manifest')
-    output=directory/'scoring';output.mkdir(exist_ok=True)
+    output=directory/'scoring';output.mkdir(exist_ok=True);preserve_scoring_outputs(output)
     before=frozen_workspace(run['prefix_export']);terminal=frozen_workspace(run['frozen_export'])
     refs.update({before['evidence_ref'],terminal['evidence_ref']})
     refs.update(reference for observation in (before,terminal) for reference in observation.get('evidence_refs',[]))
@@ -218,9 +251,24 @@ def score_run(path,*,mode='formal'):
     task=case['public_packet']
     response_input=response_judge_view(deliverables,task=task)
     trajectory_input=trajectory_judge_view(events,task=task,private_goals=bindings['goals'],frozen_state=terminal,final_response=run['final_text'])
+    prompts=judge_prompts(d['deliverable_id'] for d in deliverables)
+    packed=encode_trajectory(trajectory_input)
+    config=read_json(repo_root()/'trustfork/config/dynamic/scorer.example.json')
+    capability=binding_capability((manifest.get('resolved_api_bindings') or {}).get('logical_bindings',{}).get('gpt4o',{}))
+    prepared={key:prepare_judge_request(value,rubric=prompts[key],format_instructions='Return original rubric anchors and evidence references as JSON.',
+        output_budget=config.get('judge_output_budget_tokens'),representation=CODEC_VERSION if key=='trajectory' else 'legacy-full')
+        for key,value in [('response',response_input),('trajectory',packed)]}
+    capacities={key:capacity_report(value,capability) for key,value in prepared.items()}
+    for key,value in prepared.items():_artifact(output,'prepared_'+key+'.json',value)
+    _artifact(output,'capacity_reports.json',capacities)
+    _artifact(output,'trajectory_lossless.json',packed)
+    if mode=='formal':
+        for metric,record in scores['scores'].items():
+            report=capacities['response' if metric in ('RTF','RSR') else 'trajectory']
+            if not report['can_send']:record.update(value=None,status='judge_error',reason=report['reason'],eligible_for_primary=False)
     input_refs={'response':_artifact(output,'response_input.json',response_input),
         'trajectory':_artifact(output,'trajectory_input.json',trajectory_input),
-        'prompts':_artifact(output,'judge_prompts.json',judge_prompts(d['deliverable_id'] for d in deliverables))}
+        'prompts':_artifact(output,'judge_prompts.json',prompts)}
     _artifact(output,'visibility_index.json',consumed['visibility'])
     requests=_request_records(events,manifest,output)
     request_billing=[]
@@ -240,6 +288,9 @@ def score_run(path,*,mode='formal'):
         'scoring_mode':mode,'synthetic':bool(run['synthetic'] or mode=='test-fixtures'),
         'request_billing':request_billing,
         'numeric_fixtures_are_behavior_judgments':False if mode=='test-fixtures' else None,
+        'judge_capacity':capacities,'formal_ready':False,
         'mechanism_sample':mechanism,'real_judge_requests':0,'real_model_requests':run['real_model_requests']}
     write_json(output/'run_summary.json',summary)
+    freeze_scoring_version(output,{'scorer_manifest_hash':score_manifest['manifest_hash'],'run_manifest_hash':run['run_manifest_hash'],
+        'annotations_hash':digest(annotations),'mode':mode})
     return summary

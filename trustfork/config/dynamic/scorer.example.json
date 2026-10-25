@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "scorer_version": "dynamic-scoring-analysis-v1",
+  "scorer_version": "dynamic-scoring-analysis-v3",
   "judge_binding_ref": "gpt4o",
   "exact_judge_model_id": null,
   "provider": null,
@@ -16,7 +16,23 @@
     "provider",
     "endpoint",
     "key_env",
-    "context_capacity_tokens"
+    "context_capacity_tokens",
+    "judge_output_budget_tokens",
+    "effective_route_capacity",
+    "provider_framing",
+    "judge_budget_limits",
+    "real_provider_adapter",
+    "real_H1_H2_history"
   ],
-  "fixture_mode": "Explicit fixed numeric anchors only; synthetic, not behavior judgments"
+  "fixture_mode": "Explicit fixed numeric anchors only; synthetic, not behavior judgments",
+  "judge_output_budget_tokens": null,
+  "request_representation": "trajectory-lossless-v1",
+  "effective_capacity_status": "unknown",
+  "judge_budget": {
+    "requests": null,
+    "rpm": null,
+    "tpm": null,
+    "cost_limit": null
+  },
+  "formal_ready": false
 }
