@@ -5,6 +5,12 @@ records the pre-repair and final implementation commits, reversible restore
 commands, I01–I12 evidence, offline validation, and the historical log gap.
 Real model/Judge execution remains disabled and formal readiness is false.
 
+The [second repair and API preparation report](Repair_And_API_Preparation_Report_20261025.md)
+records startup/source/rescoring fixes and mock-tested provider/history/Judge
+paths. [Run artifacts and logging](Run_Artifacts_And_Logging.md) describes the
+new persistent campaign/index/archival interfaces and explicit frozen rescoring.
+These changes do not authorize live requests or establish formal readiness.
+
 The executable controller is `trustfork/agents/pi_dynamic.py`. It calls Docker
 directly and a passive Pi 0.84.1 bridge. The original Harbor/Pi entry and source
 tasks are unchanged. Read the implementation report and SDK compatibility
@@ -88,10 +94,20 @@ Restore support means a committed filesystem plus declared file-backed restartab
 services at a quiescent boundary. No RAM snapshot is claimed. Unclassified live
 workers or changed service code/configuration are explicitly unsupported.
 
-The bridge currently exposes scripted execution only. Real provider execution
-and judge connections remain disabled: precise bindings, API format/retry/tool
-compatibility, live history execution and judge capacity require the next
-authorized phase. Filling a model alias alone does not enable API execution.
+The bridge exposes explicit scripted, local HTTP mock and prepared API backends.
+The provider backend uses the locked Pi SDK with a host HTTP relay; host task IO
+and bridge network traps remain active. The real backend is disabled by default
+and requires a new authorized phase, complete route/compatibility/capacity data,
+independent price/rate/request limits and explicit run authorization. Filling a
+model alias or detecting a key does not enable it. Live provider/history/Judge
+behavior and legacy-versus-lossless scoring equivalence remain unverified.
+
+New CLI surfaces (run `--help` for exact arguments) are `run_dynamic --mode
+mock|api`, `--bindings`, `--request-ceiling`, `--allow-real-api`,
+`--mock-responses`, and `--campaign`; `provider_preflight`, `judge_dynamic`,
+`rescore_dynamic`, and `campaign_artifacts` are new commands. The preflight is
+read-only/offline. Judge transport is separate from pure scoring. Existing
+`--out` remains supported and refuses an existing run output before execution.
 
 ## Original resource semantics
 
