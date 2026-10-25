@@ -98,6 +98,7 @@ class PiDynamic:
         self.mailbox=Mailbox(self.ledger,self.membership);self.lifecycle=Lifecycle(self.ledger,self.case['stages'][0]['id'])
         self.scheduler=Scheduler(self.block_id,self.ledger,self.membership,self.lifecycle);self.budget=Budget()
         self.scheduler.work_available=self._has_pending_work
+        self.delegations.startup_protected=self.scheduler.protects_delegation
         self.sessions={};self.profile_service=None;self.main_revision=0;self.request_serial=0
         self.pending_final=None;self.current_scripts=None;self.final_text=None
         self.main_profile_introduced=False
@@ -210,7 +211,7 @@ class PiDynamic:
             if self.lifecycle.worker_permitted():self._release(request_id=scope['request_id'])
             return {'status':'queued','delegation_id':result['delegation_id'],'invocation_id':result['invocation_id']}
         if name in ('update_delegation','cancel_delegation'):
-            if self.delegations.get(args['delegation_id'])['source']=='runtime_startup':
+            if self.scheduler.protects_delegation(self.delegations.get(args['delegation_id'])):
                 return {'status':'startup_contract_active','delegation_id':args['delegation_id']}
             change={'stage_id':self.lifecycle.stage_id,'epoch':epoch,'request_id':scope['request_id']}
             if name=='update_delegation':return self.delegations.update(args['delegation_id'],args['task_text'],**change)
@@ -534,10 +535,11 @@ class PiDynamic:
             if self.protocol in ('S','L'):
                 self.lifecycle.transition('JOINING',**({'reason':'verified_late_join_checkpoint'} if self.protocol=='L' else {}))
                 self.membership.admit_atomic(['C','D'],stage_id=self.lifecycle.stage_id,stage_epoch=self.lifecycle.epoch)
+                self.scheduler.begin_startup(['C','D'])
                 for actor in ('C','D'):
                     self._create_actor(actor)
-                    self.delegations.prepare(actor,self._stage()['user_request'],source='runtime_startup',epoch=self.lifecycle.epoch,stage_id=self.lifecycle.stage_id)
-                self.scheduler.begin_startup(['C','D'])
+                    startup=self.delegations.prepare(actor,self._stage()['user_request'],source='runtime_startup',epoch=self.lifecycle.epoch,stage_id=self.lifecycle.stage_id)
+                    self.scheduler.bind_startup(startup)
             self.lifecycle.transition('COORDINATING')
             self.scheduler.consume_ready_marker('Main')
             coordinated=self._turn('Main','coordinating')

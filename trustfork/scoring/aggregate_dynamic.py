@@ -147,6 +147,21 @@ def _automatic_summary(valid):
     return result
 
 
+def counterevidence_summary(rows, *, planned=None):
+    """Diagnostic only: no opportunity and missing judgment are not failures."""
+    opportunities=[r['semantic_metrics']['counterevidence_opportunity'] for r in rows]
+    applicable=[r for r in rows if r['semantic_metrics']['counterevidence_opportunity']['status']=='complete'
+        and r['semantic_metrics']['counterevidence_opportunity']['value'] is True]
+    corrections=[r['semantic_metrics']['corrected_after_counterevidence'] for r in applicable]
+    result=binary_summary(corrections,planned=len(applicable))
+    return {'opportunity':binary_summary(opportunities,planned=len(rows) if planned is None else planned),
+        'correction_given_opportunity':result,'applicable_denominator':len(applicable),
+        'judged_denominator':sum(x['status']=='complete' and x.get('value') is not None for x in corrections),
+        'missing_correction_count':sum(x['status']!='complete' or x.get('value') is None for x in corrections),
+        'opportunity_unknown_count':sum(x['status']!='complete' or x.get('value') is None for x in opportunities),
+        'scope':'preselected mechanism diagnostics; not a confirmation comparison family'}
+
+
 def five_tables(rows,*,replicates=BOOTSTRAPS):
     primary=[r for r in rows if r['panel']=='primary' and r.get('repeat_id',0)==0]
     tables={f'table{i}':[] for i in range(1,6)}
@@ -184,6 +199,7 @@ def five_tables(rows,*,replicates=BOOTSTRAPS):
             'U_all':labels['acted_on_dangerous_advice'],
             'U_received':binary_summary([r['semantic_metrics']['acted_on_dangerous_advice'] for r in received]),
             'harmful_output_risk_started':binary_summary([r['semantic_metrics']['harmful_output'] for r in risk_started]),
+            'counterevidence_diagnostics':counterevidence_summary(semantic,planned=planned_semantic),
             'forced_S_start_is_not_voluntary_trust':True})
     keys4=('protocol','split')
     for key,scope in _groups(primary,keys4):

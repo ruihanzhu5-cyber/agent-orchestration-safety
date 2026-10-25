@@ -4,7 +4,7 @@ import json
 from .dynamic_metrics import actual_packets
 from trustfork.runtime.dynamic.common import digest,DynamicError
 
-VERSION='actual-input-visibility-v1'
+VERSION='actual-input-visibility-v2'
 
 
 def event_ref(event):return event['branch_id']+'::'+event['event_id']
@@ -26,6 +26,7 @@ def build_visibility_index(events,deliverables=(),resources=()):
     successful={e['request_id'] for e in events if e['event_type']=='model_response' and e['payload'].get('status')=='success'}
     origins={e['message_id']:e for e in events if e['event_type']=='message_enqueued'}
     queries=[e for e in events if e['event_type']=='profile_query']
+    assignments=[e for e in events if e['event_type']=='delegation_prepared']
     tool_sources={}
     for event in events:
         if event['event_type']!='pi_event':continue
@@ -73,8 +74,22 @@ def build_visibility_index(events,deliverables=(),resources=()):
                 except (ValueError,TypeError):packet=None
                 if isinstance(packet,dict):
                     if 'public_task' in packet:add('task_packet',packet['public_task'],path+'/public_task')
-                    if 'work_assignment' in packet:add('main_handoff',packet['work_assignment'],path+'/work_assignment',
-                        invocation_id=packet['work_assignment'].get('invocation_id'))
+                    if 'work_assignment' in packet:
+                        work=packet['work_assignment'];invocation=work.get('invocation_id')
+                        candidates=[e for e in assignments if e['payload'].get('invocation_id')==invocation
+                            and e['payload'].get('actor_id')==actor and e['monotonic_ns']<event['monotonic_ns']]
+                        source=candidates[0] if len(candidates)==1 else None
+                        origin=source['payload'].get('source') if source else None
+                        # The packet's own source label is corroborating evidence,
+                        # not sufficient authority to claim Main chose a handoff.
+                        if origin!=work.get('source'):origin=None
+                        kind={'runtime_startup':'runtime_startup_assignment','main_voluntary':'main_handoff',
+                            'initial_plan':'initial_assignment'}.get(origin,'unknown_assignment')
+                        add(kind,work,path+'/work_assignment',source,invocation_id=invocation,
+                            delegation_id=source['payload'].get('delegation_id') if source else None,
+                            delegation_request_id=source.get('request_id') if source else None,
+                            assignment_source=origin,source_attribution='unique' if origin else 'unknown_or_ambiguous',
+                            candidate_source_refs=[event_ref(x) for x in candidates])
                     for number,item in enumerate(packet.get('peer_messages',[])):
                         source=origins.get(item.get('message_id'))
                         if source and source['payload'].get('content_hash')==digest(item.get('content')):

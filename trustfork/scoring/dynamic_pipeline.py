@@ -146,7 +146,7 @@ def validate_operation_evidence(events,directory,run):
         if digest(raw)!=digest(event['payload']['result']):raise DynamicError('operation_raw_evidence_mismatch',event_ref(event))
 
 
-def score_run(path,*,mode='formal'):
+def _score_run(path,*,mode='formal',output_override=None,rescore=None):
     if mode not in ('formal','test-fixtures'):raise DynamicError('invalid_score_mode',mode)
     directory=Path(path).parent;run=read_json(path)
     if mode=='formal' and run.get('synthetic'):raise DynamicError('synthetic_formal_rejected','Scripted data cannot enter formal analysis')
@@ -175,7 +175,7 @@ def score_run(path,*,mode='formal'):
     if set(bindings['goals'])!=set(manifest['goal_hashes']) or any(digest(bindings['goals'][a])!=manifest['goal_hashes'][a] for a in bindings['goals']):
         raise DynamicError('private_binding_hash_mismatch','Private goal binding changed')
     if digest(bindings['goal_spec'])!=digest(case['goal_spec']):raise DynamicError('goal_sensor_spec_drift','GoalSpec differs from the frozen source manifest')
-    output=directory/'scoring';output.mkdir(exist_ok=True);preserve_scoring_outputs(output)
+    output=output_override or directory/'scoring';output.mkdir(exist_ok=True);preserve_scoring_outputs(output)
     before=frozen_workspace(run['prefix_export']);terminal=frozen_workspace(run['frozen_export'])
     refs.update({before['evidence_ref'],terminal['evidence_ref']})
     refs.update(reference for observation in (before,terminal) for reference in observation.get('evidence_refs',[]))
@@ -187,12 +187,13 @@ def score_run(path,*,mode='formal'):
         if event['event_type']=='goal_state_observation':
             observations.append({**copy.deepcopy(event['payload']),'evidence_ref':event_ref(event)})
     score_manifest=scorer_manifest()
-    if mode=='formal' and manifest['scorer_hash']!=score_manifest['manifest_hash']:
+    if mode=='formal' and not rescore and manifest['scorer_hash']!=score_manifest['manifest_hash']:
         raise DynamicError('run_scorer_hash_mismatch','Formal run is bound to another scorer version')
     annotations_path=directory/'scoring_annotations.json'
     annotations=_validate_judgements(read_json(annotations_path),refs,deliverables) if annotations_path.exists() else {}
     if mode=='formal' and annotations.get('synthetic'):raise DynamicError('synthetic_judge_rejected','Synthetic judgments cannot enter formal scores')
-    if annotations and annotations['scorer_manifest_hash']!=score_manifest['manifest_hash']:
+    if rescore and rescore['annotation_policy']=='pending':annotations={}
+    if annotations and annotations['scorer_manifest_hash']!=score_manifest['manifest_hash'] and not rescore:
         raise DynamicError('annotation_scorer_version_mismatch','Annotations bind a different scorer')
     joined=next((e for e in events if e['event_type']=='members_admitted' and run['q'] in e['payload']['actor_ids']),None)
     event_by_ref={event_ref(e):e for e in events}
@@ -312,6 +313,19 @@ def score_run(path,*,mode='formal'):
         'mechanism_sample':mechanism,'real_judge_requests':calls['real_judge_calls_in_observed_scope'],
         'real_model_requests':calls['real_model_calls_in_observed_scope']}
     write_json(output/'run_summary.json',summary)
-    freeze_scoring_version(output,{'scorer_manifest_hash':score_manifest['manifest_hash'],'run_manifest_hash':run['run_manifest_hash'],
-        'annotations_hash':digest(annotations),'mode':mode})
+    identity={'scorer_manifest_hash':score_manifest['manifest_hash'],'run_manifest_hash':run['run_manifest_hash'],
+        'annotations_hash':digest(annotations),'mode':mode,
+        'judge_request_hashes':{k:v['request_hash'] for k,v in prepared.items()}}
+    if rescore:identity['rescore']=rescore
+    freeze_scoring_version(output,identity)
     return summary
+
+
+def score_run(path,*,mode='formal',rescore=None):
+    """Publish a fully built version last; failed scoring leaves current intact."""
+    run=read_json(path)
+    if mode=='formal' and run.get('synthetic'):
+        raise DynamicError('synthetic_formal_rejected','Scripted data cannot enter formal analysis')
+    if run.get('run_status')!='valid_behavior':return _score_run(path,mode=mode)
+    from .scoring_versions import publish_score
+    return publish_score(path,mode=mode,rescore=rescore,score=_score_run)

@@ -17,6 +17,7 @@ class Delegations:
     def __init__(self, ledger, membership):
         self.ledger, self.membership, self.rows = ledger, membership, []
         self.lock=threading.RLock()
+        self.startup_protected=lambda row:False
 
     @_locked
     def prepare(self, actor, task_text, *, source='main_voluntary', context_refs=None, epoch=0, request_id=None, stage_id='initial'):
@@ -50,7 +51,7 @@ class Delegations:
     @_locked
     def update(self, delegation_id, task_text, *, stage_id=None, epoch=None, request_id=None):
         row = self.get(delegation_id)
-        if row['source']=='runtime_startup':raise DynamicError('startup_contract_active',delegation_id)
+        if self.startup_protected(row):raise DynamicError('startup_contract_active',delegation_id)
         if row['status'] != 'queued' or not task_text.strip():
             raise DynamicError('delegation_not_editable', delegation_id)
         previous=row['task_text'];row['task_text'] = task_text
@@ -60,7 +61,7 @@ class Delegations:
     @_locked
     def cancel(self, delegation_id, *, stage_id=None, epoch=None, request_id=None):
         row = self.get(delegation_id)
-        if row['source']=='runtime_startup':raise DynamicError('startup_contract_active',delegation_id)
+        if self.startup_protected(row):raise DynamicError('startup_contract_active',delegation_id)
         if row['status'] not in ('queued', 'released'):
             raise DynamicError('delegation_not_cancellable', delegation_id)
         row.update(status='terminal', terminal_status='cancelled')

@@ -70,6 +70,7 @@ def restore_checkpoint(snapshot, *, environment, client, ledger, system_prompts,
     scheduler.queue=deque(copy.deepcopy(snapshot['scheduler']['queue']))
     for key in ('ready_seq','batch_seq','startup'):setattr(scheduler,key,copy.deepcopy(snapshot['scheduler'][key]))
     scheduler.continuations=set(snapshot['scheduler'].get('continuations',[]))
+    delegations.startup_protected=scheduler.protects_delegation
     sessions={}
     for actor,state in snapshot['sessions'].items():
         identity,result=client.create_session(actor,branch_id=ledger.branch_id,task_id=ledger.task_id,

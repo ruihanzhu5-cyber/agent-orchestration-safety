@@ -179,6 +179,7 @@ def audit_runtime(tmp_path, protocol='S'):
     runtime.mailbox=Mailbox(runtime.ledger,runtime.membership)
     runtime.lifecycle=Lifecycle(runtime.ledger,'ask');runtime.lifecycle.state='RUNNING'
     runtime.scheduler=Scheduler('audit',runtime.ledger,runtime.membership,runtime.lifecycle)
+    runtime.delegations.startup_protected=runtime.scheduler.protects_delegation
     runtime.main_revision=0;runtime.formal_deliverables={};runtime.created=[]
     runtime._create_actor=lambda actor:runtime.created.append(actor)
     return runtime
@@ -193,14 +194,15 @@ def audit_scope(runtime):
 def test_audit_open_startup_cannot_be_released_updated_or_cancelled(tmp_path,protocol):
     runtime=audit_runtime(tmp_path,protocol)
     runtime.membership.admit_atomic(['C','D']);runtime.scheduler.begin_startup(['C','D'])
-    row=runtime.delegations.prepare('C','Original task',source='runtime_startup')
+    row=runtime.delegations.prepare('C','Original task',source='runtime_startup',stage_id=runtime.lifecycle.stage_id)
+    runtime.scheduler.bind_startup(row)
     for name,args in [('release_member',{'actor_id':'C'}),
             ('update_delegation',{'delegation_id':row['delegation_id'],'task_text':'skip startup'}),
             ('cancel_delegation',{'delegation_id':row['delegation_id']})]:
         result=runtime._coordinate('Main',name,args,audit_scope(runtime))
         assert result['status']=='startup_contract_active'
     assert runtime.membership.admitted('C')
-    assert runtime.scheduler.startup['C']=={'requests':0,'status':'open'}
+    assert runtime.scheduler.startup['C']['requests']==0 and runtime.scheduler.startup['C']['status']=='open'
     assert runtime.delegations.get(row['delegation_id'])['task_text']=='Original task'
     assert not runtime.scheduler.final_allowed()
 

@@ -59,7 +59,23 @@ class Scheduler:
         for actor in actors:
             if not self.membership.admitted(actor):
                 raise DynamicError('startup_unadmitted', actor)
-            self.startup[actor] = {'requests':0, 'status':'open'}
+            self.startup[actor] = {'requests':0, 'status':'open',
+                'stage_epoch':self.lifecycle.epoch,'stage_id':self.lifecycle.stage_id,
+                'invocation_id':None}
+
+    def protects_delegation(self, row):
+        """Protection belongs to the current initial slice, never its label alone."""
+        value=self.startup.get(row['actor_id'],{})
+        return bool(row.get('source')=='runtime_startup' and value.get('status')=='open'
+            and row['stage_epoch']==self.lifecycle.epoch==value.get('stage_epoch')
+            and row.get('stage_id')==self.lifecycle.stage_id==value.get('stage_id')
+            and value.get('invocation_id')==row.get('invocation_id'))
+
+    def bind_startup(self, row):
+        value=self.startup[row['actor_id']]
+        if value['status']!='open' or row['stage_epoch']!=value['stage_epoch']:
+            raise DynamicError('invalid_startup_binding',row['invocation_id'])
+        value['invocation_id']=row['invocation_id']
 
     def _close_startup(self,actor,reason):
         value=self.startup[actor];value['status']=reason
