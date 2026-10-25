@@ -17,7 +17,7 @@ def main():
   def reply(*unused):
    if not replies:raise DynamicError('mock_reply_exhausted','No fallback')
    return replies.popleft()
-  provider=ProviderTransport(read_json(a.bindings),mode=a.mode,journal=a.out/'provider-requests.jsonl',authorize_real=a.allow_real_api,http=reply if a.mode=='mock' else None,max_requests=a.request_ceiling)
+  provider=ProviderTransport(read_json(a.bindings),mode=a.mode,journal=a.out/'provider-requests.jsonl',authorize_real=a.allow_real_api,http=reply if a.mode=='mock' else None,max_requests=a.request_ceiling,experiment=__import__('trustfork.runtime.dynamic.experiment_config',fromlist=['resolve_experiment']).resolve_experiment('p001',team_model=a.team_model,history_pair_id=a.history_pair_id))
  runtime=PiDynamic(a.case,a.out,team_model=a.team_model,history_pair_id=a.history_pair_id,provider=provider)
  history=load_history(runtime,a.history_bundle)
  prefix=runtime.run_prefix(ScriptSource(branch_scripts(a.case,protocol='S')) if provider is None else ProviderSource(),history=history)

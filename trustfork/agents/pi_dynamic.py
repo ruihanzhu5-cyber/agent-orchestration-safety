@@ -441,6 +441,7 @@ class PiDynamic:
             if 'Main' not in self.scheduler.active:self.scheduler.enqueue_batch(['Main'],reason='delegation_result')
 
     def run_prefix(self, scripts, *, history=None):
+        if not self.synthetic and (not history or not history.get('history_bundle_id')):raise DynamicError('frozen_history_bundle_required','Formal prefix requires an explicit validated history bundle')
         self._initialize(self.out/'prefix','prefix_'+uuid.uuid4().hex)
         self.current_scripts=scripts;self.history=history or self.history
         try:
@@ -685,6 +686,7 @@ class PiDynamic:
         self._initialize(self.out/'late-prefix','late_prefix_'+uuid.uuid4().hex)
         self.current_scripts=scripts.clone()
         snapshot=early['checkpoint']
+        self.validate_prefix_target(snapshot)
         self.resources=snapshot['sessions']['Main']['config']['task_resources']
         try:
             restored=restore_checkpoint(snapshot,environment=self.environment,client=self.client,ledger=self.ledger,

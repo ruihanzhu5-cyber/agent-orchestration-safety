@@ -60,7 +60,7 @@ def main():
                     if not replies:raise DynamicError('mock_reply_exhausted','No fallback response')
                     return replies.popleft()
         provider=ProviderTransport(read_json(args.bindings),mode=args.mode,journal=args.out/'provider-requests.jsonl',
-            authorize_real=args.allow_real_api,http=mock,max_requests=args.request_ceiling)
+            authorize_real=args.allow_real_api,http=mock,max_requests=args.request_ceiling,experiment=None if args.legacy else __import__('trustfork.runtime.dynamic.experiment_config',fromlist=['resolve_experiment']).resolve_experiment(args.case,team_model=args.team_model or args.main_model,history_pair_id=args.history_pair_id,protocol=args.protocol,panel='late_join' if args.protocol=='L' else args.panel,repeat_id=args.repeat_id))
     runtime=PiDynamic(args.case,args.out,protocol=args.protocol,layout=args.layout,main_model=args.main_model,
         panel=args.panel,strategy=args.strategy,repeat_id=args.repeat_id,provider=provider,team_model=args.team_model,history_pair_id=args.history_pair_id,legacy=args.legacy)
     from trustfork.runtime.dynamic.prepared_artifacts import load_history,load_prefix

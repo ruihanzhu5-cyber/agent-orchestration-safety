@@ -34,7 +34,8 @@ def test_prepared_request_binds_every_sent_field_and_reserves_independent_output
 def test_http_json_escaping_is_not_charged_as_model_content():
     view={'private_goals_removed':True,'trajectory':[{'text':'"\\\n'*1000}]}
     p=prepare_judge_request(view,rubric='rubric',format_instructions='format',output_budget=4096,counter=len,judge_binding=BINDING)
-    assert p['input_tokens']==sum(len(m['content']) for m in p['request']['messages'])
+    assert p['message_content_tokens']==sum(len(m['content']) for m in p['request']['messages'])
+    assert p['input_tokens']==p['message_content_tokens']+p['token_accounting']['components']['role_and_call_associations']
     assert p['wire_serialization_tokens']>p['input_tokens']
     assert p['wire_tokens_are_model_input_tokens'] is False
     assert p['output_budget']==4096 and p['tool_and_format_schema_tokens']==0

@@ -34,5 +34,16 @@
     "tpm": null,
     "cost_limit": null
   },
-  "formal_ready": false
+  "formal_ready": false,
+  "scoring_profile": "dynamic-homogeneous-v2",
+  "judge_binding": "gpt4o",
+  "trajectory_representation": "trajectory-lossless-v1",
+  "response_output_budget_tokens": null,
+  "trajectory_output_budget_tokens": null,
+  "temperature": 0,
+  "parameters": {},
+  "independent_limits": {
+    "requests": null,
+    "max_cost_usd": null
+  }
 }

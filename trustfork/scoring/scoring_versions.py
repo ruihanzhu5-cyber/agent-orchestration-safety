@@ -46,11 +46,12 @@ def frozen_identity(path):
         'origin_scorer_hash':manifest['scorer_hash']}
 
 
-def rescore_contract(path,*,reason,annotation_policy='pending',compatibility=None,new_annotations=None,source_audit=None):
+def rescore_contract(path,*,reason,annotation_policy='pending',compatibility=None,new_annotations=None,source_audit=None,view_migration=None,scoring_profile=None):
     from .dynamic_pipeline import scorer_manifest
     if not reason.strip():raise DynamicError('rescore_reason_required','Describe why this frozen run needs new scoring')
     if annotation_policy not in ('pending','reuse','new'):
         raise DynamicError('invalid_annotation_policy',annotation_policy)
+    if view_migration and annotation_policy!='new':raise DynamicError('view_migration_requires_new_judge','No annotation reuse across changed views')
     root=Path(path).parent;output=root/'scoring';current=read_json(output/'current_version.json')
     parent=output/current['path'];version=read_json(parent/'version.json')
     if current['path']!='versions/'+current['version_id'] or version.get('version_id')!=current['version_id'] or digest(version['identity'])!=current['version_id']:
@@ -113,6 +114,11 @@ def rescore_contract(path,*,reason,annotation_policy='pending',compatibility=Non
         'parent_version_id':current['version_id'],'frozen_identity':origin,
         'legacy_source_audit_hash':source_audit_hash,
         'current_scorer_hash':current_scorer['manifest_hash']}
+    if view_migration:
+        required={'old_view_version','new_view_version','old_view_hash','new_view_hash','builder_version','reason','field_mapping','raw_evidence_hash'}
+        if set(view_migration)!=required or not view_migration['reason'] or not isinstance(view_migration['field_mapping'],dict) or view_migration['raw_evidence_hash']!=digest(origin) or view_migration['old_view_hash']!=read_json(parent/'trajectory_input.json')['content_hash']:raise DynamicError('view_migration_contract_invalid','Explicit source/target view and raw-evidence binding required')
+        result['view_migration']=view_migration
+    if scoring_profile is not None:result['scoring_profile']=scoring_profile
     if annotation_policy=='new':
         result.update(new_annotation_path=str(Path(new_annotations).resolve()),new_annotation_hash=file_hash(new_annotations))
     return result
@@ -132,7 +138,9 @@ def publish_score(path,*,mode,rescore,score):
         if rescore:
             previous=output/'versions'/rescore['parent_version_id']/'trajectory_input.json'
             if read_json(previous)['content_hash']!=read_json(stage/'trajectory_input.json')['content_hash']:
-                raise DynamicError('rescore_original_view_changed','Original scoring trajectory must match exactly')
+                migration=rescore.get('view_migration')
+                if not migration or rescore['annotation_policy']!='new' or migration['old_view_hash']!=read_json(previous)['content_hash'] or migration['new_view_hash']!=read_json(stage/'trajectory_input.json')['content_hash'] or migration['raw_evidence_hash']!=digest(before):raise DynamicError('rescore_original_view_changed','Changed view requires a validated migration and new Judge annotations')
+                # Migration is already bound in the immutable version identity.
         pointer=read_json(stage/'current_version.json');target=output/pointer['path'];source=stage/pointer['path']
         if target.exists():
             if read_json(target/'version.json')!=read_json(source/'version.json'):

@@ -19,7 +19,7 @@ def main():
    with lock:
     if not replies:raise DynamicError('mock_reply_exhausted','No fallback')
     return replies.popleft()
-  provider=ProviderTransport(read_json(a.bindings),mode=a.mode,journal=a.out/'provider-requests.jsonl',authorize_real=a.allow_real_api,http=reply if a.mode=='mock' else None,max_requests=a.request_ceiling)
+  provider=ProviderTransport(read_json(a.bindings),mode=a.mode,journal=a.out/'provider-requests.jsonl',authorize_real=a.allow_real_api,http=reply if a.mode=='mock' else None,max_requests=a.request_ceiling,experiment=__import__('trustfork.runtime.dynamic.experiment_config',fromlist=['resolve_experiment']).resolve_experiment('p001',team_model=a.team_model,history_pair_id=a.history_pair_id))
  runtime=PiDynamic('p001',a.out,team_model=a.team_model,history_pair_id=a.history_pair_id,provider=provider)
  bundle=prepare_history(runtime,ScriptSource(history_scripts()) if provider is None else ProviderSource(),a.out/'history-bundle.json')
  print(bundle['bundle_id'])

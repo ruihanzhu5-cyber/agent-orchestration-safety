@@ -30,6 +30,7 @@ def test_direct_q_attempt_and_environment_block_is_not_adoption(known_trajectory
  d=analyze_trajectory(events)
  for c in d['dynamic_claims']:c.update(annotation_status='annotated',harm_status='harmful')
  ann={'risk_coverage':{k:True for k in ('candidate_complete','exposure_complete','decision_complete','lineage_complete')},'unsafe_attempt_annotations':[{'actor_id':'C','status':'complete','value':True,'blocked_by_environment':True,'evidence_refs':[f['ref'](f['start'])]}]}
+ ann['risk_coverage'].update(candidate_claim_ids=[c['claim_id'] for c in d['dynamic_claims']],assessed_claim_ids=[c['claim_id'] for c in d['dynamic_claims']])
  result,_=evaluate_process(events,d,ann,'C')
  assert result['risk_adoption_any']['value']==0
  assert result['unsafe_attempt_any']['value']==1 and result['unsafe_attempt_any']['blocked_by_environment']

@@ -51,7 +51,7 @@ def validate_schema(value: dict, schema: dict) -> dict:
     return value
 
 
-def validate_bindings(config: dict, *, formal: bool) -> dict:
+def validate_bindings(config: dict, *, formal: bool, required_aliases=None, role_scope=None) -> dict:
     strict_keys(config, {"protocol_version", "mode", "real_api_enabled", "logical_bindings", "judge_binding"}, {"note","execution_limits"})
     if config["protocol_version"] != PROTOCOL_VERSION:
         raise DynamicError("wrong_protocol", config["protocol_version"])
@@ -59,6 +59,9 @@ def validate_bindings(config: dict, *, formal: bool) -> dict:
         raise DynamicError("invalid_mode", str(config["mode"]))
     if set(config["logical_bindings"]) != {"gpt4o", "deepseekflash"} or config["judge_binding"] != "gpt4o":
         raise DynamicError("invalid_model_aliases", "Only the two specified aliases and gpt4o judge are defined")
+    if role_scope=='judge':required_aliases={config['judge_binding']}
+    active=set(config['logical_bindings']) if required_aliases is None else set(required_aliases)
+    if not active or not active<=set(config['logical_bindings']):raise DynamicError('invalid_active_aliases','Unknown or empty role scope')
     required = {"provider", "base_url", "model_id", "key_env", "context_window", "max_output_tokens", "supported_parameters"}
     unresolved = []
     for alias, binding in config["logical_bindings"].items():
@@ -85,11 +88,13 @@ def validate_bindings(config: dict, *, formal: bool) -> dict:
             if capacity[key] is None:unresolved.append(alias+'.capability.'+key)
         if capacity['output_token_parameter'] and binding['supported_parameters'] is not None and capacity['output_token_parameter'] not in binding['supported_parameters']:
             unresolved.append(alias+'.capability.unsupported_output_parameter')
+    all_unresolved=list(unresolved)
+    unresolved=[x for x in unresolved if x.split('.')[0] in active]
     if not isinstance(config['real_api_enabled'],bool):raise DynamicError('invalid_real_api_flag','Expected boolean')
     if formal and (unresolved or config["real_api_enabled"] is not True):
         raise DynamicError("unresolved_formal_bindings", "Formal mode is not enabled or fully bound", evidence=sorted(unresolved))
     if formal and config['mode']!='api':raise DynamicError('invalid_formal_mode','Formal configuration must explicitly select API mode')
-    return {"unresolved": sorted(unresolved), "formal_ready": not unresolved and config["real_api_enabled"] is True and config['mode']=='api'}
+    return {"all_unresolved":sorted(all_unresolved),"active_aliases":sorted(active),"unresolved": sorted(unresolved), "formal_ready": not unresolved and config["real_api_enabled"] is True and config['mode']=='api'}
 
 
 def score_record(metric: str, value: float | None, status: str, reason: str | None = None,

@@ -7,7 +7,7 @@ from trustfork.runtime.dynamic.common import DynamicError
 
 
 def bound(tmp_path,condition='HP'):
-    p=PiDynamic('p001',tmp_path,layout='P2');p.ledger=EventLedger(tmp_path/'events.jsonl','b','p001');p.membership=Membership(p.ledger)
+    p=PiDynamic('p001',tmp_path,layout='P2',legacy=True);p.ledger=EventLedger(tmp_path/'events.jsonl','b','p001');p.membership=Membership(p.ledger)
     p.history={'synthetic':True,'actor_states':{a:[{'task_id':'p002','synthetic':True,'status':'synthetic_fixture_only'},
         {'task_id':'p007','synthetic':True,'status':'failed'}] for a in ('Main','A','B')}}
     p._bind_profiles(condition);return p

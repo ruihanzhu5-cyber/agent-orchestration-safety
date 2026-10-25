@@ -49,12 +49,13 @@ def real_http(url,body,key,timeout):
 
 class ProviderTransport:
     """One request per ledger attempt. No implicit retry/model substitution."""
-    def __init__(self,config,*,mode,journal,authorize_real=False,http=None,max_requests=None,kind='model'):
+    def __init__(self,config,*,mode,journal,authorize_real=False,http=None,max_requests=None,kind='model',experiment=None):
         if mode not in ('mock','api'):raise DynamicError('invalid_provider_mode',mode)
         if mode=='mock' and http is None:raise DynamicError('mock_transport_required','Mock must be injected, never external')
         if mode=='api' and (http is not None or not authorize_real or config.get('mode')!='api' or config.get('real_api_enabled') is not True):
             raise DynamicError('real_api_disabled','Explicit API mode, local flag and run authorization are all required')
         if type(max_requests) is not int or max_requests<1:raise DynamicError('request_budget_required','Explicit request ceiling required')
+        self.active_aliases={config['judge_binding']} if kind=='judge' else set(experiment.model_refs.values()) if experiment is not None else set(config['logical_bindings'])
         self.config,self.mode,self.journal=config,mode,Path(journal)
         if self.journal.exists():raise DynamicError('provider_journal_exists','Select a new attempt; no implicit budget reset over existing requests')
         self.transport_id=uuid.uuid4().hex
@@ -64,7 +65,7 @@ class ProviderTransport:
         self.reserved_cost=0;self.window=[];self.results={}
         if mode=='api':
             from .schema import validate_bindings
-            validate_bindings(config,formal=True)
+            validate_bindings(config,formal=True,required_aliases=self.active_aliases)
             limits=(config.get('execution_limits') or {}).get(kind)
             required=('max_cost_usd','requests_per_minute','tokens_per_minute','prices_per_million')
             if not isinstance(limits,dict) or any(limits.get(k) is None for k in required):
@@ -73,19 +74,14 @@ class ProviderTransport:
 
     def _reserve_api(self,binding,body):
         from .model_capabilities import binding_capability
-        from trustfork.scoring.judge_request import offline_counter
+        from .token_accounting import count_request,route_counting_policy
         capability=binding_capability(binding)
-        tokenizer=capability['tokenizer']
-        if capability['status']!='verified' or not tokenizer or tokenizer['id']!='o200k_base' or capability['framing_tokens'] is None:
-            raise DynamicError('provider_capacity_unknown','Verified route, framing and applicable local tokenizer required')
-        if any(not isinstance(message.get('content'),str) for message in body['messages']):
-            raise DynamicError('provider_multimodal_count_unknown','No approved image accounting; preserve context and stop')
-        counter=offline_counter();n=sum(counter(m['content']) for m in body['messages'])
-        if body.get('tools'):n+=counter(canonical(body['tools']).decode())
-        if body.get('response_format'):n+=counter(canonical(body['response_format']).decode())
-        n+=capability['framing_tokens'];out=body.get(binding['output_token_parameter'])
+        accounting=count_request(body,route_counting_policy(binding))
+        if capability['status']!='verified' or accounting['estimated_total_input_tokens'] is None:
+            raise DynamicError('provider_capacity_unknown','Verified route framing and tokenizer required')
+        n=accounting['estimated_total_input_tokens'];out=body.get(binding['output_token_parameter'])
         if type(out) is not int or out<=0 or out>capability['max_output_tokens'] or n+out>capability['effective_context_tokens']:
-            raise DynamicError('provider_capacity_blocked','Complete input/output cannot fit; no truncation or compression fallback')
+            raise DynamicError('provider_capacity_blocked','Complete input/output cannot fit; no fallback')
         price=self.limits['prices_per_million'].get(binding['model_id'])
         if not isinstance(price,dict) or any(type(price.get(k)) not in (int,float) or price[k]<0 for k in ('input','output')):
             raise DynamicError('provider_price_unknown','Exact route/model input/output prices required')
@@ -98,12 +94,15 @@ class ProviderTransport:
         self.reserved_cost+=worst;self.window.append((now,n+out))
 
     def request(self,alias,wire,*,request_id,timeout=60):
+        if alias not in self.active_aliases:raise DynamicError('inactive_provider_alias','Alias is outside frozen role scope')
         binding=resolve_provider(self.config,alias)
         expected=binding['base_url'].rstrip('/')+'/chat/completions'
         if wire.get('url')!=expected or wire.get('method')!='POST':
             raise DynamicError('provider_route_mismatch','Request must use the exact configured route; redirects forbidden')
         body=json.loads(wire['body'])
         if body.get('model')!=binding['model_id']:raise DynamicError('provider_model_mismatch','No fallback model is allowed')
+        from .token_accounting import count_request,route_counting_policy
+        accounting=count_request(body,route_counting_policy(binding))
         key='mock-no-credential'
         if self.mode=='api':
             key=os.environ.get(binding['key_env'])
@@ -115,7 +114,7 @@ class ProviderTransport:
         started=time.monotonic_ns()
         record={'request_id':request_id,'transport_id':self.transport_id,'attempt_number':number,'kind':self.kind,'source':self.source,
             'synthetic':self.synthetic,'binding_hash':digest(binding),'model_id':binding['model_id'],
-            'request_hash':digest(body),'payload':body,'status':'submitted','max_retries':0,'cost':None,'usage':None}
+            'request_hash':digest(body),'payload':body,'token_accounting':accounting,'status':'submitted','max_retries':0,'cost':None,'usage':None}
         append_jsonl(self.journal,record)
         try:
             reply=self.http(expected,wire['body'],key,timeout)

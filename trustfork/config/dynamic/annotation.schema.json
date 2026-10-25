@@ -364,6 +364,295 @@
           }
         }
       }
+    },
+    "scoring_profile": {
+      "enum": [
+        "legacy-eight-v1",
+        "dynamic-homogeneous-v2"
+      ]
+    },
+    "lineage_version": {
+      "const": "claim-lineage-v1"
+    },
+    "event_ledger_complete": {
+      "type": "boolean"
+    },
+    "attempt_coverage_complete": {
+      "type": "boolean"
+    },
+    "claim_lineage": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "source_claim": {
+            "type": "string"
+          },
+          "derived_claim": {
+            "type": "string"
+          },
+          "actor_id": {
+            "enum": [
+              "Main",
+              "A",
+              "B",
+              "C",
+              "D"
+            ]
+          },
+          "stage_epoch": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "kind": {
+            "enum": [
+              "exact_copy",
+              "explicit_forward",
+              "semantic_paraphrase"
+            ]
+          },
+          "exposure_ref": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "complete",
+              "unknown",
+              "not_annotated",
+              "not_applicable",
+              "judge_error"
+            ]
+          },
+          "annotator_version": {
+            "type": "string"
+          },
+          "evidence_refs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "uniqueItems": true
+          }
+        },
+        "required": [
+          "source_claim",
+          "derived_claim",
+          "actor_id",
+          "stage_epoch",
+          "kind",
+          "exposure_ref",
+          "status",
+          "annotator_version",
+          "evidence_refs"
+        ]
+      }
+    },
+    "risk_coverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "candidate_complete": {
+          "type": "boolean"
+        },
+        "exposure_complete": {
+          "type": "boolean"
+        },
+        "decision_complete": {
+          "type": "boolean"
+        },
+        "lineage_complete": {
+          "type": "boolean"
+        },
+        "candidate_claim_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        },
+        "assessed_claim_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        },
+        "exposure_request_refs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        },
+        "decision_evidence_refs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "candidate_complete",
+        "exposure_complete",
+        "decision_complete",
+        "lineage_complete",
+        "candidate_claim_ids",
+        "assessed_claim_ids",
+        "exposure_request_refs",
+        "decision_evidence_refs"
+      ]
+    },
+    "opportunity_annotations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "metric_id": {
+            "enum": [
+              "SAF_visible",
+              "VF_opportunity",
+              "EI_update"
+            ]
+          },
+          "actor_id": {
+            "enum": [
+              "Main",
+              "A",
+              "B",
+              "C",
+              "D"
+            ]
+          },
+          "stage_epoch": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "opportunity_state": {
+            "enum": [
+              "present",
+              "absent",
+              "unknown"
+            ]
+          },
+          "status": {
+            "enum": [
+              "complete",
+              "unknown",
+              "not_annotated",
+              "not_applicable",
+              "judge_error"
+            ]
+          },
+          "anchor": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 5
+          },
+          "visible_request_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "decision_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "evidence_refs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "uniqueItems": true
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "metric_id",
+          "actor_id",
+          "opportunity_state",
+          "status",
+          "anchor",
+          "evidence_refs"
+        ]
+      }
+    },
+    "unsafe_attempt_annotations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "actor_id": {
+            "enum": [
+              "Main",
+              "A",
+              "B",
+              "C",
+              "D"
+            ]
+          },
+          "stage_epoch": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "status": {
+            "enum": [
+              "complete",
+              "unknown",
+              "not_annotated",
+              "not_applicable",
+              "judge_error"
+            ]
+          },
+          "value": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "blocked_by_environment": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "effect_observed": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "evidence_refs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "uniqueItems": true
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "actor_id",
+          "status",
+          "value",
+          "blocked_by_environment",
+          "effect_observed",
+          "evidence_refs"
+        ]
+      }
     }
   }
 }

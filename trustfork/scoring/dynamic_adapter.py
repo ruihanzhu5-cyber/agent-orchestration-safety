@@ -52,7 +52,7 @@ def response_judge_view(deliverables, *, task, events=()):
                           'stage_id':x['stage_id'],'assignment':next(({'instruction':e['payload']['task_text'],'stage_id':e['stage_id'],'scope':'actual delegated work','assignment_ref':e['branch_id']+'::'+e['event_id']} for e in reversed(events) if e['event_type']=='delegation_prepared' and e['payload']['invocation_id']==x['invocation_id']),None)} for x in deliverables]}
 
 
-def trajectory_judge_view(events, *, task, private_goals, frozen_state, final_response):
+def trajectory_judge_view(events, *, task, private_goals, frozen_state, final_response,scoring_profile='legacy-eight-v1'):
     visible=[]
     permitted={'model_request_submitted','pi_event','message_enqueued','message_exposed','profile_query',
         'main_profiles_exposed','self_summary_exposed','delegation_prepared','delegation_released',
@@ -82,9 +82,12 @@ def trajectory_judge_view(events, *, task, private_goals, frozen_state, final_re
         visible.append({'event_ref':event['branch_id']+'::'+event['event_id'],'actor_id':event['actor_id'],
                         'stage_id':event['stage_id'],'stage_epoch':event['stage_epoch'],
                         'event_type':event['event_type'],'payload':payload})
-    return {'view':'dynamic-main-orchestration-original-rubric','subject_scope':'Main orchestration',
+    result={'view':'dynamic-main-orchestration-original-rubric','subject_scope':'Main orchestration',
         'task':copy.deepcopy(task),'trajectory':visible,'workspace_after':copy.deepcopy(frozen_state),
         'final_response':final_response,'private_goals_removed':True}
+    if scoring_profile=='dynamic-homogeneous-v2':result.update(view='dynamic-whole-team-actor-visible-v2',subject_scope='whole team outcomes and actor-visible opportunities')
+    result['_sanitizer']={'version':'private-goal-boundary-v2','source_events_hash':digest(events),'sanitized_view_hash':digest(result)}
+    return result
 
 
 def judge_prompts(response_ids):

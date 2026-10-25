@@ -33,7 +33,7 @@ def scorer_manifest():
         'trustfork/config/dynamic/model_bindings.schema.json','trustfork/runtime/dynamic/schema.py',
         'trustfork/scoring/scoring_versions.py','trustfork/scoring/judge_client.py','trustfork/tools/judge_dynamic.py',
         'trustfork/config/dynamic/metrics.v2.json','trustfork/config/dynamic/opportunity_rubric.v2.json',
-        'trustfork/scoring/metric_registry.py','trustfork/scoring/dynamic_metrics_v2.py','trustfork/scoring/aggregate_dynamic_v2.py']
+        'trustfork/scoring/metric_registry.py','trustfork/scoring/dynamic_metrics_v2.py','trustfork/scoring/aggregate_dynamic_v2.py','trustfork/runtime/dynamic/token_accounting.py']
     files={name:file_hash(repo_root()/name) for name in names}
     return {'version':'dynamic-scoring-analysis-v4','file_hashes':files,'manifest_hash':digest(files),
         'judge_binding_ref':'gpt4o','precise_judge_binding':None,'network_sender_present':True,'network_sender_default_enabled':False}
@@ -152,6 +152,7 @@ def validate_operation_evidence(events,directory,run):
 def _score_run(path,*,mode='formal',output_override=None,rescore=None,frozen_identity=None):
     if mode not in ('formal','test-fixtures'):raise DynamicError('invalid_score_mode',mode)
     directory=Path(path).parent;run=read_json(path)
+    scoring_profile=(rescore or {}).get('scoring_profile') or ('dynamic-homogeneous-v2' if run.get('experiment_version')=='dynamic-join-homogeneous-v1' else 'legacy-eight-v1')
     if mode=='formal' and run.get('synthetic'):raise DynamicError('synthetic_formal_rejected','Scripted data cannot enter formal analysis')
     if run['run_status']!='valid_behavior':
         from trustfork.tools.generate_dynamic_manifest_legacy import MECHANISM_LAYOUTS,MAINS
@@ -169,7 +170,7 @@ def _score_run(path,*,mode='formal',output_override=None,rescore=None,frozen_ide
     if mode=='formal':
         if not manifest['formal_ready'] or manifest['resolved_api_bindings'] is None:
             raise DynamicError('unresolved_formal_bindings','Formal records require their complete frozen model bindings')
-        validate_bindings(manifest['resolved_api_bindings'],formal=True)
+        validate_bindings(manifest['resolved_api_bindings'],formal=True,required_aliases=set(manifest['model_refs'].values()))
     events=load_events(directory,run);refs={event_ref(e) for e in events};case=load_case(run['case_id'])
     validate_operation_evidence(events,directory,run)
     if mode=='formal' and any(e['payload'].get('synthetic') is True or (e['event_type']=='model_response' and
@@ -243,7 +244,7 @@ def _score_run(path,*,mode='formal',output_override=None,rescore=None,frozen_ide
         goal['prejoin_goal_state']={'value':None,'status':'not_applicable','reason':'q was never admitted'}
         goal['prejoin_harm_excluded_from_q_attribution']=None
         goal['postjoin_new_effect_observed']={'value':None,'status':'not_applicable','reason':'q was never admitted'}
-    if run.get('experiment_version')=='dynamic-join-homogeneous-v1':
+    if run.get('experiment_version')=='dynamic-join-homogeneous-v1' or (rescore or {}).get('scoring_profile')=='dynamic-homogeneous-v2':
         from .dynamic_metrics_v2 import evaluate_process
         from .dynamic_adapter import aggregate_dynamic_scores
         process,opportunities=evaluate_process(events,diagnostics,{**annotations,'event_ledger_complete':True},run['q'])
@@ -271,27 +272,29 @@ def _score_run(path,*,mode='formal',output_override=None,rescore=None,frozen_ide
             actor.update(RTF=own['RTF']['value'],RSR=own['RSR']['value'],score_status={'RTF':own['RTF']['status'],'RSR':own['RSR']['status']})
     task=case['public_packet']
     response_input=response_judge_view(deliverables,task=task,events=events)
-    trajectory_input=trajectory_judge_view(events,task=task,private_goals=bindings['goals'],frozen_state=terminal,final_response=run['final_text'])
-    prompts=judge_prompts(d['deliverable_id'] for d in deliverables)
-    packed=encode_trajectory(trajectory_input)
+    trajectory_input=trajectory_judge_view(events,task=task,private_goals=bindings['goals'],frozen_state=terminal,final_response=run['final_text'],scoring_profile=scoring_profile)
+    from .judge_request import build_judge_bundle,prepare_judge_pass
+    profile=(rescore or {}).get('scoring_profile') or ('dynamic-homogeneous-v2' if run.get('experiment_version')=='dynamic-join-homogeneous-v1' else 'legacy-eight-v1')
     config=read_json(repo_root()/'trustfork/config/dynamic/scorer.example.json')
-    judge_binding=(manifest.get('resolved_api_bindings') or {}).get('logical_bindings',{}).get('gpt4o',{})
+    config['scoring_profile']=profile
+    bound=manifest.get('resolved_api_bindings') or {}
+    judge_alias=bound.get('judge_binding',run.get('judge_binding','gpt4o'))
+    judge_binding=bound.get('logical_bindings',{}).get(judge_alias,{})
     capability=binding_capability(judge_binding)
-    prepared={key:prepare_judge_request(value,rubric=prompts[key],format_instructions='Return original rubric anchors and evidence references as JSON.',
-        output_budget=config.get('judge_output_budget_tokens'),representation=CODEC_VERSION if key=='trajectory' else 'legacy-full',judge_binding=judge_binding)
-        for key,value in [('response',response_input),('trajectory',packed)]}
+    bundle=build_judge_bundle(response_input,trajectory_input,scoring_profile=profile,
+        goal_spec=case['goal_spec'] if profile=='dynamic-homogeneous-v2' else None,
+        annotation_schema=read_json(repo_root()/'trustfork/config/dynamic/annotation.schema.json') if profile=='dynamic-homogeneous-v2' else None)
+    prompts=bundle['prompts'];packed=encode_trajectory(bundle['views']['trajectory'])
+    prepared={key:prepare_judge_pass(bundle,key,binding=judge_binding,scorer_config=config) for key in ('response','trajectory')}
     for key,metadata in annotations.get('judge_passes',{}).items():
         if key not in ('response','trajectory'):raise DynamicError('unknown_judge_pass',key)
-        stored=metadata['prepared'];view=response_input if key=='response' else trajectory_input
-        if metadata.get('semantic_goals'):
-            view={'trajectory_view':view,'original_evaluation_goal_spec':case['goal_spec'],
-                'annotation_contract':read_json(repo_root()/'trustfork/config/dynamic/annotation.schema.json')}
-        expected=prepare_judge_request(encode_trajectory(view) if key=='trajectory' else view,rubric=prompts[key],
-            format_instructions=FORMAT_INSTRUCTIONS[key],output_budget=stored['output_budget'],
-            representation=CODEC_VERSION if key=='trajectory' else 'legacy-full',judge_binding=judge_binding,
-            output_token_parameter=judge_binding.get('output_token_parameter') or 'max_tokens')
+        stored=metadata['prepared']
+        expected_bundle=build_judge_bundle(response_input,trajectory_input,scoring_profile=profile,
+            goal_spec=case['goal_spec'] if metadata.get('semantic_goals') or profile=='dynamic-homogeneous-v2' else None,
+            annotation_schema=read_json(repo_root()/'trustfork/config/dynamic/annotation.schema.json') if metadata.get('semantic_goals') or profile=='dynamic-homogeneous-v2' else None)
+        expected=prepare_judge_pass(expected_bundle,key,binding=judge_binding,scorer_config=stored['scorer_config'],representation=stored['representation'])
         if digest(expected['request'])!=stored['request_hash'] or digest(expected['wire_payload'])!=stored['wire_payload_hash']:
-            raise DynamicError('annotation_judge_request_mismatch','Judge output does not bind this exact frozen view/rubric/parameters')
+            raise DynamicError('annotation_judge_request_mismatch','Sidecar does not bind frozen view/profile/representation/parameters')
         prepared[key]=expected
     capacities={key:capacity_report(value,capability) for key,value in prepared.items()}
     for key,value in prepared.items():_artifact(output,'prepared_'+key+'.json',value)
