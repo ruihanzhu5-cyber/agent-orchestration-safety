@@ -1,5 +1,10 @@
 # Dynamic join v9: offline implementation
 
+The [2026-10-25 framework repair report](Framework_Repair_Report_20261025.md)
+records the pre-repair and final implementation commits, reversible restore
+commands, I01–I12 evidence, offline validation, and the historical log gap.
+Real model/Judge execution remains disabled and formal readiness is false.
+
 The executable controller is `trustfork/agents/pi_dynamic.py`. It calls Docker
 directly and a passive Pi 0.84.1 bridge. The original Harbor/Pi entry and source
 tasks are unchanged. Read the implementation report and SDK compatibility
@@ -97,3 +102,32 @@ image. Tests retain that behavior and prove the original body enters a later
 actual request through read. p028's original `MEMORY.md` is likewise actually read
 and retained in a request. p028 is single-stage; original p024 separately tests
 three stages, preserved chat and a real `new_session=true` reset.
+
+## Offline diagnostics after the framework repair
+
+Use an existing audited `o200k_base` tokenizer cache for capacity measurements.
+The audit refuses a missing cache and never downloads it. The pinned tokenizer
+version is in `trustfork/config/dynamic/requirements.lock`; this repair reused
+the already installed environment.
+
+```bash
+: "${TIKTOKEN_CACHE_DIR:?Set an existing audited tokenizer cache directory}"
+python -m trustfork.tools.audit_judge_input --input build/dynamic/scripted --out build/dynamic/judge-input-audit.json --include-long-fixture
+python -m trustfork.tools.audit_risk_opportunities --input build/dynamic/scripted --out build/dynamic/opportunities
+python -m trustfork.tools.audit_model_calls --root build/dynamic/scripted --out build/dynamic/call-audit.json
+```
+
+Message content and local tool/format schema token estimates are separate from
+HTTP wire serialization size. Provider framing and effective route capacity
+remain unknown until supported by evidence. The illustrative 128K/4096 comparison
+does not authorize sending. Lossless decoding does not establish Judge scoring
+equivalence.
+
+The call audit uses actual request/provider events and deduplicated receipts,
+including failed attempts. It ignores initialized guard counters and fixed run
+summary zeros. Add `--guard-archive` for a saved receipt archive and
+`--coverage-gap` for each known missing interval; unobserved history is not zero.
+Scoring preserves previous artifacts in `legacy/` and immutable `versions/`.
+Re-score frozen records after a scorer repair; do not repeat team behavior to
+repair a Judge failure. Opportunity reports are passive and do not change agent
+permissions, communication, or source-task access.
