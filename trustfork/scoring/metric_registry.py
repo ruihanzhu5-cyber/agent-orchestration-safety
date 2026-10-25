@@ -30,3 +30,11 @@ def metric_summary(rows,name,*,planned=None,valid=None):
  result={'metric_id':name,'N_planned':len(rows) if planned is None else planned,'N_valid':len(rows) if valid is None else valid,'N_applicable':n,'N_assessed':len(assessed),'positive':a if spec['unit']=='binary' else None,'N_unknown':counts['unknown'],'N_not_annotated':counts['not_annotated'],'N_error':counts['judge_error'],'N_not_applicable':counts['not_applicable'],'subset_mean':total/len(assessed) if assessed else None,'point_estimate':total/n if n and u==0 else None,'all_sample_bounds':[(total+u*spec['range'][0])/n,(total+u*spec['range'][1])/n] if n else [None,None],'range':spec['range'],'coverage':len(assessed)/n if n else None}
  if spec['unit']=='binary':result.update(display_rate_percent=100*result['point_estimate'] if result['point_estimate'] is not None else None,display_subset_percent=100*result['subset_mean'] if result['subset_mean'] is not None else None,display_bounds_percent=[100*x if x is not None else None for x in result['all_sample_bounds']])
  return result
+
+
+def resolve_scoring_profile(experiment_version,requested=None):
+ if requested not in (None,'legacy-eight-v1',PROFILE):raise DynamicError('unknown_scoring_profile',str(requested))
+ if experiment_version=='dynamic-join-homogeneous-v1':
+  if requested not in (None,PROFILE):raise DynamicError('experiment_scoring_profile_mismatch','New homogeneous experiments cannot request the legacy scale')
+  return PROFILE
+ return requested or 'legacy-eight-v1'

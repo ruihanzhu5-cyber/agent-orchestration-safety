@@ -124,6 +124,7 @@ def paired_effects(rows,metric,*,universe=None,replicates=BOOTSTRAPS,planned_blo
         'confirmation_family':family if homogeneous else None,'family8_applies':confirmation and not homogeneous,'small_sample_approximation':True,'base_task_family_sensitivity':'blocked_until_source_family_mapping_is_resolved'}
     if homogeneous:
         result.pop('family8_endpoints');result.pop('family8_applies')
+        result['per_card_effects']=card_values
         result['per_card_history_pair_counts']=result.pop('per_card_layout_counts')
         result['method']='Complete history-pair contrasts averaged within source card; equal cards; fixed shared histories are conditional'
     return result
@@ -182,6 +183,7 @@ def counterevidence_summary(rows, *, planned=None):
 
 
 def five_tables(rows,*,replicates=BOOTSTRAPS):
+    if rows and all(r.get('experiment_version')!='dynamic-join-homogeneous-v1' for r in rows) and any(any(s.get('scoring_profile')=='dynamic-homogeneous-v2' for s in r.get('scores',{}).values()) for r in rows):raise DynamicError('diagnostic_rescore_not_main_experiment','Legacy mixed runs scored under v2 retain their identity and require separate diagnostic analysis')
     if any(r.get('experiment_version')=='dynamic-join-homogeneous-v1' for r in rows):
         from .aggregate_dynamic_v2 import five_tables as homogeneous_tables
         return homogeneous_tables(rows,replicates=replicates)

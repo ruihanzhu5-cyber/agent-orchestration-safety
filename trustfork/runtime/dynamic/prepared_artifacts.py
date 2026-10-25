@@ -18,6 +18,8 @@ def prepare_history(runtime,source,path):
  path=Path(path)
  if path.exists():raise DynamicError('history_bundle_exists','Immutable history cannot be replaced')
  contract=history_contract(runtime)
+ journal=runtime.provider.journal if runtime.provider is not None else None
+ journal_start=journal.stat().st_size if journal is not None and journal.exists() else 0
  try:history=runtime.run_history(scripts=source)
  except (DynamicError,OSError) as error:
   write_json(path.with_suffix('.blocked.json'),{'version':'prepared-history-blocked-v1','contract':contract,'status':'blocked','reason':getattr(error,'code',type(error).__name__),'task_attempt_directories':[p.name for p in (path.parent/'history').glob('*') if (p/'events.jsonl').exists()],'synthetic':runtime.synthetic})
@@ -39,6 +41,12 @@ def prepare_history(runtime,source,path):
  import json
  audits=[audit_request_events([json.loads(line) for line in p.read_text().splitlines()]) for p in path.parent.glob('**/events.jsonl')]
  value['accounting']['actual_provider_calls']={'real':sum(a['real_model_calls_in_observed_scope'] or 0 for a in audits),'submitted':sum(len(a['request_records']) for a in audits),'source':'actual bridge request submissions; no summary constants'}
+ if journal is not None and journal.exists():
+  with journal.open('rb') as stream:stream.seek(journal_start);submitted=[json.loads(line) for line in stream.read().splitlines() if line.strip()]
+  submitted=[r for r in submitted if r.get('status')=='submitted']
+ else:submitted=[]
+ unresolved=any(r.get('source') not in ('api','mock') for r in submitted)
+ value['accounting']['actual_provider_calls']={'version':'transport-interval-v1','real':None if unresolved else sum(r['source']=='api' for r in submitted),'mock':sum(r.get('source')=='mock' for r in submitted),'submitted':len(submitted),'journal_byte_start':journal_start,'journal_byte_end':journal.stat().st_size if journal is not None and journal.exists() else 0,'source':'actual transport submitted records in this history preparation interval'}
  value['bundle_id']='history_bundle_'+digest(value);write_json(path,value)
  history['history_bundle_id']=value['bundle_id'];runtime.history=history
  return value
@@ -62,7 +70,7 @@ def load_history(runtime,path,*,reuse_journal=None):
    session=state['session']
    if digest(session)!=state['snapshot_hash'] or digest(session)!=value['session_hashes'][actor][i] or session['config']['actor_id']!=actor or session['config']['task_id']!=h['tasks'][i]:raise DynamicError('history_session_hash_mismatch',actor)
  h['history_bundle_id']=identity;runtime.history=h
- if reuse_journal:append_jsonl(Path(reuse_journal),{'event':'history_bundle_loaded','bundle_id':identity,'target_block':runtime.block_id,'new_history_task_attempts':0})
+ append_jsonl(Path(reuse_journal) if reuse_journal is not None else runtime.out/'history-bundle-reuse.jsonl',{'event':'history_bundle_loaded','bundle_id':identity,'target_block':runtime.block_id,'new_history_task_attempts':0})
  return h
 def save_prefix(runtime,prefix,path):
  from trustfork.agents.pi_dynamic import ScriptSource

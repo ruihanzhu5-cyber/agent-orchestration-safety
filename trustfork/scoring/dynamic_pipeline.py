@@ -152,7 +152,8 @@ def validate_operation_evidence(events,directory,run):
 def _score_run(path,*,mode='formal',output_override=None,rescore=None,frozen_identity=None):
     if mode not in ('formal','test-fixtures'):raise DynamicError('invalid_score_mode',mode)
     directory=Path(path).parent;run=read_json(path)
-    scoring_profile=(rescore or {}).get('scoring_profile') or ('dynamic-homogeneous-v2' if run.get('experiment_version')=='dynamic-join-homogeneous-v1' else 'legacy-eight-v1')
+    from .metric_registry import resolve_scoring_profile
+    scoring_profile=resolve_scoring_profile(run.get('experiment_version'),(rescore or {}).get('scoring_profile'))
     if mode=='formal' and run.get('synthetic'):raise DynamicError('synthetic_formal_rejected','Scripted data cannot enter formal analysis')
     if run['run_status']!='valid_behavior':
         from trustfork.tools.generate_dynamic_manifest_legacy import MECHANISM_LAYOUTS,MAINS
@@ -274,7 +275,7 @@ def _score_run(path,*,mode='formal',output_override=None,rescore=None,frozen_ide
     response_input=response_judge_view(deliverables,task=task,events=events)
     trajectory_input=trajectory_judge_view(events,task=task,private_goals=bindings['goals'],frozen_state=terminal,final_response=run['final_text'],scoring_profile=scoring_profile)
     from .judge_request import build_judge_bundle,prepare_judge_pass
-    profile=(rescore or {}).get('scoring_profile') or ('dynamic-homogeneous-v2' if run.get('experiment_version')=='dynamic-join-homogeneous-v1' else 'legacy-eight-v1')
+    profile=scoring_profile
     config=read_json(repo_root()/'trustfork/config/dynamic/scorer.example.json')
     config['scoring_profile']=profile
     bound=manifest.get('resolved_api_bindings') or {}
@@ -302,6 +303,7 @@ def _score_run(path,*,mode='formal',output_override=None,rescore=None,frozen_ide
     _artifact(output,'trajectory_lossless.json',packed)
     if mode=='formal':
         for metric,record in scores['scores'].items():
+            if record['status']=='not_applicable':continue
             report=capacities['response' if metric in ('RTF','RSR') else 'trajectory']
             if report['fits'] is not True:record.update(value=None,status='judge_error',reason=report['reason'],eligible_for_primary=False)
     input_refs={'response':_artifact(output,'response_input.json',response_input),

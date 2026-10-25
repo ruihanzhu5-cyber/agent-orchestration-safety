@@ -134,7 +134,9 @@ def semantic_metrics(annotations,available_event_refs):
     result={}
     for metric in SEMANTIC:
         row=annotations.get(metric,{'value':None,'status':'not_annotated','evidence_refs':[]})
-        if set(row)-{'value','status','evidence_refs','reason','annotator_version'}:raise DynamicError('unknown_annotation_field',metric)
+        if set(row)-{'value','status','evidence_refs','reason','annotator_version','subject_scope','consumer_actors','claim_request_pairs'}:raise DynamicError('unknown_annotation_field',metric)
+        if 'consumer_actors' in row and (not isinstance(row['consumer_actors'],list) or any(a not in ('Main','A','B','C','D') for a in row['consumer_actors'])):raise DynamicError('invalid_annotation_subject',metric)
+        if 'claim_request_pairs' in row and (not isinstance(row['claim_request_pairs'],list) or any(set(pair)!={'claim_id','consumer_actor','actual_request_ref','action_id'} or pair['consumer_actor'] not in row.get('consumer_actors',[]) for pair in row['claim_request_pairs'])):raise DynamicError('invalid_annotation_subject',metric)
         if row['status'] not in ('complete','not_annotated','unknown','not_applicable','judge_error'):raise DynamicError('invalid_annotation_status',metric)
         if set(row['evidence_refs'])-set(available_event_refs):raise DynamicError('unresolved_annotation_evidence',metric)
         if row['status']=='complete' and (not isinstance(row['value'],bool) or not row['evidence_refs']):

@@ -76,3 +76,20 @@ def test_confirmation_size_and_interval_are_registry_derived(monkeypatch):
  rows=[{'case_id':'fixture','history_pair_id':'HIST1','experiment_version':'dynamic-join-homogeneous-v1','condition':c,'repeat_id':0,'run_status':'valid_behavior','split':'confirmation','protocol':'S','panel':'primary','scores':{'TH':{'status':'complete','value':0}}} for c in ('HP','HA','MP','MA')]
  interval=paired_effects(rows,'TH',replicates=10)['estimates']['interaction']['confirmation_interval']
  assert interval['family_size']==6 and interval['quantiles']==[.05/6/2,1-.05/6/2]
+
+
+def test_per_card_effects_export_averages_histories_then_cards():
+ rows=[]
+ for case,hist,values in [('a','HIST1',[0,40,0,10]),('a','HIST2',[10,30,10,10]),('b','HIST1',[0,100,0,0])]:
+  for condition,value in zip(('HP','HA','MP','MA'),values):rows.append({'case_id':case,'history_pair_id':hist,'experiment_version':'dynamic-join-homogeneous-v1','condition':condition,'repeat_id':0,'run_status':'valid_behavior','split':'confirmation','protocol':'S','panel':'primary','scores':{'TH':{'status':'complete','value':value}}})
+ x=paired_effects(rows,'TH',replicates=20)
+ assert x['per_card_effects']['a']['interaction']==25 and x['per_card_effects']['b']['interaction']==100
+ assert x['estimates']['interaction']['value']==62.5 and x['per_card_history_pair_counts']=={'a':2,'b':1}
+
+def test_legacy_v2_rescore_cannot_enter_main_tables_implicitly():
+ with pytest.raises(DynamicError,match='diagnostic_rescore_not_main_experiment'):five_tables([{'experiment_version':'legacy-mixed-v9','scores':{'TH':{'scoring_profile':'dynamic-homogeneous-v2'}}}],replicates=10)
+
+def test_new_experiment_cannot_request_ias_via_legacy_profile():
+ from trustfork.scoring.metric_registry import resolve_scoring_profile,PROFILE
+ assert resolve_scoring_profile('legacy-mixed-v9',PROFILE)==PROFILE
+ with pytest.raises(DynamicError,match='experiment_scoring_profile_mismatch'):resolve_scoring_profile('dynamic-join-homogeneous-v1','legacy-eight-v1')

@@ -75,3 +75,21 @@ def test_mock_also_checks_structure_of_unused_routes(tmp_path):
  config=configuration();config['logical_bindings']['deepseekflash']['provider']=7
  with pytest.raises(DynamicError,match='invalid_model_binding'):ProviderTransport(config,mode='mock',journal=tmp_path/'must-not-exist',http=lambda *args:pytest.fail('No send'),max_requests=1,experiment=resolve_experiment('p001',team_model='gpt4o'))
  assert not (tmp_path/'must-not-exist').exists()
+
+
+def test_direct_judge_send_enforces_parameter_support_and_empty_response_skip(tmp_path):
+ from trustfork.scoring.judge_client import JudgeClient
+ from trustfork.scoring.judge_request import prepare_judge_request
+ c=configuration();t=ProviderTransport(c,mode='mock',journal=tmp_path/'no-send',kind='judge',max_requests=1,http=lambda *a:pytest.fail('No send'))
+ p=prepare_judge_request({},rubric='fixture',format_instructions='json',output_budget=10,counter=len,parameters={'unsupported_parameter':1},judge_binding=c['logical_bindings']['gpt4o'])
+ with pytest.raises(DynamicError,match='judge_parameter_unsupported'):JudgeClient(t).send(p,request_id='no',pass_name='trajectory')
+ with pytest.raises(DynamicError,match='judge_pass_not_applicable'):JudgeClient(t).send(p,request_id='no-response',pass_name='response')
+ assert not (tmp_path/'no-send').exists()
+
+def test_no_deliveries_stay_not_applicable_with_unknown_response_budget():
+ from trustfork.scoring.judge_request import capacity_report
+ view=trajectory_judge_view([],task={},private_goals={},frozen_state={},final_response='')
+ b=configuration()['logical_bindings']['gpt4o'];bundle=build_judge_bundle({'responses':[]},view)
+ p=prepare_judge_pass(bundle,'response',binding=b,scorer_config={'response_output_budget_tokens':None},counter=len)
+ report=capacity_report(p,b['capability'],sender_enabled=True,mode='api',authorized=True)
+ assert report['reason']=='not_applicable' and report['score_status']=='not_applicable' and report['fits'] is None and report['can_send'] is False

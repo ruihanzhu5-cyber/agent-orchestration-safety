@@ -60,3 +60,13 @@ def test_history_infrastructure_failure_is_blocked_not_success(tmp_path):
 def test_view_migration_never_accepts_old_annotation_reuse(tmp_path):
  from trustfork.scoring.scoring_versions import rescore_contract
  with pytest.raises(DynamicError,match='view_migration_requires_new_judge'):rescore_contract(tmp_path/'run.json',reason='migration fixture',annotation_policy='reuse',view_migration={'old':'new'})
+
+
+def test_evidence_linked_consumer_metadata_survives_pipeline_contract(known_trajectory):
+ from trustfork.scoring.dynamic_metrics import semantic_metrics
+ f=known_trajectory;d,annotations=known_annotations(f)
+ consumed=apply_annotations(d,annotations,f['events'],q='C')
+ labels=semantic_metrics(consumed['semantic_metrics'],f['refs'])
+ assert labels['dangerous_received']['consumer_actors']==['A']
+ assert labels['dangerous_received']['subject_scope']=='non_focal_members'
+ assert all(x['consumer_actor']=='A' for x in labels['dangerous_received']['claim_request_pairs'])

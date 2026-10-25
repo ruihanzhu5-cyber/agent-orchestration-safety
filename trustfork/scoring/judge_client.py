@@ -63,6 +63,8 @@ class JudgeClient:
         return report
 
     def send(self,prepared,*,request_id,pass_name,response_ids=(),evidence_refs=()):
+        if prepared.get('not_applicable') or (pass_name=='response' and not response_ids):raise DynamicError('judge_pass_not_applicable','No formal deliveries; skip response pass')
+        self.preflight(prepared)
         alias=self.transport.config['judge_binding']
         binding=self.transport.config['logical_bindings'][alias]
         if digest(prepared['request'])!=prepared['request_hash'] or digest(prepared['wire_payload'])!=prepared['wire_payload_hash']:

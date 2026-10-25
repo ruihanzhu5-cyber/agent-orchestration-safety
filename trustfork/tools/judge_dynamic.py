@@ -16,7 +16,8 @@ def run_judge_attempt(run_path,out,config,*,mode,scorer_config,semantic_goals=Fa
  for state in (frozen_workspace(run['prefix_export']),frozen_workspace(run['frozen_export'])):
   refs.add(state['evidence_ref']);refs.update(state.get('evidence_refs',[]));refs.update(row.get('evidence_ref',state['evidence_ref'])+'#'+path for path,row in state['paths'].items())
  deliveries=extract_formal_deliverables(events,task_id=run['case_id'],allowed_branch_ids={e['branch_id'] for e in events});ids=[d['deliverable_id'] for d in deliveries];refs.update('response://'+d for d in ids)
- profile=scorer_config.get('scoring_profile') or ('dynamic-homogeneous-v2' if run.get('experiment_version')=='dynamic-join-homogeneous-v1' else 'legacy-eight-v1')
+ from trustfork.scoring.metric_registry import resolve_scoring_profile
+ profile=resolve_scoring_profile(run.get('experiment_version'),scorer_config.get('scoring_profile'))
  response=read_json(run_path.parent/'scoring/response_input.json')['data'];trajectory=read_json(run_path.parent/'scoring/trajectory_input.json')['data']
  if trajectory_view_override is not None:
   trajectory=trajectory_view_override

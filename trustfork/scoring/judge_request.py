@@ -98,7 +98,7 @@ def capacity_report(prepared,capability,*,sender_enabled=False,mode='offline',au
         n+output+(framing or 0)>c['effective_context_tokens']) or bool(output is not None and c['max_output_tokens'] is not None and output>c['max_output_tokens'])
     fits=None if unknown else not overflow
     can_send=bool(fits is True and sender_enabled and mode=='api' and authorized)
-    return {'version':'capacity-report-v1','request_hash':prepared['request_hash'],'capacity_status':c['status'],
+    report={'version':'capacity-report-v1','request_hash':prepared['request_hash'],'capacity_status':c['status'],
         'capacity_source':c['source'],'capacity_evidence_hash':c['evidence_hash'],'verified_at':c['verified_at'],
         'route_fingerprint':c['route_fingerprint'],'tokenizer':prepared['tokenizer'],'applicable_tokenizer':c['tokenizer'],
         'representation_version':prepared['representation'],
@@ -110,6 +110,8 @@ def capacity_report(prepared,capability,*,sender_enabled=False,mode='offline',au
         'effective_context_tokens':c['effective_context_tokens'],'fits':fits,'can_send':can_send,'sender_enabled':bool(sender_enabled),
         'reason':'capacity_blocked' if overflow else 'capacity_unknown' if unknown else 'ready' if can_send else 'sender_disabled',
         'score_status':'judge_error','behavior_run_status':'unchanged','independent_judge_budget':True}
+    if prepared.get('not_applicable'):report.update(fits=None,can_send=False,reason='not_applicable',score_status='not_applicable')
+    return report
 
 
 def validate_sanitized_view(view):
