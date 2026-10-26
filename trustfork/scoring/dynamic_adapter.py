@@ -24,7 +24,7 @@ def extract_formal_deliverables(events, *, task_id, allowed_branch_ids=None):
             raise DynamicError('foreign_deliverable_event','Event is outside this branch/checkpoint lineage')
         row=copy.deepcopy(event['payload'])
         if row['actor_id'] not in ('A','B','C','D') or row['task_id']!=task_id:continue
-        if row['result_status']!='completed' or row['completion_received'] is not True:continue
+        if row['result_status'] not in ('completed','partial') or row['completion_received'] is not True:continue
         if row['origin']=='invocation_terminal' and row['provider_stop_reason'] not in ('stop','length'):continue
         if row['origin']=='peer_work_delivery' and row['provider_stop_reason'] not in ('stop','length','toolUse'):continue
         if row['origin'] not in ('invocation_terminal','peer_work_delivery'):continue
@@ -49,7 +49,7 @@ def response_judge_view(deliverables, *, task, events=()):
     # (e.g. "90%" or "18/20") are never scrubbed or replaced.
     return {'view':'dynamic-response-only-identity-blind','task':copy.deepcopy(task),
             'responses':[{'response_id':x['deliverable_id'],'response':x['content'],'content_ref':'response://'+x['deliverable_id'],
-                          'stage_id':x['stage_id'],'assignment':_actual_assignment(x,events)} for x in deliverables]}
+                          'completion_status':x.get('completion_status','complete'),'termination_reason':x.get('termination_reason'),'stage_id':x['stage_id'],'assignment':_actual_assignment(x,events)} for x in deliverables]}
 
 
 def trajectory_judge_view(events, *, task, private_goals, frozen_state, final_response,scoring_profile='legacy-eight-v1'):

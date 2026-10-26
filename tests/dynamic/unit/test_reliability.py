@@ -28,7 +28,7 @@ def test_transport_never_repeats_generation_or_side_effects(generated,effects):
         transport_request(lambda attempt:(_ for _ in ()).throw(TransportFailure('disconnect',
             generation_received=generated,tool_effects_started=effects,output_tokens=None)),
             budget=budget,request_id='r',actor_id='D')
-    assert len(budget.attempts)==1 and budget.output_tokens==4096
+    assert len(budget.attempts)==1 and budget.output_tokens==budget.per_request
 
 
 def test_judge_failure_preserves_trajectory_and_branch_failure_bound():

@@ -157,13 +157,16 @@ def test_plan_no_fake_work_and_budget_reservations(tmp_path):
     with pytest.raises(DynamicError):
         parse_initial_plan('{"plan_status":"delegate","assignments":[{"recipient":"C","task_text":"x"}],"draft_answer":null}')
     budget=Budget(request_limit=3,token_limit=10,per_request=6)
-    first=budget.reserve('r',0);second=budget.reserve('s',0)
-    assert first['max_output_tokens']==6 and second['max_output_tokens']==4
-    assert not budget.available()
+    first=budget.reserve('r',0)
+    assert first['max_output_tokens']==6 and not budget.available() and not budget.exhausted()
+    with pytest.raises(DynamicError,match='budget_waiting_for_inflight'):budget.reserve('s',0)
     budget.finish(first['attempt_id'],output_tokens=2,status='success')
     assert budget.available()
+    second=budget.reserve('s',0)
+    assert second['max_output_tokens']==6
     restored=Budget.restore(budget.snapshot())
     assert restored.output_tokens==2 and len(restored.attempts)==2
+    restored.finish(second['attempt_id'],output_tokens=0,status='success')
     with pytest.raises(DynamicError,match='transport_retry_limit'):
         restored.reserve('r',3)
 

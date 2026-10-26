@@ -78,6 +78,12 @@ class PiDynamic:
         if self.experiment:
             from trustfork.runtime.dynamic.experiment_config import block_id
             self.block_id=block_id(case_id,self.experiment,strategy)
+        from trustfork.runtime.dynamic.experiment_config import resolve_runtime_budget
+        override=(provider.config.get('runtime_budgets') or {}).get(main_model) if provider else None
+        self.runtime_budget=resolve_runtime_budget(main_model,override)
+        if self.experiment:
+            from dataclasses import replace
+            self.experiment=replace(self.experiment,runtime_budget=self.runtime_budget)
         self.history=None
         self.provider=provider
         self.resolved_api_bindings=copy.deepcopy(provider.config) if provider else None
@@ -110,7 +116,7 @@ class PiDynamic:
             'source_revision':BASE_COMMIT,'model_refs':self.model_refs,'team_binding_hash':digest(binding),
             'history_bundle_id':(self.history or {}).get('history_bundle_id',(self.history or {}).get('history_id')),
             'history_hash':digest(self.history),'prompt_tool_budget_hash':digest({'prompts':file_hash(Path(__file__)),
-                'tools':WORK_TOOLS,'planning':file_hash(config_dir()/'protocol.json'),'budget':[120,48000,4096,1200]})}
+                'tools':WORK_TOOLS,'planning':file_hash(config_dir()/'protocol.json'),'budget':self.runtime_budget})}
 
     def validate_prefix_target(self,snapshot):
         previous=self.history
@@ -155,7 +161,7 @@ class PiDynamic:
         self.environment=DockerEnvironment(self.directory/'environment',branch_id=branch_id,ledger=self.ledger)
         self.membership=Membership(self.ledger);self.delegations=Delegations(self.ledger,self.membership)
         self.mailbox=Mailbox(self.ledger,self.membership);self.lifecycle=Lifecycle(self.ledger,self.case['stages'][0]['id'])
-        self.scheduler=Scheduler(self.block_id,self.ledger,self.membership,self.lifecycle);self.budget=Budget()
+        self.scheduler=Scheduler(self.block_id,self.ledger,self.membership,self.lifecycle);self.budget=Budget(**{k:v for k,v in self.runtime_budget.items() if k!='http_timeout_seconds'})
         self.scheduler.work_available=self._has_pending_work
         self.delegations.startup_protected=self.scheduler.protects_delegation
         self.sessions={};self.profile_service=None;self.main_revision=0;self.request_serial=0
@@ -163,6 +169,7 @@ class PiDynamic:
         self.main_profile_introduced=False
         self.self_profile_sessions=set()
         self.confirming_final=False
+        self.termination_reason=None
         self.client=PiClient(self.directory/'control',self.environment,ledger=self.ledger,coordination=self._coordinate,observer=self._observe_goal,
             provider=getattr(self,'provider',None),model_refs=self.model_refs)
         self.private_goals={a:NORMAL_GOAL for a in ('Main','A','B','C','D')}
@@ -351,7 +358,8 @@ class PiDynamic:
         self.ledger.append('model_request_ready',{'input_revision':revision,'input_packet':packet,'input_hash':digest(packet),
             'attempt_id':attempt['attempt_id'],'maintenance':False},actor_id=actor,stage_id=self.lifecycle.stage_id,
             stage_epoch=self.lifecycle.epoch,request_id=request_id,invocation_id=invocation['invocation_id'] if invocation else None)
-        self.mailbox.advance(actor,request_id,'submitted')
+        # A local ready/claimed packet is not an HTTP submission.
+        # Confirmation still requires an actual successful generation response.
         before=self.client.call(self.sessions[actor],'export_session')
         def execute_attempt(record):
             actual_request_id=record['attempt_id']
@@ -360,7 +368,7 @@ class PiDynamic:
             value=self.client.call(self.sessions[actor],'execute_turn',{'messages':[{'role':'user','content':canonical(packet).decode(),'timestamp':int(time.time()*1000)}],
                 'script':self.current_scripts.take(actor,phase,self.lifecycle.epoch),'max_output_tokens':record['max_output_tokens']},
                 request_id=actual_request_id,stage_id=self.lifecycle.stage_id,epoch=self.lifecycle.epoch,
-                invocation_id=invocation['invocation_id'] if invocation else None,timeout=max(0.05,self.budget.deadline-time.monotonic()))
+                invocation_id=invocation['invocation_id'] if invocation else None,timeout=max(0.05,min(self.runtime_budget['http_timeout_seconds']+10,self.budget.deadline-time.monotonic())))
             failure=value.get('transport_failure')
             response=value.get('response')
             if failure:raise TransportFailure(failure['code'],generation_received=failure['generation_received'],
@@ -401,7 +409,9 @@ class PiDynamic:
             self.self_profile_sessions.add(self.sessions[actor])
             self.ledger.append('self_summary_exposed',{'profile_hash':digest(actual['own_profile']),'profile_metadata':self.profile_metadata},actor_id=actor,stage_id=self.lifecycle.stage_id,stage_epoch=self.lifecycle.epoch,request_id=actual_request_id)
         self.ledger.append('model_response',{'status':result['status'],'response':response,'confirmed_message_ids':exposed,'synthetic':self.synthetic,
-            'execution_backend':self.execution_mode},
+            'execution_backend':self.execution_mode,
+            'generation_finish_reason':response.get('stopReason') if response else None,
+            'completion_status':result.get('completion_status','unavailable')},
             actor_id=actor,stage_id=self.lifecycle.stage_id,stage_epoch=self.lifecycle.epoch,request_id=actual_request_id,
             invocation_id=invocation['invocation_id'] if invocation else None)
         if not success:raise DynamicError('pi_generation_failed',response.get('errorMessage','Provider failed') if response else 'No completion')
@@ -433,14 +443,17 @@ class PiDynamic:
         return result
 
     def _formal(self,actor,invocation,response,request_id):
+        partial=response['stopReason']=='length'
         self.delegations.complete(invocation['invocation_id'],stage_id=self.lifecycle.stage_id,
-            epoch=self.lifecycle.epoch,request_id=request_id)
+            epoch=self.lifecycle.epoch,request_id=request_id,terminal_status='resource_ended' if partial else 'completed')
         identity='deliverable_'+uuid.uuid4().hex;content=text_of(response)
         recipients=['Main'] if invocation['source'] in ('initial_plan','main_voluntary') else []
         value={'deliverable_id':identity,'actor_id':actor,'task_id':self.case['case_id'],'branch_id':self.ledger.branch_id,
             'stage_id':self.lifecycle.stage_id,'stage_epoch':self.lifecycle.epoch,'invocation_id':invocation['invocation_id'],
             'request_ref':request_id,'recipient_ids':recipients,'origin':'invocation_terminal','content':content,
-            'content_hash':digest(content),'result_status':'completed','completion_received':True,
+            'content_hash':digest(content),'result_status':'partial' if partial else 'completed','completion_received':True,
+            'generation_finish_reason':response['stopReason'],'completion_status':'partial' if partial else 'complete',
+            'termination_reason':'output_limit' if partial else None,
             'provider_stop_reason':response['stopReason'],'forward_of':None}
         if recipients:value['message_id']=uuid.uuid4().hex
         event=self.ledger.append('formal_deliverable',value,actor_id=actor,stage_id=self.lifecycle.stage_id,stage_epoch=self.lifecycle.epoch,
@@ -466,6 +479,12 @@ class PiDynamic:
             result=self._turn('Main','planning')
             while result['response']['stopReason']=='toolUse' and self.budget.available():
                 result=self._turn('Main','planning')
+            if result['response']['stopReason']=='length':
+                self.termination_reason='output_limit'
+                self.ledger.append('resource_termination',{'reason':'output_limit','phase':'planning'})
+                value={'status':'resource_ended','reason':'output_limit','synthetic':self.synthetic}
+                write_json(self.directory/'prefix-outcome.json',value)
+                return value
             plan=parse_initial_plan(text_of(result['response']),allowed_context_refs=('task://current-stage',),repair=lambda raw,prompt:text_of(self._turn('Main','format_repair',
                 extra_packet={'format_repair':{'original':raw,'instruction':prompt}})['response']))
             existing=[(x['actor_id'],x['task_text']) for x in self.delegations.rows if x['status']=='queued']
@@ -543,7 +562,12 @@ class PiDynamic:
                 and self.scheduler.startup.get(actor,{}).get('status')=='open'):
             self.scheduler._close_startup(actor,'initial_invocation_completed')
         if actor=='Main' and unfinished:self.confirming_final=False
-        self.scheduler.complete(actor,unfinished=unfinished)
+        partial=result['response']['stopReason']=='length'
+        self.scheduler.complete(actor,unfinished=unfinished,terminal_status='resource_ended' if partial else None)
+        if partial and actor=='Main':
+            self.termination_reason='output_limit'
+            self.pending_final={'text':None,'revision':result['input_revision']}
+            return
         if actor=='Main' and not unfinished:
             self.pending_final={'text':text_of(result['response']),'revision':result['input_revision']}
         if actor!='Main' and not unfinished and any(x['actor_id']==actor and x['status']=='released' for x in self.delegations.rows):
@@ -555,18 +579,19 @@ class PiDynamic:
         futures={}
         with concurrent.futures.ThreadPoolExecutor(max_workers=5,thread_name_prefix='actor-permit') as executor:
             while True:
-                if self.budget.exhausted() or (not futures and not self.budget.available()):
+                if self.termination_reason or self.budget.exhausted() or (not futures and not self.budget.available()):
+                    self.termination_reason=self.termination_reason or ('time_limit' if time.monotonic()>=self.budget.deadline else 'team_budget')
                     self.scheduler.terminate_startup('global_budget_or_timeout')
                     self.pending_final=self.pending_final or {'text':None,'revision':self.main_revision}
-                if self.pending_final and (self.protocol=='F' or self.scheduler.final_allowed(hard_limit=self.budget.exhausted())):
+                if self.pending_final and (self.protocol=='F' or self.scheduler.final_allowed(hard_limit=bool(self.termination_reason) or self.budget.exhausted())):
                     self._drain(futures,deadline=min(time.monotonic()+30,self.budget.deadline))
-                    if self.pending_final['revision']!=self.main_revision and self.budget.available():
+                    if self.pending_final['revision']!=self.main_revision and self.budget.available() and not self.termination_reason:
                         self.ledger.append('final_stale',{'proposed_revision':self.pending_final['revision'],'current_revision':self.main_revision})
                         self.pending_final=None;self.confirming_final=True;self.scheduler.enqueue_batch(['Main'],reason='confirm_stale_final')
                     else:
                         if self.protocol=='F':self.scheduler.terminate_startup('main_final_before_slice_end')
                         self.final_text=self.pending_final['text'];return
-                if self.budget.available():
+                if self.budget.available() and not self.termination_reason:
                     while self.budget.available() and (permit:=self.scheduler.permit(actors=('Main',) if self.confirming_final else None)) is not None:
                         actor=permit['actor_id'];invocation=self._next_invocation(actor) if actor!='Main' else None
                         reservation=self._reserve(actor)
@@ -616,12 +641,13 @@ class PiDynamic:
             self.lifecycle.transition('COORDINATING')
             self.scheduler.consume_ready_marker('Main')
             coordinated=self._turn('Main','coordinating')
-            if coordinated['response']['stopReason']!='toolUse':self.pending_final={'text':text_of(coordinated['response']),'revision':coordinated['input_revision']}
+            if coordinated['response']['stopReason']=='length':self.termination_reason='output_limit'
+            if coordinated['response']['stopReason']!='toolUse':self.pending_final={'text':None if self.termination_reason else text_of(coordinated['response']),'revision':coordinated['input_revision']}
             self.lifecycle.transition('RUNNING');self._release()
             if coordinated['response']['stopReason']=='toolUse':self.scheduler.enqueue_batch(['Main'],reason='unfinished_coordination_turn')
             for stage_index in range(self.lifecycle.epoch,len(self.case['stages'])):
                 self._run_stage()
-                if stage_index+1==len(self.case['stages']) or not self.budget.available():break
+                if self.termination_reason or stage_index+1==len(self.case['stages']) or not self.budget.available():break
                 next_stage=self.case['stages'][stage_index+1]
                 self.lifecycle.close_stage(self.environment,next_stage=next_stage,deadline=self.budget.deadline,drain=lambda epoch:None,
                     reset=lambda epoch:self._stage_reset(epoch,True),migrate=lambda epoch,new:self._stage_reset(epoch,False))
@@ -665,7 +691,7 @@ class PiDynamic:
                 'protocol':self.protocol,'panel':self.panel,'condition':condition,'q':self.q,'r':self.r,'split':self.case['split'],'suite':self.case['suite'],
                 'strategy':self.strategy,'repeat_id':self.repeat_id,'comparison_set_id':self.panel,'branch_attempt':attempt,
                 'baseline_run_id':None,'baseline_status':'resolve_from_primary_run_index',
-                'run_status':'valid_behavior','mode':self.execution_mode,'synthetic':self.synthetic,'final_text':self.final_text,'budget':self.budget.snapshot(),
+                'run_status':'resource_ended' if self.termination_reason else 'valid_behavior','completion_status':'partial' if self.termination_reason else 'complete','termination_reason':self.termination_reason,'mode':self.execution_mode,'synthetic':self.synthetic,'final_text':self.final_text,'budget':self.budget.snapshot(),
                 'events_path':'events.jsonl','prefix_events_path':'prefix-events.json','prefix_export':snapshot['environment']['workspace_export'],
                 'formal_deliverables':list(self.formal_deliverables.values()),'frozen_export':exported,
                 'environment_verification':restored['environment_verification'],'duration_sec':time.monotonic()-started,

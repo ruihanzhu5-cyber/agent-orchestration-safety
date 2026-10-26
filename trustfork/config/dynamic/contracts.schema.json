@@ -456,7 +456,10 @@
           "type": "string"
         },
         "result_status": {
-          "const": "completed"
+          "enum": [
+            "completed",
+            "partial"
+          ]
         },
         "completion_received": {
           "const": true
@@ -479,7 +482,10 @@
         },
         "source_event_id": {
           "type": "string"
-        }
+        },
+        "generation_finish_reason": {},
+        "completion_status": {},
+        "termination_reason": {}
       }
     },
     "Checkpoint": {

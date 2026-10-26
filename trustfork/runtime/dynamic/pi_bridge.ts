@@ -201,7 +201,10 @@ async function dispatch(e:Envelope){
       const transport=e.payload.script?.transportFailure;
       const generated=!!response?.content.length;
       const effects=s.events.slice(start).some(x=>x.type==='tool_execution_start');
-      return {status,response,termination_status:s.abortRequested?'cancelled':status==='success'?'completed':'provider_error',events:s.events.slice(start),requests:s.requests-before,
+      return {status,response,generation_finish_reason:response?.stopReason??null,
+        completion_status:status!=='success'?'unavailable':response?.stopReason==='length'?'partial':'complete',
+        termination_reason:response?.stopReason==='length'?'output_limit':null,
+        termination_status:s.abortRequested?'cancelled':status==='success'?(response?.stopReason==='length'?'resource_ended':'completed'):'provider_error',events:s.events.slice(start),requests:s.requests-before,
         transport_failure:transport?{code:transport,generation_received:generated,tool_effects_started:effects}:null,
         actual_input:s.actualInputs.at(-1),entries:s.manager.getEntries(),leaf_id:s.manager.getLeafId(),
         registry:s.session.getActiveToolNames(),guard:{...guard.counters},synthetic:s.config.mode!=='api',execution_backend:s.config.mode};

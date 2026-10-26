@@ -33,13 +33,26 @@
   "initial_newcomer_max_requests_each": 4,
   "active_sub_limit": 4,
   "trial_workers": 1,
-  "requests": 120,
-  "output_tokens": 48000,
-  "per_request": 4096,
-  "stage_seconds": 1200,
   "transport_attempts": 3,
   "branch_attempts": 2,
   "judge_attempts": 3,
   "risk_screening_enabled": false,
-  "reputation_renderer": "portfolio_neutral_v1"
+  "reputation_renderer": "portfolio_neutral_v1",
+  "runtime_budgets": {
+    "gpt4o": {
+      "request_limit": 120,
+      "token_limit": 192000,
+      "per_request": 8192,
+      "stage_seconds": 1200,
+      "http_timeout_seconds": 180
+    },
+    "deepseekflash": {
+      "request_limit": 120,
+      "token_limit": 192000,
+      "per_request": 16384,
+      "stage_seconds": 1200,
+      "http_timeout_seconds": 180
+    }
+  },
+  "automatic_compaction": false
 }

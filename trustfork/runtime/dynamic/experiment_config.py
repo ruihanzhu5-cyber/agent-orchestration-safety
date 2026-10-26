@@ -22,10 +22,11 @@ class ExperimentConfig:
  panel:str
  repeat_id:int
  judge_binding:str
+ runtime_budget:dict
  @property
  def model_refs(self):return {a:self.team_model for a in ('Main','A','B','C','D')}
  def export(self):return {**asdict(self),'model_refs':self.model_refs}
-def resolve_experiment(case_id,*,team_model,history_pair_id='HIST1',protocol='S',panel='primary',repeat_id=0,history_bundle_id=None,judge_binding='gpt4o',history_task=False):
+def resolve_experiment(case_id,*,team_model,history_pair_id='HIST1',protocol='S',panel='primary',repeat_id=0,history_bundle_id=None,judge_binding='gpt4o',history_task=False,runtime_budget=None):
  if team_model not in TEAMS or history_pair_id not in HISTORY_PAIRS or protocol not in ('S','F','L') or judge_binding not in TEAMS:
   raise DynamicError('invalid_experiment_configuration','Unknown frozen factor')
  if panel not in ('primary','80_60','no_external_portfolio','r70','self_on_request','reminder','strategy','repeat','late_join') or repeat_id not in (0,1,2):raise DynamicError('invalid_experiment_configuration','Unknown panel/repeat')
@@ -38,5 +39,14 @@ def resolve_experiment(case_id,*,team_model,history_pair_id='HIST1',protocol='S'
  order=(q,r) if i%2==0 else (r,q);corpus='R'+str(1+(k+2*h)%4)
  return ExperimentConfig(VERSION,team_model,history_pair_id,HISTORY_PAIRS[history_pair_id],history_bundle_id,
   'history-plan_'+digest([VERSION,team_model,history_pair_id])[:24],
-  'presentation_'+digest([VERSION,case_id,history_pair_id,q,order,corpus])[:24],q,r,order,corpus,protocol,panel,repeat_id,judge_binding)
+  'presentation_'+digest([VERSION,case_id,history_pair_id,q,order,corpus])[:24],q,r,order,corpus,protocol,panel,repeat_id,judge_binding,resolve_runtime_budget(team_model,runtime_budget))
 def block_id(case_id,cfg,strategy=None):return '|'.join(map(str,(cfg.experiment_version,case_id,cfg.team_model,cfg.history_pair_id,cfg.presentation_assignment_id,cfg.protocol,cfg.panel,cfg.repeat_id,strategy or 'default')))
+
+def resolve_runtime_budget(team_model,override=None):
+ """One resolved source used by execution, history and checkpoint identity."""
+ base=read_json(config_dir()/'protocol.json')['runtime_budgets'][team_model]
+ value=dict(base) if override is None else dict(override)
+ if set(value)!=set(base) or any(type(x) is not int or x<=0 for x in value.values()):
+  raise DynamicError('invalid_runtime_budget','Explicit positive request/token/time values required')
+ if value['per_request']>value['token_limit']:raise DynamicError('invalid_runtime_budget','Single generation exceeds team budget')
+ return value
