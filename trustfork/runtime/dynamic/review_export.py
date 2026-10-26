@@ -1,0 +1,223 @@
+"""Deterministic white-list review copy; original evidence is never edited."""
+import base64,csv,hashlib,io,json,re,sqlite3
+from pathlib import Path
+from .artifacts import safe_slug
+from .common import DynamicError,canonical,file_hash,read_json
+
+VERSION='dynamic-review-export-v1'
+ROOT_FILES={'campaign.json','plan.jsonl','resolved-config.json','results.json','cost-summary.json'}
+ROLE_DIRS={'blocks','history','probes','diagnostics','test-results','analysis'}
+RUNTIME_NAMES={'run.json','run_manifest.json','events.jsonl','prefix-events.json','delivery_receipts.json',
+ 'private_bindings.json','profile_metadata.json','history.json','history-execution.json','history-bundle.json',
+ 'partial-state.json','prefix-outcome.json','block.json','provider-requests.jsonl','judge-requests.jsonl',
+ 'judge-structure-repairs.jsonl','capacity-checks.jsonl','scoring_annotations.json','partial_annotations.json'}
+PRIVATE_FIELDS={'authorization','cookie','set-cookie','access_token','refresh_token','key_env'}
+def sha(data):return hashlib.sha256(data).hexdigest()
+def jsonlines(p):return [json.loads(x) for x in p.read_text().splitlines() if x.strip()] if p.exists() else []
+
+class Redactor:
+ def __init__(self,secrets=(),private_paths=()):
+  self.secrets=sorted({s for s in secrets if isinstance(s,str) and s},key=lambda s:(-len(s),s))
+  self.paths=sorted({str(p) for p in private_paths if str(p)},key=lambda s:-len(s));self.changes=[]
+ def text(self,s,ref):
+  for i,secret in enumerate(self.secrets,1):
+   if secret in s:
+    s=s.replace(secret,f'[REDACTED_CREDENTIAL_{i:03d}]')
+    self.changes.append({'reference':ref,'reason':'known_real_credential','placeholder':i})
+  for p in self.paths:
+   if p in s:
+    s=s.replace(p,'[LOCAL_PRIVATE_PATH]');self.changes.append({'reference':ref,'reason':'real_local_path'})
+  def header(m):
+   self.changes.append({'reference':ref,'reason':'authentication_header'})
+   return m.group(1)+'[REDACTED_AUTH_HEADER]'
+  return re.sub(r'(?im)^(\s*(?:authorization|cookie|set-cookie)\s*:\s*)[^\r\n]*',header,s)
+ def value(self,v,ref):
+  if isinstance(v,dict):
+   out={}
+   for k,item in v.items():
+    if k.lower() in PRIVATE_FIELDS and item is not None:
+     out[k]='[REDACTED_PRIVATE_FIELD]';self.changes.append({'reference':ref+'/'+k,'reason':'authentication_field'})
+    elif k in ('content_b64','data') and isinstance(item,str):
+     try:raw=base64.b64decode(item,validate=True);text=raw.decode()
+     except (ValueError,UnicodeError):out[k]=self.value(item,ref+'/'+k)
+     else:
+      text2=self.text(text,ref+'/'+k)
+      out[k]=base64.b64encode(text2.encode()).decode() if text2!=text else item
+    else:out[k]=self.value(item,ref+'/'+k)
+   return out
+  if isinstance(v,list):return [self.value(x,ref+'/'+str(i)) for i,x in enumerate(v)]
+  if isinstance(v,str):
+   if v.lstrip().startswith(('{','[')):
+    try:parsed=json.loads(v)
+    except ValueError:pass
+    else:
+     changed=self.value(parsed,ref+'/decoded-json')
+     return canonical(changed).decode() if changed!=parsed else v
+   return self.text(v,ref)
+  return v
+ def scan(self,data):
+  if any(s.encode() in data for s in self.secrets):raise DynamicError('review_secret_scan_failed','Known credential remains; do not publish')
+
+def allowed(p,root):
+ rel=p.relative_to(root)
+ if p.is_symlink() or p.name.startswith('.env') or p.name in ('auth.json','models-cache.json','config.json'):return False
+ if p.suffix not in ('.json','.jsonl','.csv','.md','.txt'):return False
+ if len(rel.parts)==1:return p.name in ROOT_FILES
+ if rel.parts[0] not in ROLE_DIRS:return False
+ if rel.parts[0] in ('probes','diagnostics','test-results','analysis'):return True
+ return (p.name in RUNTIME_NAMES or p.name.endswith(('-prepared.json','-result.json','-error.json')) or
+  (p.name.startswith(('prepared_','history-bundle','prefix-')) and p.suffix=='.json') or
+  any(s in rel.parts for s in ('scoring','scoring-versions','operation-evidence')) or ('control' in rel.parts and p.suffix=='.jsonl'))
+
+def csv_text(fields,rows):
+ out=io.StringIO();w=csv.DictWriter(out,fieldnames=fields,extrasaction='ignore');w.writeheader()
+ for row in rows:w.writerow({k:canonical(v).decode() if isinstance(v,(dict,list)) else v for k,v in row.items() if k in fields})
+ return out.getvalue()
+
+def state_difference(before,after,red,reference):
+ from trustfork.scoring.goal_observer import frozen_workspace
+ try:
+  a=frozen_workspace(before);b=frozen_workspace(after)
+ except (DynamicError,OSError,KeyError) as error:
+  return {'observation_status':'unknown','reason':getattr(error,'code',type(error).__name__),'filesystem_changes':None,
+   'scope':'Original archive unavailable or invalid; no invented unchanged/absent facts'}
+ complete=a.get('consistent_cutoff') and b.get('consistent_cutoff')
+ changes=[]
+ for path in sorted(set(a['paths'])|set(b['paths'])):
+  left=a['paths'].get(path);right=b['paths'].get(path)
+  clean=lambda value:{k:v for k,v in (value or {}).items() if k!='evidence_ref'}
+  if clean(left)!=clean(right):changes.append({'path':path,'before':left,'after':right})
+ value={'observation_status':'observed' if complete else 'partial_or_unknown','filesystem_changes':changes if complete else None,
+  'before':{k:v for k,v in a.items() if k!='paths'},'after':{k:v for k,v in b.items() if k!='paths'},
+  'before_path_index':{k:{n:v for n,v in row.items() if n!='content_b64'} for k,row in a['paths'].items()},
+  'after_path_index':{k:{n:v for n,v in row.items() if n!='content_b64'} for k,row in b['paths'].items()},
+  'scope':'Captured workspace/service/home assets only; full changed file bytes preserved as Base64. Original archives remain local. Not a RAM snapshot.'}
+ return red.value(value,reference)
+
+def export_campaign(source,destination,*,secrets=(),private_paths=(),snapshot=False,max_part_bytes=5*1024*1024,max_total_bytes=50*1024*1024):
+ source=Path(source).resolve();destination=Path(destination).resolve()
+ if source==destination or source in destination.parents or destination in source.parents:raise DynamicError('review_export_overlaps_source','Share copy must be outside originals')
+ campaign=read_json(source/'campaign.json')
+ if campaign.get('status')=='open' and not snapshot:raise DynamicError('review_campaign_not_stopped','Seal campaign or explicitly select partial snapshot')
+ if max_part_bytes<100:raise DynamicError('review_part_size_invalid','Part limit too small')
+ candidates=sorted(p for p in source.rglob('*') if p.is_file() and allowed(p,source))
+ before={p.relative_to(source).as_posix():file_hash(p) for p in candidates}
+ red=Redactor(secrets,(*private_paths,str(source)));files={};mappings=[];excluded=[];events={}
+ def put(name,data):
+  raw=data.encode() if isinstance(data,str) else data
+  if name in files and files[name]!=raw:raise DynamicError('review_export_collision',name)
+  red.scan(raw);files[name]=raw
+ def parts(prefix,rows):
+  names=[];chunk=[];size=0
+  for i,row in enumerate(rows):
+   raw=canonical(row)+b'\n'
+   if len(raw)>max_part_bytes:
+    name=prefix+f'.large-{i:06d}.json';put(name,canonical(row)+b'\n')
+    raw=canonical({'large_record_ref':name,'export_hash':sha(files[name]),'original_sequence':row.get('sequence')})+b'\n'
+   if chunk and size+len(raw)>max_part_bytes:
+    name=prefix+f'.part-{len(names):04d}.jsonl';put(name,b''.join(chunk));names.append(name);chunk=[];size=0
+   chunk.append(raw);size+=len(raw)
+  if chunk or not names:
+   name=prefix+f'.part-{len(names):04d}.jsonl';put(name,b''.join(chunk));names.append(name)
+  return names
+ runs=[]
+ for p in candidates:
+  if p.name=='run.json':
+   run=read_json(p)
+   if isinstance(run,dict) and run.get('run_id'):
+    runs.append((p,run,'trajectories/'+safe_slug(str(run.get('block_id',run['run_id']))+'|'+str(run.get('condition'))+'|'+run['run_id'])))
+ def mapped(rel):
+  path=source/rel
+  for p,run,prefix in runs:
+   if path.parent==p.parent or p.parent in path.parents:return prefix+'/'+path.relative_to(p.parent).as_posix()
+  return 'evidence/'+rel
+ for p in candidates:
+  rel=p.relative_to(source).as_posix();target=mapped(rel)
+  try:
+   if p.suffix=='.jsonl':
+    rows=red.value(jsonlines(p),rel);names=parts(target.removesuffix('.jsonl'),rows)
+    if p.name=='events.jsonl':events[p.parent]=rows
+   elif p.suffix=='.json':
+    put(target,canonical(red.value(read_json(p),rel))+b'\n');names=[target]
+   else:put(target,red.text(p.read_text(),rel));names=[target]
+  except (ValueError,UnicodeError) as error:
+   excluded.append({'source':rel,'reason':'unreadable_text_or_json','error_type':type(error).__name__});continue
+  mappings.append({'source_path':rel,'source_hash':before[rel],'source_size':p.stat().st_size,
+   'exports':[{'path':n,'export_hash':sha(files[n]),'size':len(files[n])} for n in names]})
+ for p in source.rglob('*'):
+  if p.is_symlink():excluded.append({'source':p.relative_to(source).as_posix(),'reason':'symlink_not_followed'})
+  elif p.is_file() and not allowed(p,source):excluded.append({'source':p.relative_to(source).as_posix(),'reason':'outside_explicit_text_whitelist_original_retained_locally'})
+ plans=red.value(jsonlines(source/'plan.jsonl'),'plan')
+ put('plan.jsonl',b''.join(canonical(p)+b'\n' for p in plans));results=[]
+ for p,run,prefix in runs:
+  run=red.value(run,p.relative_to(source).as_posix());rows=events.get(p.parent,[])
+  seen=set();conversation=[f"# {run['run_id']}",'',f"Status: {run.get('run_status','unknown')}",'']
+  for e in rows:
+   key=(e.get('branch_id'),e.get('event_id'))
+   if key in seen:raise DynamicError('review_duplicate_event_id',str(key))
+   seen.add(key)
+   if e.get('event_type') in ('model_request_submitted','model_response','message_enqueued','tool_visibility','pi_event'):
+    conversation += [f"## {e.get('sequence')} · {e.get('event_type')} · actor={e.get('actor_id')} · request={e.get('request_id')} · event={e.get('event_id')}",'','~~~json',json.dumps(e['payload'],ensure_ascii=False,indent=2),'~~~','']
+  put(prefix+'/conversation.md','\n'.join(conversation))
+  names=parts(prefix+'/requests',[e for e in rows if e.get('event_type') in ('provider_payload','model_response')])
+  metric=p.parent/'scoring'/'run_summary.json'
+  put(prefix+'/metrics.json',canonical(red.value(read_json(metric),str(metric.relative_to(source))) if metric.exists() else {'value':None,'status':'not_annotated','reason':'No completed scoring artifact'})+b'\n')
+  frozen=run.get('frozen_export')
+  state=state_difference(run.get('prefix_export'),frozen,red,prefix+'/state-diff')
+  state['run_export_ref']=mapped(p.relative_to(source).as_posix())
+  put(prefix+'/state-diff.json',canonical(state)+b'\n')
+  put(prefix+'/README.md',f"# {run['run_id']}\n\nCondition: {run.get('condition')}; protocol: {run.get('protocol')}; model: {run.get('team_model',run.get('main_model'))}.\n\nStatus: {run.get('run_status')}; termination: {run.get('termination_reason')}.\n\n[Conversation](conversation.md) · [Metrics](metrics.json) · [State observation](state-diff.json)\n\nRequest/response shards: "+', '.join('['+Path(n).name+']('+Path(n).name+')' for n in names)+"\n\nFull events, Judge records and source mappings are indexed in the campaign manifest.\n")
+  result_row={k:run.get(k) for k in ('run_id','case_id','team_model','main_model','protocol','condition','run_status','termination_reason','completion_status')}
+  result_row.update(kind='t3',billing_run_id=run['run_id'],metric_summary=read_json(metric).get('scores') if metric.exists() else None,
+   observation_complete=read_json(metric).get('observation_complete') if metric.exists() else None,
+   unknown_reason=None if metric.exists() else 'No completed scoring artifact')
+  results.append(result_row)
+ for p in candidates:
+  if p.name=='history-execution.json':
+   raw=read_json(p);v=red.value(raw,str(p.relative_to(source)))
+   rel=p.relative_to(source)
+   team=rel.parts[1] if len(rel.parts)>1 and rel.parts[1] in ('gpt4o','deepseekflash') else None
+   results.append({'run_id':v.get('history_id'),'case_id':v.get('task_id'),'team_model':team,'run_status':v.get('status'),'kind':'history','billing_run_id':next((e.get('branch_id') for e in events.get(p.parent,[]) if e.get('branch_id')),None),'source_ref':mapped(rel)})
+   put('history/'+safe_slug(str(v.get('history_id')))+'-state-diff.json',canonical(state_difference(raw.get('initial_state'),raw.get('frozen_state'),red,str(rel)+'/state-diff'))+b'\n')
+ started={(r.get('case_id'),r.get('team_model') or r.get('main_model'),r.get('protocol'),r.get('condition')) for r in results}
+ for plan in plans:
+  if plan.get('kind') in ('t3','history') and (plan.get('case_id'),plan.get('team_model'),plan.get('protocol'),plan.get('condition')) not in started:
+   results.append({**plan,'run_status':'not_started','termination_reason':plan.get('not_started_reason','not_started')})
+ costs=[];db_path=source/'campaign-budget.sqlite3'
+ if db_path.exists():
+  with sqlite3.connect('file:'+str(db_path)+'?mode=ro',uri=True) as db:
+   db.row_factory=sqlite3.Row
+   for row in db.execute('SELECT * FROM requests ORDER BY updated_at,request_id'):
+    v=dict(row);v.update(json.loads(v.pop('metadata')));v['reserved_cost_cny']=v.pop('reserved')/1e6
+    settled=v.pop('settled');v['settled_cost_cny']=settled/1e6 if settled is not None else None
+    costs.append(red.value(v,'costs/'+v['request_id']))
+ for result in results:
+  rows=[c for c in costs if result.get('billing_run_id') and c.get('run_id')==result['billing_run_id']]
+  result['direct_requests']=sum(c.get('submitted_at') is not None for c in rows)
+  result['direct_settled_cny_upper']=sum(c['settled_cost_cny'] or 0 for c in rows if c['status']=='settled')
+  result['direct_unknown_reserved_cny']=sum(c['reserved_cost_cny'] for c in rows if c['status'] in ('submitted','charge_unknown','reserved'))
+  result['cost_scope']='Direct run plus Judge only; shared history/prefix/probe costs remain separate ledger rows; never multiply them per branch'
+ put('results.csv',csv_text(['kind','run_id','case_id','team_model','main_model','protocol','condition','run_status','termination_reason','completion_status','source_ref','observation_complete','unknown_reason','metric_summary','direct_requests','direct_settled_cny_upper','direct_unknown_reserved_cny','cost_scope'],results))
+ put('costs.csv',csv_text(['request_id','run_id','phase','purpose','actor_id','provider','model_id','status','estimated_input_tokens','max_generated_tokens','reserved_cost_cny','settled_cost_cny','usage','pricing_basis','source_currency','conversion_basis','settlement_basis'],costs))
+ config=source/'resolved-config.json'
+ put('config.redacted.json',canonical(red.value(read_json(config),'config') if config.exists() else {'status':'not_resolved','real_api_enabled':False})+b'\n')
+ tests=[(p.relative_to(source).as_posix(),mapped(p.relative_to(source).as_posix())) for p in candidates if p.relative_to(source).parts[0]=='test-results']
+ put('tests.md','# Test evidence\n\n'+('\n'.join('- ['+a+']('+b+')' for a,b in tests) if tests else 'No retained test receipt; no pass claimed.')+'\n\nActual Docker tests, mock responses and real probes are separate evidence scopes.\n')
+ links='\n'.join('- ['+red.text(r['run_id'],'index')+']('+prefix+'/README.md)' for _,r,prefix in runs)
+ put('README.md',f"# {campaign.get('campaign_id',source.name)}\n\nStatus: {campaign.get('status')}; "+('explicit partial snapshot' if snapshot else 'stopped campaign')+f".\n\nExecution code SHA: {campaign.get('identity',{}).get('commit','unknown')}.\n\nCampaign ceiling CNY100; interface_probe sub-ceiling CNY20 is included. Consult costs.csv and diagnostics for settlement and unknown charges. Engineering smoke is not a main experiment.\n\n[Plan](plan.jsonl) · [Results](results.csv) · [Costs](costs.csv) · [Tests](tests.md) · [Configuration](config.redacted.json) · [Manifest](manifest.json)\n\nRecorded T3 runs: {len(runs)}; plan rows: {len(plans)}. Unstarted items are retained.\n\n"+links+"\n\nOriginal binary archives/databases remain local. Selected complete text evidence is shared; exclusions and distinct source/export hashes are recorded in manifest.json.\n")
+ if before!={p.relative_to(source).as_posix():file_hash(p) for p in sorted(source.rglob('*')) if p.is_file() and allowed(p,source)}:raise DynamicError('review_source_changed','Stop writers or use a new snapshot')
+ if sum(map(len,files.values()))>max_total_bytes:raise DynamicError('review_export_size_exceeded','Do not silently omit evidence or push huge files')
+ manifest={'version':VERSION,'campaign_id':campaign.get('campaign_id',source.name),'execution_code_sha':campaign.get('identity',{}).get('commit'),
+  'snapshot':snapshot,'snapshot_boundary':{'source_files':before,'campaign_status':campaign.get('status')},'source_export_mapping':mappings,
+  'redactions':red.changes,'missing_or_excluded':excluded,'binary_exclusion_policy':['environment archives','databases','dependencies','caches','unlisted file types'],
+  'files':[{'path':n,'size':len(v),'export_hash':sha(v)} for n,v in sorted(files.items())],'size_bytes_excluding_manifest':sum(map(len,files.values())),
+  'known_credential_scan':'passed','human_diff_review_required':True}
+ put('manifest.json',canonical(manifest)+b'\n')
+ if destination.exists():
+  actual={p.relative_to(destination).as_posix():p.read_bytes() for p in destination.rglob('*') if p.is_file()}
+  if actual!=files:raise DynamicError('review_export_exists_changed','Choose a new explicit publication version')
+  return manifest
+ destination.mkdir(parents=True)
+ for name,data in files.items():
+  p=destination/name;p.parent.mkdir(parents=True,exist_ok=True);p.write_bytes(data)
+ return manifest

@@ -1,6 +1,7 @@
 
 .env
 .env.*
+*.env
 !.env.example
 !trustfork/**/.env
 *.pem
@@ -26,7 +27,9 @@ dist/
 
 jobs/
 !trustfork/jobs/
-runs/
+**/runs/*
+!/runs/README.md
+!/runs/published/
 results/
 outputs/
 *.log

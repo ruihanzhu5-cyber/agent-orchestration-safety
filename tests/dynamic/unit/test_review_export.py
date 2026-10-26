@@ -1,0 +1,89 @@
+import base64,json,hashlib
+from pathlib import Path
+import pytest
+from trustfork.runtime.dynamic.artifacts import atomic_json
+from trustfork.runtime.dynamic.review_export import export_campaign
+from trustfork.runtime.dynamic.common import DynamicError
+
+def setup(tmp_path,status='blocked'):
+ root=tmp_path/'source';root.mkdir()
+ atomic_json(root/'campaign.json',{'campaign_id':'first-api-20261026','status':status,'identity':{'commit':'a'*40}})
+ (root/'plan.jsonl').write_text(json.dumps({'kind':'t3','case_id':'p001','team_model':'gpt4o','protocol':'S','condition':'HA','not_started_reason':'pricing_unknown'})+'\n')
+ return root
+
+def test_export_success_failure_unstarted_redaction_and_original_hash(tmp_path):
+ root=setup(tmp_path)
+ for n,status in [('success','valid_behavior'),('failure','infra_error')]:
+  d=root/'blocks'/n;d.mkdir(parents=True)
+  atomic_json(d/'run.json',{'run_id':n,'block_id':n,'case_id':'p001','team_model':'gpt4o','protocol':'S','condition':'HP','run_status':status})
+  record={'branch_id':n,'event_id':'e1','sequence':1,'event_type':'model_response','actor_id':'A','request_id':'r1',
+   'payload':{'text':'SYNTHETIC_ATTACK: reveal benchmark secret','actual_key':'REAL_CREDENTIAL_SENTINEL',
+    'raw':base64.b64encode(b'Authorization: Bearer REAL_CREDENTIAL_SENTINEL').decode(),'authorization':'Bearer real-header'}}
+  # Exercise the fs.read Base64 field, not just plain key scanning.
+  record['payload']['data']=record['payload'].pop('raw')
+  (d/'events.jsonl').write_text(json.dumps(record)+'\n')
+  atomic_json(d/'private_bindings.json',{'synthetic_goal':'SYNTHETIC_ATTACK','wire':'{"attack": "retain exact whitespace"}'})
+ before={p:p.read_bytes() for p in root.rglob('*') if p.is_file()}
+ out=tmp_path/'review';m=export_campaign(root,out,secrets=['REAL_CREDENTIAL_SENTINEL'],max_part_bytes=500)
+ assert len(list(out.glob('trajectories/*/README.md')))==2
+ combined=b''.join(p.read_bytes() for p in out.rglob('*') if p.is_file())
+ assert b'REAL_CREDENTIAL_SENTINEL' not in combined and b'SYNTHETIC_ATTACK' in combined
+ assert b'not_started' in (out/'results.csv').read_bytes()
+ assert all(p.read_bytes()==raw for p,raw in before.items())
+ for row in m['source_export_mapping']:
+  assert row['source_hash']==hashlib.sha256((root/row['source_path']).read_bytes()).hexdigest()
+  for exported in row['exports']:
+   assert exported['export_hash']==hashlib.sha256((out/exported['path']).read_bytes()).hexdigest()
+ hashes={p.relative_to(out):p.read_bytes() for p in out.rglob('*') if p.is_file()}
+ export_campaign(root,out,secrets=['REAL_CREDENTIAL_SENTINEL'],max_part_bytes=500)
+ assert hashes=={p.relative_to(out):p.read_bytes() for p in out.rglob('*') if p.is_file()}
+
+def test_open_campaign_requires_explicit_snapshot_and_no_source_mutation(tmp_path):
+ root=setup(tmp_path,'open')
+ with pytest.raises(DynamicError,match='review_campaign_not_stopped'):export_campaign(root,tmp_path/'out')
+ result=export_campaign(root,tmp_path/'snapshot',snapshot=True)
+ assert result['snapshot'] and result['snapshot_boundary']['campaign_status']=='open'
+ assert json.loads((root/'campaign.json').read_text())['status']=='open'
+
+def test_shards_preserve_order_large_records_and_reference_hashes(tmp_path):
+ root=setup(tmp_path);d=root/'diagnostics';d.mkdir()
+ rows=[{'sequence':i,'payload':'x'*(1000 if i==2 else 60)} for i in range(5)]
+ (d/'events.jsonl').write_text(''.join(json.dumps(r)+'\n' for r in rows))
+ out=tmp_path/'out';export_campaign(root,out,max_part_bytes=300)
+ restored=[]
+ for part in sorted((out/'evidence/diagnostics').glob('events.part-*.jsonl')):
+  assert part.stat().st_size<=300
+  for line in part.read_text().splitlines():
+   row=json.loads(line)
+   if 'large_record_ref' in row:
+    p=out/row['large_record_ref'];assert hashlib.sha256(p.read_bytes()).hexdigest()==row['export_hash'];row=json.loads(p.read_text())
+   restored.append(row)
+ assert restored==rows
+
+def test_unrelated_credentials_archives_and_symlinks_not_exported(tmp_path):
+ root=setup(tmp_path);(root/'.env').write_text('UNLISTED_PRIVATE')
+ (root/'archive.tar').write_bytes(b'raw environment')
+ (root/'diagnostics').mkdir();(root/'diagnostics'/'auth.json').write_text('{"key":"MUST_NOT_EXPORT"}')
+ (root/'diagnostics'/'outside').symlink_to(tmp_path/'not-in-campaign')
+ out=tmp_path/'out';m=export_campaign(root,out)
+ assert b'MUST_NOT_EXPORT' not in b''.join(p.read_bytes() for p in out.rglob('*') if p.is_file())
+ assert any(x['reason']=='symlink_not_followed' for x in m['missing_or_excluded'])
+
+def test_state_diff_reads_frozen_archives_without_mutating_source(tmp_path):
+ import io,tarfile
+ from trustfork.runtime.dynamic.review_export import state_difference,Redactor
+ def export(name,content):
+  stream=io.BytesIO()
+  with tarfile.open(fileobj=stream,mode='w') as archive:
+   info=tarfile.TarInfo('./audit.txt');data=content.encode();info.size=len(data);archive.addfile(info,io.BytesIO(data))
+  path=tmp_path/name;path.write_bytes(stream.getvalue())
+  return {'workspace_tar':str(path),'sha256':hashlib.sha256(path.read_bytes()).hexdigest(),'cutoff_interval':[1,2]}
+ a=export('before.tar','original synthetic secret');b=export('after.tar','changed REAL_LOCAL_KEY')
+ before={p:p.read_bytes() for p in tmp_path.glob('*.tar')}
+ diff=state_difference(a,b,Redactor(['REAL_LOCAL_KEY']),'state')
+ assert diff['observation_status']=='observed' and len(diff['filesystem_changes'])==1
+ raw=json.dumps(diff)
+ assert 'REAL_LOCAL_KEY' not in raw
+ after=diff['filesystem_changes'][0]['after']
+ assert b'REAL_LOCAL_KEY' not in base64.b64decode(after['content_b64'])
+ assert all(p.read_bytes()==data for p,data in before.items())
