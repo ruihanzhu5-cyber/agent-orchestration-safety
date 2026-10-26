@@ -67,13 +67,27 @@ def clone_frozen_run(source,destination):
  """Copy exact raw records and old score versions; new scoring never edits the parent."""
  source=Path(source);dest=Path(destination)
  if dest.exists():raise DynamicError("followup_clone_exists","Reuse via recorded action state, never overwrite")
- before=frozen_identity(source);run=read_json(source);dest.mkdir(parents=True)
+ before=frozen_identity(source);run=read_json(source)
+ if not (source.parent/"private_bindings.json").is_file():raise DynamicError("followup_private_source_missing","Original scoring bindings are required; no fabricated replacement")
+ support={name:file_hash(source.parent/name) for name in ("private_bindings.json","profile_metadata.json","delivery_receipts.json") if (source.parent/name).is_file()}
+ operations=source.parent/"environment/operation-evidence"
+ if operations.is_dir():
+  for entry in operations.rglob("*"):
+   if entry.is_symlink():raise DynamicError("followup_source_symlink","No implicit traversal when copying raw operation evidence")
+   if entry.is_file():support[entry.relative_to(source.parent).as_posix()]=file_hash(entry)
+
+ dest.mkdir(parents=True)
  for name in ("run.json",run["run_manifest_path"],run["events_path"],run["prefix_events_path"]):
   rel=Path(name)
   if rel.is_absolute() or ".." in rel.parts:raise DynamicError("followup_source_relative_path","Frozen record paths must stay in run directory")
   target=dest/rel;target.parent.mkdir(parents=True,exist_ok=True);shutil.copyfile(source.parent/rel,target)
+ for name in support:
+  (dest/name).parent.mkdir(parents=True,exist_ok=True)
+  shutil.copyfile(source.parent/name,dest/name)
+  if file_hash(dest/name)!=support[name]:raise DynamicError("followup_clone_identity_mismatch","Scoring metadata copy differs")
  shutil.copytree(source.parent/"scoring",dest/"scoring")
  if frozen_identity(dest/"run.json")!=before:raise DynamicError("followup_clone_identity_mismatch","Copied raw record differs")
- atomic_json(dest/"origin.json",{"source_run":str(source),"source_frozen_identity":before,"run_id":run["run_id"],"behavior_execution_sha":EXECUTION,"new_behavior_requests":0})
+ atomic_json(dest/"origin.json",{"source_run":str(source),"source_frozen_identity":before,"run_id":run["run_id"],"behavior_execution_sha":EXECUTION,"new_behavior_requests":0,"support_file_hashes":support})
+ if any(file_hash(source.parent/name)!=h for name,h in support.items()):raise DynamicError("followup_parent_changed","Original scoring metadata changed")
  if frozen_identity(source)!=before:raise DynamicError("followup_parent_changed","Source changed while copying")
  return dest/"run.json"

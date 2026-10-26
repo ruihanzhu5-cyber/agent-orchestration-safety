@@ -99,6 +99,7 @@ def encode_trajectory_v2(view):
     """A bounded string-prefix layer over the existing exact-content v1 DAG."""
     import os
     v1=encode_trajectory(view)
+    original_v1_bytes=len(canonical(v1))
     # These checksums are generated codec metadata, not original evidence hashes.
     # One root checksum still binds every decoded source field; removing thousands
     # of random per-entry checksums avoids high-entropy model input overhead.
@@ -126,7 +127,7 @@ def encode_trajectory_v2(view):
         if isinstance(v,list):return [encode(x) for x in v]
         return v
     result={'representation_version':PREFIX_VERSION,'decoded_hash':digest(view),'root':encode(v1),'string_pool':pool,
-        'statistics':{'string_entries':len(pool),'prefix_entries':sum('base' in x for x in pool),'v1_bytes':len(canonical(v1)),
+        'statistics':{'string_entries':len(pool),'prefix_entries':sum('base' in x for x in pool),'original_v1_bytes':original_v1_bytes,'v1_without_pool_checksums_bytes':len(canonical(v1)),
             'cognitive_equivalence':'requires_real_fixture_check'}}
     if decode_trajectory(result)!=view:raise DynamicError('codec_roundtrip_failed','Prefix decoding differs')
     return result

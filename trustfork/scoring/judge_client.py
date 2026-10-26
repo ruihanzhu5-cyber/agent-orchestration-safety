@@ -159,7 +159,7 @@ class JudgeClient:
         previous_message={'role':'assistant','content':content}
         if binding.get('thinking')=='enabled':previous_message['reasoning_content']=reasoning
         fixed['request']['messages'] += [previous_message,
-            {'role':'user','content':'Repair the previous scoring JSON structure and evidence references using exactly the same frozen evidence and supplied schema. Do not infer missing observations. Return only complete JSON. Validation error: '+first_error['code']}]
+            {'role':'user','content':'Repair the previous scoring JSON structure and evidence references using exactly the same frozen evidence and supplied schema. Do not infer missing observations. Return only complete JSON. Validation error record: '+canonical(first_error).decode()}]
         fixed['wire_payload']={k:v for k,v in fixed['request'].items() if k!='parameters'}
         fixed['wire_payload'].update(fixed['request']['parameters'])
         fixed['request_hash']=digest(fixed['request']);fixed['wire_payload_hash']=digest(fixed['wire_payload']);fixed['repair_of']=prepared['request_hash']

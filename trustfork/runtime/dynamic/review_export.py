@@ -9,7 +9,7 @@ FOLLOWUP_ROOT_FILES={'segment.json','budget-summary.json','input-size-audit.json
 ROOT_FILES=FOLLOWUP_ROOT_FILES|{'campaign.json','plan.jsonl','resolved-config.json','results.json','cost-summary.json'}
 ROLE_DIRS={'blocks','history','probes','diagnostics','test-results','analysis','fixtures','gpt-rescore','deepseek','actions','tests'}
 RUNTIME_NAMES={'run.json','run_manifest.json','events.jsonl','prefix-events.json','delivery_receipts.json',
- 'pass-states.json','attempt-summary.json','trajectory-output-estimate.json','trajectory-output-estimate-error.json','origin.json','private_bindings.json','profile_metadata.json','history.json','history-execution.json','history-bundle.json',
+ 'history-bundle-reuse.jsonl','pass-states.json','attempt-summary.json','trajectory-output-estimate.json','trajectory-output-estimate-error.json','origin.json','private_bindings.json','profile_metadata.json','history.json','history-execution.json','history-bundle.json',
  'partial-state.json','prefix-outcome.json','block.json','provider-requests.jsonl','judge-requests.jsonl',
  'judge-structure-repairs.jsonl','capacity-checks.jsonl','scoring_annotations.json','partial_annotations.json'}
 PRIVATE_FIELDS={'authorization','cookie','set-cookie','access_token','refresh_token','key_env'}
@@ -140,8 +140,20 @@ def export_campaign(source,destination,*,secrets=(),private_paths=(),snapshot=Fa
   rel=p.relative_to(source).as_posix();target=mapped(rel)
   try:
    if p.suffix=='.jsonl':
-    rows=red.value(jsonlines(p),rel);names=parts(target.removesuffix('.jsonl'),rows)
-    if p.name=='events.jsonl':events[p.parent]=rows
+    if p.name=='events.jsonl' and any(p.parent==run_file.parent for run_file,_,_ in runs):
+     rows=red.value(jsonlines(p),rel);events[p.parent]=rows
+    else:
+     # History/prefix shards need no retained in-memory conversation index.
+     # Stream every row, preserving byte order and the same stable redaction refs.
+     def stream_rows(path=p,reference=rel):
+      with path.open() as lines:
+       for i,line in enumerate(lines):
+        if not line.strip():continue
+        value=red.value(json.loads(line),reference+'/'+str(i))
+        if path.name=='events.jsonl' and path.parent not in events:events[path.parent]=[value]
+        yield value
+     rows=stream_rows()
+    names=parts(target.removesuffix('.jsonl'),rows)
    elif p.suffix=='.json':
     put(target,canonical(red.value(read_json(p),rel))+b'\n');names=[target]
    else:put(target,red.text(p.read_text(),rel));names=[target]
@@ -205,8 +217,8 @@ def export_campaign(source,destination,*,secrets=(),private_paths=(),snapshot=Fa
 
  started={(r.get('case_id'),r.get('team_model') or r.get('main_model'),r.get('protocol'),r.get('condition')) for r in results}
  for plan in plans:
-  if plan.get('kind') in ('t3','history') and (plan.get('case_id'),plan.get('team_model'),plan.get('protocol'),plan.get('condition')) not in started:
-   results.append({**plan,'run_status':'not_started','termination_reason':plan.get('not_started_reason','not_started')})
+  if plan.get('kind') in ('t3','history','rescore') and (plan.get('case_id'),plan.get('team_model'),plan.get('protocol'),plan.get('condition')) not in started:
+   results.append({**plan,'run_status':plan.get('run_status','not_started'),'termination_reason':plan.get('not_started_reason',plan.get('reason','not_started'))})
  costs=[];db_path=Path(ledger_path) if ledger_path is not None else source/'campaign-budget.sqlite3'
  if ledger_path is not None and not db_path.is_file():raise DynamicError('review_original_ledger_missing','Explicit original ledger not found')
  if db_path.exists():

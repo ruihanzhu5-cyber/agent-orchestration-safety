@@ -51,6 +51,16 @@ def test_shared_contract_real_h1_h2_then_s_and_f_without_forced_recruitment(tmp_
   assert judged["pass_states"]["trajectory"]["status"]=="blocked"
   assert judged["pass_states"]["response"]["status"] in ("completed","not_applicable")
   assert frozen_identity(r.directory/"run.json")==before and frozen_identity(copied)==before
+  # The copy must reach final aggregation, not just preparation/transport.
+  from trustfork.scoring.scoring_versions import rescore_contract
+  from trustfork.runtime.dynamic.common import file_hash
+  original_pointer=file_hash(r.directory/"scoring/current_version.json")
+  contract=rescore_contract(copied,reason="Offline copied-source full aggregation regression",annotation_policy="new",new_annotations=tmp_path/(protocol+"-judge")/"scoring_annotations.json")
+  summary=score_run(copied,mode="test-fixtures",rescore=contract)
+  assert summary["run_id"]==result["run_id"]
+  assert file_hash(r.directory/"scoring/current_version.json")==original_pointer
+  assert frozen_identity(copied)==before
+
 
  for body in mock.seen:
   for m in body["messages"]:

@@ -21,3 +21,9 @@ def test_bad_prefix_reference_does_not_guess_or_repair(bad):
  if bad=="bounds":p["string_pool"][i]["prefix_chars"]=99999999
  if bad=="unicode_hash":p["string_pool"][i]["hash"]="bad"
  with pytest.raises(DynamicError):decode_trajectory(p)
+
+def test_codec_volume_labels_keep_original_and_metadata_reduced_sizes_separate():
+ from trustfork.runtime.dynamic.common import canonical
+ original=view();encoded=encode_trajectory_v2(original)
+ assert encoded["statistics"]["original_v1_bytes"]==len(canonical(encode_trajectory(original)))
+ assert encoded["statistics"]["v1_without_pool_checksums_bytes"]<encoded["statistics"]["original_v1_bytes"]

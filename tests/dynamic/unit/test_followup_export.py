@@ -9,6 +9,7 @@ def test_followup_exports_explicit_sources_pass_states_and_only_segment_costs(tm
  write_json(source/"resolved-config.json",{"judge_binding":"deepseekflash","key_env":"private-credential-variable"})
  write_json(source/"input-size-audit.json",{"service_prompt_tokens":None,"token_estimate":123,"bytes":999})
  write_json(source/"fixtures/summary.json",{"passed":False})
+ (source/"plan.jsonl").write_text(json.dumps({"plan_id":"old-gpt-score","kind":"rescore","case_id":"p001","team_model":"gpt4o","protocol":"F","condition":"HP","run_id":"old","status":"blocked","reason":"formal_judge_fixture_gate","run_status":"not_rescored"})+"\n")
  write_json(source/"actions/rescore_old_gpt.json",{"status":"blocked"})
  write_json(source/"gpt-rescore/F-HP/judge-followup/pass-states.json",{"response":{"status":"not_applicable"},"trajectory":{"status":"blocked"}})
  db=tmp_path/"original.sqlite";b=CampaignBudget(db,campaign_id="original")
@@ -20,6 +21,7 @@ def test_followup_exports_explicit_sources_pass_states_and_only_segment_costs(tm
  assert (dest/"input-size-audit.json").exists() and (dest/"segment.json").exists()
  assert (dest/"evidence/gpt-rescore/F-HP/judge-followup/pass-states.json").exists()
  text=(dest/"README.md").read_text()
+ assert "not_rescored" in (dest/"results.csv").read_text() and "old-gpt-score" not in (dest/"costs.csv").read_text()
  assert "Parent campaign: old" in text and "Plan_Judge_Followup_Report" in text and "Runtime_Budget_And_First" not in text
  assert "private-credential-variable" not in (dest/"config.redacted.json").read_text()
  assert any(x["reason"]=="outside_explicit_text_whitelist_original_retained_locally" for x in manifest["missing_or_excluded"]) is False
