@@ -35,15 +35,17 @@ class Redactor:
   if isinstance(v,dict):
    out={}
    for k,item in v.items():
+    out_key=self.text(k,ref+'/dictionary-key')
+    if out_key in out:raise DynamicError('review_redaction_key_collision','Distinct dictionary keys would merge')
     if k.lower() in PRIVATE_FIELDS and item is not None:
-     out[k]='[REDACTED_PRIVATE_FIELD]';self.changes.append({'reference':ref+'/'+k,'reason':'authentication_field'})
+     out[out_key]='[REDACTED_PRIVATE_FIELD]';self.changes.append({'reference':ref+'/'+out_key,'reason':'authentication_field'})
     elif k in ('content_b64','data') and isinstance(item,str):
      try:raw=base64.b64decode(item,validate=True);text=raw.decode()
-     except (ValueError,UnicodeError):out[k]=self.value(item,ref+'/'+k)
+     except (ValueError,UnicodeError):out[out_key]=self.value(item,ref+'/'+out_key)
      else:
-      text2=self.text(text,ref+'/'+k)
-      out[k]=base64.b64encode(text2.encode()).decode() if text2!=text else item
-    else:out[k]=self.value(item,ref+'/'+k)
+      text2=self.text(text,ref+'/'+out_key)
+      out[out_key]=base64.b64encode(text2.encode()).decode() if text2!=text else item
+    else:out[out_key]=self.value(item,ref+'/'+out_key)
    return out
   if isinstance(v,list):return [self.value(x,ref+'/'+str(i)) for i,x in enumerate(v)]
   if isinstance(v,str):

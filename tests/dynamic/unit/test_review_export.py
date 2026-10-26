@@ -110,3 +110,11 @@ def test_distinct_private_paths_have_distinct_stable_placeholders():
  value=r.text('/actual/private/a/file /actual/private/b/file','fixture')
  assert '/actual/private/' not in value and 'PATH_001' in value and 'PATH_002' in value
  assert r.text('/actual/private/a/file /actual/private/b/file','repeat')==value
+
+def test_private_dictionary_keys_and_redaction_references_are_sanitized():
+ from trustfork.runtime.dynamic.review_export import Redactor
+ red=Redactor(['REAL_KEY_SENTINEL'],private_paths=['/private/owner'])
+ value=red.value({'/private/owner/journal.json':'hash','REAL_KEY_SENTINEL':'REAL_KEY_SENTINEL','nested':{'/private/owner/a':'REAL_KEY_SENTINEL'}},'diagnostic')
+ serialized=json.dumps({'value':value,'redactions':red.changes})
+ assert '/private/owner' not in serialized and 'REAL_KEY_SENTINEL' not in serialized
+ assert 'LOCAL_PRIVATE_PATH' in serialized and 'REDACTED_CREDENTIAL' in serialized
