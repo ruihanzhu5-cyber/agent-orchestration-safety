@@ -1,0 +1,97 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+___ test_shared_contract_real_h1_h2_then_s_and_f_without_forced_recruitment ____
+
+tmp_path = PosixPath('[LOCAL_PRIVATE_PATH_006]/pytest-0/test_shared_contract_real_h1_h0')
+
+    def test_shared_contract_real_h1_h2_then_s_and_f_without_forced_recruitment(tmp_path):
+     cfg=runpy.run_path(str(repo_root()/"tests/dynamic/unit/test_provider_preparation.py"))["configuration"]()
+     for b in cfg["logical_bindings"].values():
+      b["max_output_tokens"]=16384;b["capability"]["max_output_tokens"]=16384
+      b["capability"]["tokenizer"].update(id="o200k_base",version=importlib.metadata.version("tiktoken"),count_method="local-message-content-and-schema-bpe-estimate")
+     mock=MockHistory()
+     transport=ProviderTransport(cfg,mode="mock",journal=tmp_path/"requests.jsonl",http=mock,max_requests=180)
+     history_runtime=PiDynamic("p001",tmp_path/"history",provider=transport)
+     hfile=tmp_path/"history/history-bundle.json"
+     bundle=prepare_history(history_runtime,ProviderSource(),hfile)
+     assert bundle["contract"]["planning_contract"]["contract_version"]=="initial-plan-v2"
+     for status in bundle["task_statuses"].values():assert status=="completed_unjudged"
+     for protocol in ("S","F"):
+      r=PiDynamic("p001",tmp_path/protocol,provider=transport,protocol=protocol)
+      history=load_history(r,hfile)
+      prefix=r.run_prefix(ProviderSource(),history=history)
+      assert prefix["status"]=="triggered"
+      assert prefix["checkpoint"]["bindings"]["prefix_identity"]["planning_contract"]["contract_version"]=="initial-plan-v2"
+      save_prefix(r,prefix,tmp_path/protocol/"prepared-prefix.json")
+      result=r.run_branch(prefix["checkpoint"],"HP",ProviderSource(),attempt=0)
+      assert result["run_status"]=="valid_behavior"
+      events=[json.loads(x) for x in (r.directory/"events.jsonl").read_text().splitlines()]
+      actors={e["actor_id"] for e in events if e["event_type"]=="model_request_submitted"}
+      if protocol=="S":
+       assert {"C","D"}<=actors
+       # Existing admission is programmatic and both enter at the same PLAN_READY boundary.
+       admits=[e for e in events if e["event_type"]=="members_admitted"]
+       assert len(admits)==1 and set(admits[0]["payload"]["actor_ids"])=={"C","D"}
+      else:assert not ({"C","D"}&actors)
+      from trustfork.scoring.dynamic_pipeline import score_run
+      score_run(r.directory/"run.json",mode="test-fixtures")
+      from trustfork.runtime.dynamic.followup import clone_frozen_run
+      from trustfork.scoring.scoring_versions import frozen_identity
+      from trustfork.tools.judge_dynamic import run_judge_attempt
+      from test_homogeneous_end_to_end import judge_replies
+      before=frozen_identity(r.directory/"run.json")
+      copied=clone_frozen_run(r.directory/"run.json",tmp_path/(protocol+"-rescore"))
+      replies=judge_replies(result,events)
+      scoring={"scoring_profile":"dynamic-homogeneous-v2","response_output_budget_tokens":256,"trajectory_output_budget_tokens":999999,"trajectory_representation":"trajectory-lossless-v2"}
+      judged=run_judge_attempt(copied,tmp_path/(protocol+"-judge"),cfg,mode="mock",scorer_config=scoring,mock_replies=replies)
+      assert judged["pass_states"]["trajectory"]["status"]=="blocked"
+      assert judged["pass_states"]["response"]["status"] in ("completed","not_applicable")
+      assert frozen_identity(r.directory/"run.json")==before and frozen_identity(copied)==before
+      # The copy must reach final aggregation, not just preparation/transport.
+      from trustfork.scoring.scoring_versions import rescore_contract
+      from trustfork.runtime.dynamic.common import file_hash
+      original_pointer=file_hash(r.directory/"scoring/current_version.json")
+      contract=rescore_contract(copied,reason="Offline copied-source full aggregation regression",annotation_policy="new",new_annotations=tmp_path/(protocol+"-judge")/"scoring_annotations.json")
+>     summary=score_run(copied,mode="test-fixtures",rescore=contract)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/dynamic/integration/test_plan_judge_followup.py:59: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+trustfork/scoring/dynamic_pipeline.py:384: in score_run
+    return publish_score(path,mode=mode,rescore=rescore,score=_score_run)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+trustfork/scoring/scoring_versions.py:137: in publish_score
+    summary=score(path,mode=mode,output_override=stage,rescore=rescore,frozen_identity=before)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+trustfork/scoring/dynamic_pipeline.py:176: in _score_run
+    validate_operation_evidence(events,directory,run)
+trustfork/scoring/dynamic_pipeline.py:148: in validate_operation_evidence
+    raw=EvidenceStore(root/'operation-evidence',event['branch_id']).get(receipt['raw_result_ref'],branch_id=event['branch_id'])
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+trustfork/runtime/dynamic/events.py:42: in get
+    data = (self.root / (identity + ".json")).read_bytes()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+../../.local/share/uv/python/cpython-3.12.13-linux-x86_64-gnu/lib/python3.12/pathlib.py:1019: in read_bytes
+    with self.open(mode='rb') as f:
+         ^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = PosixPath('[LOCAL_PRIVATE_PATH_006]/pytest-0/test_shared_contract_real_h1_h0/S-rescore/environment/operation-evidence/5d64979e95299cee805a23057232aef26d5e2df5551ca9487c6c322a3975afd7.json')
+mode = 'rb', buffering = -1, encoding = None, errors = None, newline = None
+
+    def open(self, mode='r', buffering=-1, encoding=None,
+             errors=None, newline=None):
+        """
+        Open the file pointed to by this path and return a file object, as
+        the built-in open() function does.
+        """
+        if "b" not in mode:
+            encoding = io.text_encoding(encoding)
+>       return io.open(self, mode, buffering, encoding, errors, newline)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       FileNotFoundError: [Errno 2] No such file or directory: '[LOCAL_PRIVATE_PATH_006]/pytest-0/test_shared_contract_real_h1_h0/S-rescore/environment/operation-evidence/5d64979e95299cee805a23057232aef26d5e2df5551ca9487c6c322a3975afd7.json'
+
+../../.local/share/uv/python/cpython-3.12.13-linux-x86_64-gnu/lib/python3.12/pathlib.py:1013: FileNotFoundError
+=========================== short test summary info ============================
+FAILED tests/dynamic/integration/test_plan_judge_followup.py::test_shared_contract_real_h1_h2_then_s_and_f_without_forced_recruitment
+1 failed in 100.47s (0:01:40)

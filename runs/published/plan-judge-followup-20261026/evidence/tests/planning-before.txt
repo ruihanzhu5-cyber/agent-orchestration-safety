@@ -1,0 +1,16 @@
+
+==================================== ERRORS ====================================
+_______ ERROR collecting tests/dynamic/unit/test_plan_judge_followup.py ________
+ImportError while importing test module '[LOCAL_PRIVATE_PATH_010]/research/trustfork-original-clean-20261024/tests/dynamic/unit/test_plan_judge_followup.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+../../.local/share/uv/python/cpython-3.12.13-linux-x86_64-gnu/lib/python3.12/importlib/__init__.py:90: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/dynamic/unit/test_plan_judge_followup.py:4: in <module>
+    from trustfork.runtime.dynamic.initial_plan import planning_contract,parse_initial_plan,planning_identity
+E   ImportError: cannot import name 'planning_contract' from 'trustfork.runtime.dynamic.initial_plan' ([LOCAL_PRIVATE_PATH_010]/research/trustfork-original-clean-20261024/trustfork/runtime/dynamic/initial_plan.py)
+=========================== short test summary info ============================
+ERROR tests/dynamic/unit/test_plan_judge_followup.py
+!!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!
+1 error in 4.54s

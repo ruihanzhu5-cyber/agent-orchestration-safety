@@ -1,0 +1,16 @@
+
+==================================== ERRORS ====================================
+__________ ERROR collecting tests/dynamic/unit/test_followup_codec.py __________
+ImportError while importing test module '[LOCAL_PRIVATE_PATH_010]/research/trustfork-original-clean-20261024/tests/dynamic/unit/test_followup_codec.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+../../.local/share/uv/python/cpython-3.12.13-linux-x86_64-gnu/lib/python3.12/importlib/__init__.py:90: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/dynamic/unit/test_followup_codec.py:4: in <module>
+    from trustfork.scoring.trajectory_codec import encode_trajectory_v2,decode_trajectory,encode_trajectory
+E   ImportError: cannot import name 'encode_trajectory_v2' from 'trustfork.scoring.trajectory_codec' ([LOCAL_PRIVATE_PATH_010]/research/trustfork-original-clean-20261024/trustfork/scoring/trajectory_codec.py)
+=========================== short test summary info ============================
+ERROR tests/dynamic/unit/test_followup_codec.py
+!!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!
+1 error in 4.00s

@@ -1,0 +1,59 @@
+........................................................................ [ 23%]
+...........F............................................................ [ 47%]
+........................................................................ [ 71%]
+........................................................................ [ 95%]
+...............                                                          [100%]
+=================================== FAILURES ===================================
+__ test_followup_exports_explicit_sources_pass_states_and_only_segment_costs ___
+
+tmp_path = PosixPath('[LOCAL_PRIVATE_PATH_006]/pytest-0/test_followup_exports_explicit0')
+
+    def test_followup_exports_explicit_sources_pass_states_and_only_segment_costs(tmp_path):
+     source=tmp_path/"source";source.mkdir()
+     write_json(source/"campaign.json",{"campaign_id":"followup","parent_campaign_id":"old","identity":{"commit":"new"},"status":"blocked"})
+     write_json(source/"segment.json",{"parent_campaign_id":"old","execution_code_sha":"new","source_hash":"old-hash"})
+     write_json(source/"resolved-config.json",{"judge_binding":"deepseekflash","key_env":"private-credential-variable"})
+     write_json(source/"input-size-audit.json",{"service_prompt_tokens":None,"token_estimate":123,"bytes":999})
+     write_json(source/"fixtures/summary.json",{"passed":False})
+     (source/"plan.jsonl").write_text(json.dumps({"plan_id":"old-gpt-score","kind":"rescore","case_id":"p001","team_model":"gpt4o","protocol":"F","condition":"HP","run_id":"old","status":"blocked","reason":"formal_judge_fixture_gate","run_status":"not_rescored"})+"\\n")
+     write_json(source/"actions/rescore_old_gpt.json",{"status":"blocked"})
+     write_json(source/"gpt-rescore/F-HP/judge-followup/pass-states.json",{"response":{"status":"not_applicable"},"trajectory":{"status":"blocked"}})
+     db=tmp_path/"original.sqlite";b=CampaignBudget(db,campaign_id="original")
+     b.reserve("old",phase="interface_probe",reserved_cost_cny=1,metadata={});b.submitted("old");b.settle("old",settled_cost_cny=.5,usage={})
+     seg=CampaignBudget(db,campaign_id="original",must_exist=True,segment_id="s",segment_cny=20,segment_identity={"old":"hash"})
+     seg.reserve("new",phase="interface_probe",reserved_cost_cny=1,metadata={});seg.submitted("new");seg.settle("new",settled_cost_cny=.1,usage={})
+>    dest=tmp_path/"public";manifest=export_campaign(source,dest,ledger_path=db,ledger_segment_id="s")
+                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/dynamic/unit/test_followup_export.py:19: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+trustfork/runtime/dynamic/review_export.py:167: in export_campaign
+    plans=red.value(jsonlines(source/'plan.jsonl'),'plan')
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+trustfork/runtime/dynamic/review_export.py:17: in jsonlines
+    def jsonlines(p):return [json.loads(x) for x in p.read_text().splitlines() if x.strip()] if p.exists() else []
+                             ^^^^^^^^^^^^^
+../../.local/share/uv/python/cpython-3.12.13-linux-x86_64-gnu/lib/python3.12/json/__init__.py:346: in loads
+    return _default_decoder.decode(s)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <json.decoder.JSONDecoder object at 0x7badbe13b5f0>
+s = '{"plan_id": "old-gpt-score", "kind": "rescore", "case_id": "p001", "team_model": "gpt4o", "protocol": "F", "condition": "HP", "run_id": "old", "status": "blocked", "reason": "formal_judge_fixture_gate", "run_status": "not_rescored"}\\n'
+_w = <built-in method match of re.Pattern object at 0x7badbe2ee740>
+
+    def decode(self, s, _w=WHITESPACE.match):
+        """Return the Python representation of ``s`` (a ``str`` instance
+        containing a JSON document).
+    
+        """
+        obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+        end = _w(s, end).end()
+        if end != len(s):
+>           raise JSONDecodeError("Extra data", s, end)
+E           json.decoder.JSONDecodeError: Extra data: line 1 column 233 (char 232)
+
+../../.local/share/uv/python/cpython-3.12.13-linux-x86_64-gnu/lib/python3.12/json/decoder.py:341: JSONDecodeError
+=========================== short test summary info ============================
+FAILED tests/dynamic/unit/test_followup_export.py::test_followup_exports_explicit_sources_pass_states_and_only_segment_costs
+1 failed, 302 passed in 67.32s (0:01:07)

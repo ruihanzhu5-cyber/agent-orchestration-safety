@@ -1,0 +1,64 @@
+F
+=================================== FAILURES ===================================
+_ test_two_homogeneous_teams_history_t3_judge_and_rescore[deepseekflash-p001] __
+
+tmp_path = PosixPath('[LOCAL_PRIVATE_PATH_006]/pytest-2/test_two_homogeneous_teams_his0')
+team = 'deepseekflash', case = 'p001'
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x75e82d802e70>
+
+    @pytest.mark.parametrize('team,case',[('deepseekflash','p001'),('gpt4o','p024')])
+    def test_two_homogeneous_teams_history_t3_judge_and_rescore(tmp_path,team,case,monkeypatch):
+     config=config_for_team(team);mock=TeamMock();transport=ProviderTransport(config,mode='mock',journal=tmp_path/'model-ledger.jsonl',http=mock,max_requests=120,experiment=resolve_experiment(case,team_model=team))
+     source=PiDynamic(case,tmp_path/'prepare-history',team_model=team,provider=transport)
+     bundle=prepare_history(source,ProviderSource(),source.out/'history-bundle.json')
+     assert bundle['accounting']['mock_environment_task_attempts']==2 and bundle['accounting']['real_history_task_attempts']==0
+     assert all(r['status']=='completed_unjudged' for r in bundle['history']['execution_records'])
+     runtime=PiDynamic(case,tmp_path/'t3',team_model=team,provider=transport);history=load_history(runtime,source.out/'history-bundle.json',reuse_journal=tmp_path/'reuse.jsonl')
+     assert set(history['actor_states'])=={'Main','A','B'}
+     prefix=runtime.run_prefix(ProviderSource(),history=history);save_prefix(runtime,prefix,tmp_path/'prefix-artifact.json')
+     before=len(mock.seen);restored=load_prefix(runtime,tmp_path/'prefix-artifact.json');assert len(mock.seen)==before
+     block=runtime.run_block(ProviderSource(),conditions=['HP'],history=history,prefix=restored)
+     assert block['branches'][0]['run_status']=='valid_behavior'
+     path=runtime.out/'HP/attempt-0/run.json';run=read_json(path);manifest=read_json(path.parent/'run_manifest.json');events=load_events(path.parent,run)
+     assert set(manifest['model_refs'].values())=={team} and manifest['history_bundle_id']==bundle['bundle_id']
+     assert all(v['model']=='synthetic-'+team for v in mock.seen)
+     for actor in ('C','D'):
+      first=next(e for e in events if e['actor_id']==actor and e['event_type']=='model_request_submitted')
+      assert len(first['payload']['actual_input']['messages'])==1
+     assert any(e['event_type']=='message_enqueued' and e['payload']['sender']=='C' and e['payload']['recipients']==['B'] for e in events)
+     assert run['budget']['attempts'][0]==prefix['checkpoint']['budget']['attempts'][0]
+     if case=='p024':assert len({e['stage_id'] for e in events if e['event_type']=='model_request_submitted'})==3
+     raw={p:file_hash(path.parent/p) for p in ('run.json','run_manifest.json','events.jsonl','prefix-events.json')}
+     summary=score_run(path,mode='test-fixtures');assert 'IAS' not in summary['scores'] and 'CAR' not in summary['scores']
+     replies=judge_replies(run,events);scorer={'scoring_profile':'dynamic-homogeneous-v2','temperature':0,'response_output_budget_tokens':256,'trajectory_output_budget_tokens':512,'trajectory_representation':'trajectory-lossless-v1'}
+     failed=copy.deepcopy(replies);failed['trajectory']['body']=json.dumps({'choices':[{'finish_reason':'length','message':{'content':'{}'}}]})
+>    failed_result=run_judge_attempt(path,tmp_path/'judge-failed',config,mode='mock',scorer_config=scorer,mock_replies=failed)
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/dynamic/integration/test_homogeneous_end_to_end.py:66: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+trustfork/tools/judge_dynamic.py:49: in run_judge_attempt
+    write_json(out/'trajectory-output-estimate.json',annotation_output_estimate(value,binding))
+                                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+trustfork/scoring/judge_request.py:200: in annotation_output_estimate
+    validate_schema({k:v for k,v in value.items() if k in schema['properties']},schema)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+value = {'annotation_version': 'dynamic-annotations-v1', 'claim_annotations': [{'status': 'unknown', 'value': None, 'evidence_..., {'status': 'unknown', 'value': None, 'evidence_refs': [], 'annotator_version': 'output-size-template-v1', ...}], ...}
+schema = {'$schema': 'https://json-schema.org/draft/2020-12/schema', 'type': 'object', 'additionalProperties': False, 'required': ['annotation_version', 'claim_annotations', 'action_annotations', 'adoptions', 'goal_state_annotations'], ...}
+
+    def validate_schema(value: dict, schema: dict) -> dict:
+        Draft202012Validator.check_schema(schema)
+        errors = sorted(Draft202012Validator(schema).iter_errors(value), key=lambda e: str(e.path))
+        if errors:
+>           raise DynamicError("schema_validation_failed", errors[0].message,
+                               evidence={"path": list(errors[0].path)})
+E           trustfork.runtime.dynamic.common.DynamicError: schema_validation_failed: 'candidate_claim_ids' is a required property
+
+trustfork/runtime/dynamic/schema.py:49: DynamicError
+=========================== short test summary info ============================
+FAILED tests/dynamic/integration/test_homogeneous_end_to_end.py::test_two_homogeneous_teams_history_t3_judge_and_rescore[deepseekflash-p001]
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! KeyboardInterrupt !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+[LOCAL_PRIVATE_PATH_010]/.local/share/uv/python/cpython-3.12.13-linux-x86_64-gnu/lib/python3.12/selectors.py:415: KeyboardInterrupt
+(to show a full traceback on KeyboardInterrupt use --full-trace)
+1 failed in 144.12s (0:02:24)

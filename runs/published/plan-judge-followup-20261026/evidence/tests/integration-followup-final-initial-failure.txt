@@ -1,0 +1,75 @@
+F
+=================================== FAILURES ===================================
+___ test_shared_contract_real_h1_h2_then_s_and_f_without_forced_recruitment ____
+
+tmp_path = PosixPath('[LOCAL_PRIVATE_PATH_006]/pytest-0/test_shared_contract_real_h1_h0')
+
+    def test_shared_contract_real_h1_h2_then_s_and_f_without_forced_recruitment(tmp_path):
+     cfg=runpy.run_path(str(repo_root()/"tests/dynamic/unit/test_provider_preparation.py"))["configuration"]()
+     for b in cfg["logical_bindings"].values():
+      b["max_output_tokens"]=16384;b["capability"]["max_output_tokens"]=16384
+      b["capability"]["tokenizer"].update(id="o200k_base",version=importlib.metadata.version("tiktoken"),count_method="local-message-content-and-schema-bpe-estimate")
+     mock=MockHistory()
+     transport=ProviderTransport(cfg,mode="mock",journal=tmp_path/"requests.jsonl",http=mock,max_requests=180)
+     history_runtime=PiDynamic("p001",tmp_path/"history",provider=transport)
+     hfile=tmp_path/"history/history-bundle.json"
+     bundle=prepare_history(history_runtime,ProviderSource(),hfile)
+     assert bundle["contract"]["planning_contract"]["contract_version"]=="initial-plan-v2"
+     for status in bundle["task_statuses"].values():assert status=="completed_unjudged"
+     for protocol in ("S","F"):
+      r=PiDynamic("p001",tmp_path/protocol,provider=transport,protocol=protocol)
+      history=load_history(r,hfile)
+      prefix=r.run_prefix(ProviderSource(),history=history)
+      assert prefix["status"]=="triggered"
+      assert prefix["checkpoint"]["bindings"]["prefix_identity"]["planning_contract"]["contract_version"]=="initial-plan-v2"
+      save_prefix(r,prefix,tmp_path/protocol/"prepared-prefix.json")
+      result=r.run_branch(prefix["checkpoint"],"HP",ProviderSource(),attempt=0)
+      assert result["run_status"]=="valid_behavior"
+      events=[json.loads(x) for x in (r.directory/"events.jsonl").read_text().splitlines()]
+      actors={e["actor_id"] for e in events if e["event_type"]=="model_request_submitted"}
+      if protocol=="S":
+       assert {"C","D"}<=actors
+       # Existing admission is programmatic and both enter at the same PLAN_READY boundary.
+       admits=[e for e in events if e["event_type"]=="newcomers_joined"]
+       assert not admits or set(admits[0]["payload"].get("actor_ids",["C","D"]))=={"C","D"}
+      else:assert not ({"C","D"}&actors)
+      from trustfork.scoring.dynamic_pipeline import score_run
+      score_run(r.directory/"run.json",mode="test-fixtures")
+      from trustfork.runtime.dynamic.followup import clone_frozen_run
+      from trustfork.scoring.scoring_versions import frozen_identity
+      from trustfork.tools.judge_dynamic import run_judge_attempt
+      from test_homogeneous_end_to_end import judge_replies
+      before=frozen_identity(r.directory/"run.json")
+      copied=clone_frozen_run(r.directory/"run.json",tmp_path/(protocol+"-rescore"))
+      replies=judge_replies(result,events)
+      scoring={"scoring_profile":"dynamic-homogeneous-v2","response_output_budget_tokens":256,"trajectory_output_budget_tokens":999999,"trajectory_representation":"trajectory-lossless-v2"}
+>     judged=run_judge_attempt(copied,tmp_path/(protocol+"-judge"),cfg,mode="mock",scorer_config=scoring,mock_replies=replies)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/dynamic/integration/test_plan_judge_followup.py:50: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+trustfork/tools/judge_dynamic.py:49: in run_judge_attempt
+    write_json(out/'trajectory-output-estimate.json',annotation_output_estimate(value,binding))
+                                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+trustfork/scoring/judge_request.py:200: in annotation_output_estimate
+    validate_schema({k:v for k,v in value.items() if k in schema['properties']},schema)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+value = {'annotation_version': 'dynamic-annotations-v1', 'claim_annotations': [{'status': 'unknown', 'value': None, 'evidence_..., {'status': 'unknown', 'value': None, 'evidence_refs': [], 'annotator_version': 'output-size-template-v1', ...}], ...}
+schema = {'$schema': 'https://json-schema.org/draft/2020-12/schema', 'type': 'object', 'additionalProperties': False, 'required': ['annotation_version', 'claim_annotations', 'action_annotations', 'adoptions', 'goal_state_annotations'], ...}
+
+    def validate_schema(value: dict, schema: dict) -> dict:
+        Draft202012Validator.check_schema(schema)
+        errors = sorted(Draft202012Validator(schema).iter_errors(value), key=lambda e: str(e.path))
+        if errors:
+>           raise DynamicError("schema_validation_failed", errors[0].message,
+                               evidence={"path": list(errors[0].path)})
+E           trustfork.runtime.dynamic.common.DynamicError: schema_validation_failed: 'candidate_claim_ids' is a required property
+
+trustfork/runtime/dynamic/schema.py:49: DynamicError
+=========================== short test summary info ============================
+FAILED tests/dynamic/integration/test_plan_judge_followup.py::test_shared_contract_real_h1_h2_then_s_and_f_without_forced_recruitment
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! KeyboardInterrupt !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+[LOCAL_PRIVATE_PATH_010]/.local/share/uv/python/cpython-3.12.13-linux-x86_64-gnu/lib/python3.12/selectors.py:415: KeyboardInterrupt
+(to show a full traceback on KeyboardInterrupt use --full-trace)
+1 failed in 153.90s (0:02:33)

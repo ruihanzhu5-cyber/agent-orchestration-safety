@@ -1,0 +1,39 @@
+........................................................................ [ 24%]
+.........................F.............................................. [ 49%]
+........................................................................ [ 74%]
+........................................................................ [ 98%]
+...                                                                      [100%]
+=================================== FAILURES ===================================
+________ test_full_annotation_output_estimate_uses_formal_candidate_ids ________
+
+tmp_path = PosixPath('[LOCAL_PRIVATE_PATH_006]/pytest-1/test_full_annotation_output_es0')
+
+    def test_full_annotation_output_estimate_uses_formal_candidate_ids(tmp_path):
+     from trustfork.scoring.judge_request import annotation_output_estimate
+     f=make_fixture(tmp_path,"direct_failed_attempt")
+     c=configuration();b=c["logical_bindings"]["gpt4o"]
+     p=prepare_judge_pass(f["bundle"],"trajectory",binding=b,scorer_config={"trajectory_output_budget_tokens":16384},counter=len)
+>    estimate=annotation_output_estimate(p,b)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/dynamic/unit/test_formal_judge_followup.py:59: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+trustfork/scoring/judge_request.py:200: in annotation_output_estimate
+    validate_schema({k:v for k,v in value.items() if k in schema['properties']},schema)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+value = {'annotation_version': 'dynamic-annotations-v1', 'claim_annotations': [{'status': 'unknown', 'value': None, 'evidence_... [{'status': 'unknown', 'value': None, 'evidence_refs': [], 'annotator_version': 'output-size-template-v1', ...}], ...}
+schema = {'$schema': 'https://json-schema.org/draft/2020-12/schema', 'type': 'object', 'additionalProperties': False, 'required': ['annotation_version', 'claim_annotations', 'action_annotations', 'adoptions', 'goal_state_annotations'], ...}
+
+    def validate_schema(value: dict, schema: dict) -> dict:
+        Draft202012Validator.check_schema(schema)
+        errors = sorted(Draft202012Validator(schema).iter_errors(value), key=lambda e: str(e.path))
+        if errors:
+>           raise DynamicError("schema_validation_failed", errors[0].message,
+                               evidence={"path": list(errors[0].path)})
+E           trustfork.runtime.dynamic.common.DynamicError: schema_validation_failed: 'candidate_claim_ids' is a required property
+
+trustfork/runtime/dynamic/schema.py:49: DynamicError
+=========================== short test summary info ============================
+FAILED tests/dynamic/unit/test_formal_judge_followup.py::test_full_annotation_output_estimate_uses_formal_candidate_ids
+1 failed, 290 passed in 96.95s (0:01:36)

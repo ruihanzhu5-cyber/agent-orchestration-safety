@@ -1,0 +1,92 @@
+FF.                                                                      [100%]
+=================================== FAILURES ===================================
+_________ test_independent_response_survives_trajectory_capacity_block _________
+
+tmp_path = PosixPath('[LOCAL_PRIVATE_PATH_006]/pytest-0/test_independent_response_surv0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x706a86a33080>
+
+    def test_independent_response_survives_trajectory_capacity_block(tmp_path,monkeypatch):
+     run,c,s,replies=setup(tmp_path,monkeypatch)
+>    result=run_judge_attempt(run,tmp_path/"attempt",c,mode="mock",scorer_config=s,mock_replies=replies)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/dynamic/unit/test_followup_judge_passes.py:26: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+trustfork/tools/judge_dynamic.py:45: in run_judge_attempt
+    if key in passes:client.preflight(value)
+                     ^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <trustfork.scoring.judge_client.JudgeClient object at 0x706a86a335c0>
+prepared = {'version': 'prepared-judge-request-v2', 'request': {'messages': [{'role': 'system', 'content': 'Score each supplied f...onse_id":"d","text":"a genuine fixture delivery"}]}'}], 'tools': [], 'model': 'exact-fixture', 'max_tokens': 128}, ...}
+
+    def preflight(self,prepared):
+        alias=self.transport.config['judge_binding'];binding=self.transport.config['logical_bindings'][alias]
+        if prepared.get('not_applicable'):return {'fits':True,'reason':'not_applicable'}
+        report=self._capacity(prepared)
+        for key in prepared['request']['parameters']:
+            if key not in binding['supported_parameters']:raise DynamicError('judge_parameter_unsupported',key)
+>       if report['fits'] is not True:raise DynamicError(report['reason'],'Preflight every pass before any transmission')
+                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       trustfork.runtime.dynamic.common.DynamicError: capacity_unknown: Preflight every pass before any transmission
+
+trustfork/scoring/judge_client.py:102: DynamicError
+__________ test_first_single_pass_pending_and_explicit_success_reuse ___________
+
+tmp_path = PosixPath('[LOCAL_PRIVATE_PATH_006]/pytest-0/test_first_single_pass_pending0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x706a86a33da0>
+
+    def test_first_single_pass_pending_and_explicit_success_reuse(tmp_path,monkeypatch):
+     run,c,s,replies=setup(tmp_path,monkeypatch)
+>    first=run_judge_attempt(run,tmp_path/"first",c,mode="mock",scorer_config=s,mock_replies=replies,passes=("response",))
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/dynamic/unit/test_followup_judge_passes.py:35: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+run_path = PosixPath('[LOCAL_PRIVATE_PATH_006]/pytest-0/test_first_single_pass_pending0/run.json')
+out = PosixPath('[LOCAL_PRIVATE_PATH_006]/pytest-0/test_first_single_pass_pending0/first')
+config = {'protocol_version': 'dynamic-join-v9-trajectory-portfolio', 'mode': 'offline', 'real_api_enabled': False, 'logical_bi...etic', 'base_url': 'https://mock.invalid/v1', 'model_id': 'exact-fixture', 'key_env': 'UNUSED_FIXTURE_KEY', ...}}, ...}
+mode = 'mock'
+scorer_config = {'response_output_budget_tokens': 128, 'trajectory_output_budget_tokens': 999999, 'trajectory_representation': 'legacy-full'}
+semantic_goals = False, representation = None
+mock_replies = {'response': {'status': 200, 'headers': {'content-type': 'application/json'}, 'body': '{"choices": [{"finish_reason": ..."rsr\\": 0, \\"status\\": \\"complete\\", \\"evidence_refs\\": [\\"response://d\\"]}}}", "reasoning_content": ""}}]}'}}
+max_requests = 4, authorize_real = False, passes = ('response',)
+prior_attempt = None, trajectory_view_override = None
+
+    def run_judge_attempt(run_path,out,config,*,mode,scorer_config,semantic_goals=False,representation=None,mock_replies=None,max_requests=4,authorize_real=False,passes=('response','trajectory'),prior_attempt=None,trajectory_view_override=None):
+     out=Path(out);run_path=Path(run_path)
+     if out.exists():raise DynamicError('judge_output_exists','Choose a new attempt; team remains frozen')
+     run=read_json(run_path);events=load_events(run_path.parent,run);refs={e['branch_id']+'::'+e['event_id'] for e in events}
+     from trustfork.scoring.goal_observer import frozen_workspace
+     for state in (frozen_workspace(run['prefix_export']),frozen_workspace(run['frozen_export'])):
+      refs.add(state['evidence_ref']);refs.update(state.get('evidence_refs',[]));refs.update(row.get('evidence_ref',state['evidence_ref'])+'#'+path for path,row in state['paths'].items())
+     deliveries=extract_formal_deliverables(events,task_id=run['case_id'],allowed_branch_ids={e['branch_id'] for e in events});ids=[d['deliverable_id'] for d in deliveries];refs.update('response://'+d for d in ids)
+     from trustfork.scoring.metric_registry import resolve_scoring_profile
+     profile=resolve_scoring_profile(run.get('experiment_version'),scorer_config.get('scoring_profile'))
+     response=read_json(run_path.parent/'scoring/response_input.json')['data'];trajectory=read_json(run_path.parent/'scoring/trajectory_input.json')['data']
+     if trajectory_view_override is not None:
+      trajectory=trajectory_view_override
+      if trajectory.get('_sanitizer',{}).get('source_events_hash')!=digest(events):raise DynamicError('judge_view_source_mismatch','Derived view must bind the same frozen raw events')
+     semantic=semantic_goals or profile=='dynamic-homogeneous-v2'
+     bundle=build_judge_bundle(response,trajectory,scoring_profile=profile,goal_spec=load_case(run['case_id'])['goal_spec'] if semantic else None,annotation_schema=read_json(config_dir()/'annotation.schema.json') if semantic else None)
+     binding=config['logical_bindings'][config['judge_binding']]
+     prepared={key:prepare_judge_pass(bundle,key,binding=binding,scorer_config=scorer_config,representation=representation) for key in ('response','trajectory')}
+     current=[None]
+     transport=ProviderTransport(config,mode=mode,journal=out/'judge-requests.jsonl',authorize_real=authorize_real,http=(lambda *unused:mock_replies[current[0]]) if mode=='mock' else None,max_requests=max_requests,kind='judge')
+     if scorer_config.get('judge_binding',config['judge_binding'])!=config['judge_binding']:raise DynamicError('judge_binding_mismatch','Scorer and frozen Judge binding must agree')
+     client=JudgeClient(transport);annotation={'response_judgements':{},'trajectory_judgements':{},'scorer_manifest_hash':scorer_manifest()['manifest_hash'],'synthetic':transport.synthetic,'scoring_profile':profile,'judge_passes':{}}
+     for key,value in prepared.items():write_json(out/(key+'-prepared.json'),value)
+     pending=[k for k,v in prepared.items() if k in passes and not v['not_applicable']]
+     if len(pending)>max_requests:raise DynamicError('judge_request_budget_blocked','All pending passes must fit the independent request ceiling')
+     for key,value in prepared.items():
+      if key not in passes and not value['not_applicable']:
+>      if prior_attempt is None:raise DynamicError('judge_prior_pass_required','Explicit prior successful pass required')
+                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E      trustfork.runtime.dynamic.common.DynamicError: judge_prior_pass_required: Explicit prior successful pass required
+
+trustfork/tools/judge_dynamic.py:38: DynamicError
+=========================== short test summary info ============================
+FAILED tests/dynamic/unit/test_followup_judge_passes.py::test_independent_response_survives_trajectory_capacity_block
+FAILED tests/dynamic/unit/test_followup_judge_passes.py::test_first_single_pass_pending_and_explicit_success_reuse
+2 failed, 1 passed in 3.79s

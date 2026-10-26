@@ -1,0 +1,33 @@
+FF............                                                           [100%]
+=================================== FAILURES ===================================
+_________ test_independent_response_survives_trajectory_capacity_block _________
+
+tmp_path = PosixPath('[LOCAL_PRIVATE_PATH_006]/pytest-0/test_independent_response_surv0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7e69786d86e0>
+
+    def test_independent_response_survives_trajectory_capacity_block(tmp_path,monkeypatch):
+     run,c,s,replies=setup(tmp_path,monkeypatch)
+     result=run_judge_attempt(run,tmp_path/"attempt",c,mode="mock",scorer_config=s,mock_replies=replies)
+>    assert result["pass_states"]["response"]["status"]=="completed"
+E    AssertionError: assert 'blocked' == 'completed'
+E      
+E      - completed
+E      + blocked
+
+tests/dynamic/unit/test_followup_judge_passes.py:27: AssertionError
+__________ test_first_single_pass_pending_and_explicit_success_reuse ___________
+
+tmp_path = PosixPath('[LOCAL_PRIVATE_PATH_006]/pytest-0/test_first_single_pass_pending0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7e697866b2c0>
+
+    def test_first_single_pass_pending_and_explicit_success_reuse(tmp_path,monkeypatch):
+     run,c,s,replies=setup(tmp_path,monkeypatch)
+     first=run_judge_attempt(run,tmp_path/"first",c,mode="mock",scorer_config=s,mock_replies=replies,passes=("response",))
+>    assert first["judge_attempts"]==1 and first["pass_states"]["trajectory"]["status"]=="pending"
+E    assert (0 == 1)
+
+tests/dynamic/unit/test_followup_judge_passes.py:36: AssertionError
+=========================== short test summary info ============================
+FAILED tests/dynamic/unit/test_followup_judge_passes.py::test_independent_response_survives_trajectory_capacity_block
+FAILED tests/dynamic/unit/test_followup_judge_passes.py::test_first_single_pass_pending_and_explicit_success_reuse
+2 failed, 12 passed in 5.51s

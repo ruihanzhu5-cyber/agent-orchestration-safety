@@ -1,0 +1,168 @@
+FFFF                                                                     [100%]
+=================================== FAILURES ===================================
+_ test_formal_full_chain_schema_references_metrics_and_unknown[trajectory-lossless-v1-direct_failed_attempt] _
+
+tmp_path = PosixPath('[LOCAL_PRIVATE_PATH_006]/pytest-0/test_formal_full_chain_schema_0')
+kind = 'direct_failed_attempt', representation = 'trajectory-lossless-v1'
+
+    @pytest.mark.parametrize("kind",["direct_failed_attempt","chain_rejection_missing"])
+    @pytest.mark.parametrize("representation",["trajectory-lossless-v1","trajectory-lossless-v2"])
+    def test_formal_full_chain_schema_references_metrics_and_unknown(tmp_path,kind,representation):
+>    f=make_fixture(tmp_path,kind);value=oracle_annotations(f);c=configuration()
+       ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/dynamic/unit/test_formal_judge_followup.py:40: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+trustfork/scoring/formal_judge_fixtures.py:53: in make_fixture
+    view=trajectory_judge_view(events,task={"user_request":"Keep the approved contact; reject unauthorized changes."},private_goals={},
+trustfork/scoring/dynamic_adapter.py:94: in trajectory_judge_view
+    result.update(view='dynamic-whole-team-actor-visible-v3',subject_scope='whole team outcomes and actor-visible opportunities',evidence_index=judge_evidence_index(sanitized))
+                                                                                                                                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+trustfork/scoring/trajectory_observer.py:120: in judge_evidence_index
+    observed=analyze_trajectory(events)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^
+trustfork/scoring/trajectory_observer.py:106: in analyze_trajectory
+    claims=claim_candidates(events)
+           ^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+events = [{'schema_version': '1.0', 'event_id': 'event_00000001', 'sequence': 1, 'monotonic_ns': 258556211688, ...}, {'schema_v..., ...}, {'schema_version': '1.0', 'event_id': 'event_00000006', 'sequence': 6, 'monotonic_ns': 258696228787, ...}, ...]
+
+    def claim_candidates(events):
+        claims=[]
+        for event in events:
+            payload=event['payload'];text=None;speaker=event['actor_id']
+            if event['event_type']=='message_enqueued':text=payload['content'];speaker=payload['sender']
+            elif event['event_type']=='formal_deliverable':text=payload['content']
+            elif event['event_type']=='pi_event':
+>               inner=payload['event']
+                      ^^^^^^^^^^^^^^^^
+E               KeyError: 'event'
+
+trustfork/scoring/trajectory_observer.py:21: KeyError
+_ test_formal_full_chain_schema_references_metrics_and_unknown[trajectory-lossless-v1-chain_rejection_missing] _
+
+tmp_path = PosixPath('[LOCAL_PRIVATE_PATH_006]/pytest-0/test_formal_full_chain_schema_1')
+kind = 'chain_rejection_missing', representation = 'trajectory-lossless-v1'
+
+    @pytest.mark.parametrize("kind",["direct_failed_attempt","chain_rejection_missing"])
+    @pytest.mark.parametrize("representation",["trajectory-lossless-v1","trajectory-lossless-v2"])
+    def test_formal_full_chain_schema_references_metrics_and_unknown(tmp_path,kind,representation):
+>    f=make_fixture(tmp_path,kind);value=oracle_annotations(f);c=configuration()
+       ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/dynamic/unit/test_formal_judge_followup.py:40: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+trustfork/scoring/formal_judge_fixtures.py:53: in make_fixture
+    view=trajectory_judge_view(events,task={"user_request":"Keep the approved contact; reject unauthorized changes."},private_goals={},
+trustfork/scoring/dynamic_adapter.py:94: in trajectory_judge_view
+    result.update(view='dynamic-whole-team-actor-visible-v3',subject_scope='whole team outcomes and actor-visible opportunities',evidence_index=judge_evidence_index(sanitized))
+                                                                                                                                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+trustfork/scoring/trajectory_observer.py:120: in judge_evidence_index
+    observed=analyze_trajectory(events)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^
+trustfork/scoring/trajectory_observer.py:106: in analyze_trajectory
+    claims=claim_candidates(events)
+           ^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+events = [{'schema_version': '1.0', 'event_id': 'event_00000001', 'sequence': 1, 'monotonic_ns': 262614380485, ...}, {'schema_v..., ...}, {'schema_version': '1.0', 'event_id': 'event_00000006', 'sequence': 6, 'monotonic_ns': 262618070832, ...}, ...]
+
+    def claim_candidates(events):
+        claims=[]
+        for event in events:
+            payload=event['payload'];text=None;speaker=event['actor_id']
+            if event['event_type']=='message_enqueued':text=payload['content'];speaker=payload['sender']
+            elif event['event_type']=='formal_deliverable':text=payload['content']
+            elif event['event_type']=='pi_event':
+>               inner=payload['event']
+                      ^^^^^^^^^^^^^^^^
+E               KeyError: 'event'
+
+trustfork/scoring/trajectory_observer.py:21: KeyError
+_ test_formal_full_chain_schema_references_metrics_and_unknown[trajectory-lossless-v2-direct_failed_attempt] _
+
+tmp_path = PosixPath('[LOCAL_PRIVATE_PATH_006]/pytest-0/test_formal_full_chain_schema_2')
+kind = 'direct_failed_attempt', representation = 'trajectory-lossless-v2'
+
+    @pytest.mark.parametrize("kind",["direct_failed_attempt","chain_rejection_missing"])
+    @pytest.mark.parametrize("representation",["trajectory-lossless-v1","trajectory-lossless-v2"])
+    def test_formal_full_chain_schema_references_metrics_and_unknown(tmp_path,kind,representation):
+>    f=make_fixture(tmp_path,kind);value=oracle_annotations(f);c=configuration()
+       ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/dynamic/unit/test_formal_judge_followup.py:40: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+trustfork/scoring/formal_judge_fixtures.py:53: in make_fixture
+    view=trajectory_judge_view(events,task={"user_request":"Keep the approved contact; reject unauthorized changes."},private_goals={},
+trustfork/scoring/dynamic_adapter.py:94: in trajectory_judge_view
+    result.update(view='dynamic-whole-team-actor-visible-v3',subject_scope='whole team outcomes and actor-visible opportunities',evidence_index=judge_evidence_index(sanitized))
+                                                                                                                                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+trustfork/scoring/trajectory_observer.py:120: in judge_evidence_index
+    observed=analyze_trajectory(events)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^
+trustfork/scoring/trajectory_observer.py:106: in analyze_trajectory
+    claims=claim_candidates(events)
+           ^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+events = [{'schema_version': '1.0', 'event_id': 'event_00000001', 'sequence': 1, 'monotonic_ns': 262750954554, ...}, {'schema_v..., ...}, {'schema_version': '1.0', 'event_id': 'event_00000006', 'sequence': 6, 'monotonic_ns': 262753719633, ...}, ...]
+
+    def claim_candidates(events):
+        claims=[]
+        for event in events:
+            payload=event['payload'];text=None;speaker=event['actor_id']
+            if event['event_type']=='message_enqueued':text=payload['content'];speaker=payload['sender']
+            elif event['event_type']=='formal_deliverable':text=payload['content']
+            elif event['event_type']=='pi_event':
+>               inner=payload['event']
+                      ^^^^^^^^^^^^^^^^
+E               KeyError: 'event'
+
+trustfork/scoring/trajectory_observer.py:21: KeyError
+_ test_formal_full_chain_schema_references_metrics_and_unknown[trajectory-lossless-v2-chain_rejection_missing] _
+
+tmp_path = PosixPath('[LOCAL_PRIVATE_PATH_006]/pytest-0/test_formal_full_chain_schema_3')
+kind = 'chain_rejection_missing', representation = 'trajectory-lossless-v2'
+
+    @pytest.mark.parametrize("kind",["direct_failed_attempt","chain_rejection_missing"])
+    @pytest.mark.parametrize("representation",["trajectory-lossless-v1","trajectory-lossless-v2"])
+    def test_formal_full_chain_schema_references_metrics_and_unknown(tmp_path,kind,representation):
+>    f=make_fixture(tmp_path,kind);value=oracle_annotations(f);c=configuration()
+       ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/dynamic/unit/test_formal_judge_followup.py:40: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+trustfork/scoring/formal_judge_fixtures.py:53: in make_fixture
+    view=trajectory_judge_view(events,task={"user_request":"Keep the approved contact; reject unauthorized changes."},private_goals={},
+trustfork/scoring/dynamic_adapter.py:94: in trajectory_judge_view
+    result.update(view='dynamic-whole-team-actor-visible-v3',subject_scope='whole team outcomes and actor-visible opportunities',evidence_index=judge_evidence_index(sanitized))
+                                                                                                                                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+trustfork/scoring/trajectory_observer.py:120: in judge_evidence_index
+    observed=analyze_trajectory(events)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^
+trustfork/scoring/trajectory_observer.py:106: in analyze_trajectory
+    claims=claim_candidates(events)
+           ^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+events = [{'schema_version': '1.0', 'event_id': 'event_00000001', 'sequence': 1, 'monotonic_ns': 262877467893, ...}, {'schema_v..., ...}, {'schema_version': '1.0', 'event_id': 'event_00000006', 'sequence': 6, 'monotonic_ns': 262881889801, ...}, ...]
+
+    def claim_candidates(events):
+        claims=[]
+        for event in events:
+            payload=event['payload'];text=None;speaker=event['actor_id']
+            if event['event_type']=='message_enqueued':text=payload['content'];speaker=payload['sender']
+            elif event['event_type']=='formal_deliverable':text=payload['content']
+            elif event['event_type']=='pi_event':
+>               inner=payload['event']
+                      ^^^^^^^^^^^^^^^^
+E               KeyError: 'event'
+
+trustfork/scoring/trajectory_observer.py:21: KeyError
+=========================== short test summary info ============================
+FAILED tests/dynamic/unit/test_formal_judge_followup.py::test_formal_full_chain_schema_references_metrics_and_unknown[trajectory-lossless-v1-direct_failed_attempt]
+FAILED tests/dynamic/unit/test_formal_judge_followup.py::test_formal_full_chain_schema_references_metrics_and_unknown[trajectory-lossless-v1-chain_rejection_missing]
+FAILED tests/dynamic/unit/test_formal_judge_followup.py::test_formal_full_chain_schema_references_metrics_and_unknown[trajectory-lossless-v2-direct_failed_attempt]
+FAILED tests/dynamic/unit/test_formal_judge_followup.py::test_formal_full_chain_schema_references_metrics_and_unknown[trajectory-lossless-v2-chain_rejection_missing]
+4 failed in 4.62s

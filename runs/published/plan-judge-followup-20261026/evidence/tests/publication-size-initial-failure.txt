@@ -1,0 +1,9 @@
+export selected files 199 source text bytes 1261751676
+Traceback (most recent call last):
+  File "[LOCAL_PRIVATE_PATH_002]/plan-judge-followup-20261026/export_review.py", line 15, in <module>
+    manifest=export_campaign(root,destination,secrets=secrets,private_paths=paths,ledger_path=read_json(root/'resolved-config.json')['campaign_budget']['path'],ledger_segment_id='plan-judge-followup-20261026')
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "[LOCAL_PRIVATE_PATH_010]/research/trustfork-original-clean-20261024/trustfork/runtime/dynamic/review_export.py", line 264, in export_campaign
+    if sum(map(len,files.values()))>max_total_bytes:raise DynamicError('review_export_size_exceeded','Lossless packing still exceeds publication limit; do not silently omit evidence')
+                                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+trustfork.runtime.dynamic.common.DynamicError: review_export_size_exceeded: Lossless packing still exceeds publication limit; do not silently omit evidence
