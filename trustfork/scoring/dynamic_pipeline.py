@@ -306,7 +306,7 @@ def _score_run(path,*,mode='formal',output_override=None,rescore=None,frozen_ide
         expected_bundle=build_judge_bundle(response_input,trajectory_input,scoring_profile=profile,
             goal_spec=case['goal_spec'] if metadata.get('semantic_goals') or profile=='dynamic-homogeneous-v2' else None,
             annotation_schema=read_json(repo_root()/'trustfork/config/dynamic/annotation.schema.json') if metadata.get('semantic_goals') or profile=='dynamic-homogeneous-v2' else None)
-        expected=prepare_judge_pass(expected_bundle,key,binding=judge_binding,scorer_config=stored['scorer_config'],representation=stored['representation'])
+        expected=prepare_judge_pass(expected_bundle,key,binding=judge_pass_binding(metadata,judge_binding),scorer_config=stored['scorer_config'],representation=stored['representation'])
         if digest(expected['request'])!=stored['request_hash'] or digest(expected['wire_payload'])!=stored['wire_payload_hash']:
             raise DynamicError('annotation_judge_request_mismatch','Sidecar does not bind frozen view/profile/representation/parameters')
         prepared[key]=expected
@@ -372,6 +372,19 @@ def _score_run(path,*,mode='formal',output_override=None,rescore=None,frozen_ide
     if rescore:identity['rescore']=rescore
     freeze_scoring_version(output,identity)
     return summary
+
+
+def judge_pass_binding(metadata,original_binding):
+    # Legacy sidecars were checked against the frozen origin. New sidecars bind
+    # the scoring route explicitly without rewriting the behavior manifest.
+    if 'resolved_judge_binding' not in metadata:
+        if any(k in metadata for k in ('judge_binding_identity_version','resolved_judge_binding_hash')):
+            raise DynamicError('annotation_judge_binding_invalid','Incomplete explicit scoring binding')
+        return original_binding
+    binding=metadata['resolved_judge_binding']
+    if metadata.get('judge_binding_identity_version')!='judge-binding-snapshot-v1' or not isinstance(binding,dict) or digest(binding)!=metadata.get('resolved_judge_binding_hash') or any(k in binding for k in ('key_env','api_key','authorization','access_token')):
+        raise DynamicError('annotation_judge_binding_invalid','Explicit scoring binding version/hash or public fields differ')
+    return binding
 
 
 def score_run(path,*,mode='formal',rescore=None):

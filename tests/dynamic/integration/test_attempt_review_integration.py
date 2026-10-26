@@ -22,7 +22,7 @@ def test_compatible_history_budget_and_real_checkpoint_resume_through_final_mock
  budget.reserve('old-paid',phase='engineering_smoke',reserved_cost_cny=8,metadata={});budget.submitted('old-paid');budget.settle('old-paid',settled_cost_cny=7,usage={})
  migrate_attempts(budget.path,apply=True,backup=tmp_path/'backup.sqlite3')
  attempt=ExecutionAttempt(budget,tmp_path/'new-attempt',attempt_id='review-offline',parent_attempt='old-test',identity={'execution_code_sha':'synthetic-current-code'})
- cfg=configured(budget.path);cfg['judge_binding']='deepseekflash';cfg['campaign_budget'].update(segment_id=budget.segment_id,segment_cny=20,segment_identity={'identity_hash':'old-test'},must_exist=True)
+ cfg=configured(budget.path);cfg['judge_binding']='gpt4o';cfg['campaign_budget'].update(segment_id=budget.segment_id,segment_cny=20,segment_identity={'identity_hash':'old-test'},must_exist=True)
  for binding in cfg['logical_bindings'].values():binding['capability']['tokenizer'].update(id='o200k_base',version=importlib.metadata.version('tiktoken'),count_method='local-message-content-and-schema-bpe-estimate')
  for limits in cfg['execution_limits'].values():limits.update(requests_per_minute=10000,tokens_per_minute=100000000)
  mock=MockHistory();t=ProviderTransport(cfg,mode='mock',journal=attempt.path/'requests.jsonl',http=mock,max_requests=100)
@@ -64,6 +64,7 @@ def test_compatible_history_budget_and_real_checkpoint_resume_through_final_mock
  score_run(path,mode='test-fixtures');raw=frozen_identity(path);events=load_events(path.parent,run);replies=judge_replies(run,events)
  # Full strict Judge chain with synthetic replies. These anchors are not research judgments.
  for binding in cfg['logical_bindings'].values():binding.update(context_window=1000000,max_output_tokens=65536);binding['capability'].update(effective_context_tokens=1000000,max_output_tokens=65536)
+ cfg['judge_binding']='deepseekflash' # Different new scorer; frozen behavior manifest keeps GPT Judge.
  judged=run_judge_attempt(path,attempt.path/'judge',cfg,mode='mock',scorer_config={'scoring_profile':'dynamic-homogeneous-v2','execution_scope':'engineering_smoke','response_output_budget_tokens':16384,'trajectory_output_budget_tokens':32768,'trajectory_representation':'trajectory-lossless-v2'},mock_replies=replies,max_requests=4,request_namespace=attempt.request_id('score/S/HP','judge'),execution_context={'execution_attempt_id':attempt.attempt_id,'execution_stage_id':'score/S/HP','execution_review_id':'synthetic-runtime-review'})
  assert all(s['status'] in ('completed','not_applicable') for s in judged['pass_states'].values())
  contract=rescore_contract(path,reason='Synthetic reviewed resume integration',annotation_policy='new',new_annotations=attempt.path/'judge/scoring_annotations.json')

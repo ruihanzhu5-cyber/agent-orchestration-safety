@@ -103,7 +103,8 @@ def run_judge_attempt(run_path,out,config,*,mode,scorer_config,semantic_goals=Fa
    consume(candidate)
   except DynamicError as error:
    state.update(status='failed',reason=error.code,error=error.record());write_json(out/(key+'-error.json'),error.record());save();continue
-  candidate['judge_passes'][key]={'prepared':value,'result_hash':digest(result),'semantic_goals':bool(semantic and key=='trajectory'),'synthetic':transport.synthetic}
+  snapshot={k:deepcopy(binding[k]) for k in ('api','provider','base_url','model_id','context_window','max_output_tokens','supported_parameters','capability','compat','thinking','reasoning_effort','output_token_parameter','engineering_counting') if k in binding}
+  candidate['judge_passes'][key]={'prepared':value,'result_hash':digest(result),'semantic_goals':bool(semantic and key=='trajectory'),'synthetic':transport.synthetic,'judge_binding_identity_version':'judge-binding-snapshot-v1','resolved_judge_binding':snapshot,'resolved_judge_binding_hash':digest(snapshot)}
   annotation=candidate
   state.update(status='completed',reason='validated_pass',result_hash=digest(result),reused=key in reuse)
   if key in reuse:state['prior_attempt']=str(Path(prior_attempt))
