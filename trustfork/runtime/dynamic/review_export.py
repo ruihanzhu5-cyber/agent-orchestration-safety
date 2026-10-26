@@ -260,7 +260,7 @@ def export_campaign(source,destination,*,secrets=(),private_paths=(),snapshot=Fa
   for row in mappings:
    for item in row['exports']:
     item['path']=renames.get(item['path'],item['path']);item['export_hash']=sha(files[item['path']]);item['size']=len(files[item['path']])
-  files['README.md']+=b'\nLarge evidence is losslessly packed: duplicate JSON uses content-reference-v1; large JSON/JSONL uses gzip. Conversation event order/IDs and links to complete payloads remain. See manifest.json packing and trustfork/runtime/dynamic/review_packing.py for reconstruction. GitHub may not expand gzip.\n'
+  files['README.md']+=b'\nLarge evidence is losslessly packed: duplicate JSON uses content-reference-v1; large JSON uses gzip and large JSONL uses XZ. Conversation event order/IDs and links to complete payloads remain. See manifest.json packing and trustfork/runtime/dynamic/review_packing.py for reconstruction. GitHub may not expand gzip/XZ.\n'
  if sum(map(len,files.values()))>max_total_bytes:raise DynamicError('review_export_size_exceeded','Lossless packing still exceeds publication limit; do not silently omit evidence')
  manifest={'version':VERSION,'campaign_id':campaign.get('campaign_id',source.name),'execution_code_sha':campaign.get('identity',{}).get('commit'),
   'exporter_source_hash':file_hash(Path(__file__)),'snapshot':snapshot,'snapshot_boundary':{'source_files':before,'campaign_status':campaign.get('status')},'source_export_mapping':mappings,

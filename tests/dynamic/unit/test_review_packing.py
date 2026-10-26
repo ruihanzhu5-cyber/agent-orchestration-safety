@@ -33,3 +33,16 @@ def test_complete_export_auto_packs_within_limit_and_keeps_manifest_hashes(tmp_p
  assert json.loads(read_review_bytes(out,'evidence/diagnostics/large.json.gz'))['complete_text']=='RISK_SYNTHETIC '*40000
  for row in manifest['files']:assert sha((out/row['path']).read_bytes())==row['export_hash']
  export_campaign(source,out,max_total_bytes=100000)
+
+def test_xz_large_jsonl_is_deterministic_complete_and_hash_bound(tmp_path):
+ raw=b"".join(canonical({"sequence":i,"event_id":str(i),"text":"independent occurrence "+("long context "*8000)})+b"\n" for i in range(50))
+ files={"evidence/events.jsonl":raw,"README.md":b"[Events](evidence/events.jsonl)"}
+ out,rename,note=pack_review_files(files)
+ name=rename["evidence/events.jsonl"]
+ assert name.endswith(".xz") and len(out[name])<len(raw)/100
+ for n,data in out.items():
+  p=tmp_path/n;p.parent.mkdir(parents=True,exist_ok=True);p.write_bytes(data)
+ assert read_review_bytes(tmp_path,name)==raw and len(read_review_bytes(tmp_path,name).splitlines())==50
+ assert note["xz_files"][0]["uncompressed_sha256"]==sha(raw)
+ assert note["xz_files"][0]["stored_sha256"]==sha(out[name])
+ assert name.encode() in out["README.md"] and pack_review_files(files)[0]==out

@@ -1,9 +1,9 @@
 """Lossless publication packing only; never used by runtime or scoring."""
-import gzip,json,posixpath,re,hashlib
+import gzip,lzma,json,posixpath,re,hashlib
 from pathlib import Path
 from .common import canonical,DynamicError
 def sha(v):return hashlib.sha256(v).hexdigest()
-VERSION='review-lossless-packing-v1'
+VERSION='review-lossless-packing-v2'
 
 def pack_review_files(original):
  files=dict(original);duplicates=[];compressed=[];external=[]
@@ -29,7 +29,7 @@ def pack_review_files(original):
    if name==target:continue
    files[name]=canonical({'review_encoding':'content-reference-v1','review_duplicate_ref':target,'uncompressed_sha256':digest})+b'\n'
    duplicates.append({'path':name,'content_ref':target,'content_sha256':digest,'bytes_saved_before_compression':len(original.get(name,b''))-len(files[name])})
- rename={n:n+'.gz' for n,d in files.items() if n.endswith(('.json','.jsonl','.txt')) and '/' in n and len(d)>256*1024}
+ rename={n:n+('.xz' if n.endswith('.jsonl') else '.gz') for n,d in files.items() if n.endswith(('.json','.jsonl','.txt')) and '/' in n and len(d)>256*1024}
  packed={}
  # Leaf JSON/data files first, so large-record wrapper hashes can refer to stored bytes.
  for name,data in files.items():
@@ -61,13 +61,13 @@ def pack_review_files(original):
     v.update(large_record_ref=target,export_hash=sha(packed[target]))
    rows.append(canonical(v)+b'\n')
   raw=b''.join(rows);target=rename.get(name,name)
-  packed[target]=gzip.compress(raw,mtime=0) if name in rename else raw
+  packed[target]=(lzma.compress(raw,format=lzma.FORMAT_XZ,preset=6) if target.endswith('.xz') else gzip.compress(raw,mtime=0)) if name in rename else raw
   if name in rename:compressed.append({'original_review_path':name,'stored_path':target,'uncompressed_sha256':sha(raw),'uncompressed_size':len(raw),'stored_sha256':sha(packed[target]),'stored_size':len(packed[target])})
  for d in duplicates:d['content_ref']=rename.get(d['content_ref'],d['content_ref'])
  for e in external:e['payload_ref']=rename.get(e['payload_ref'],e['payload_ref'])
- note={'version':VERSION,'duplicate_files':duplicates,'gzip_files':compressed,'conversation_payload_refs':external,
-  'reconstruction':'read_review_bytes expands gzip/content-reference-v1. JSONL large_record_ref wrappers preserve the original record and order. Source/export hashes are distinct; runtime/scoring originals are untouched.',
-  'github_view':'GitHub may not expand gzip. Plain README/config/plan/results/costs/tests and conversation event indexes remain readable. Download and expand gzip to inspect complete large records.'}
+ note={'version':VERSION,'duplicate_files':duplicates,'gzip_files':[r for r in compressed if r['stored_path'].endswith('.gz')],'xz_files':[r for r in compressed if r['stored_path'].endswith('.xz')],'conversation_payload_refs':external,
+  'reconstruction':'read_review_bytes expands gzip, XZ and content-reference-v1. JSONL large_record_ref wrappers preserve the original record and order. Source/export hashes are distinct; runtime/scoring originals are untouched.',
+  'github_view':'GitHub may not expand gzip. Plain README/config/plan/results/costs/tests and conversation event indexes remain readable. Download and expand gzip/XZ to inspect complete large records.'}
  return packed,rename,note
 
 def read_review_bytes(root,relative,_seen=None):
@@ -77,6 +77,7 @@ def read_review_bytes(root,relative,_seen=None):
  if path in seen:raise DynamicError('review_reference_cycle',relative)
  seen.add(path);raw=path.read_bytes()
  if str(path).endswith('.gz'):raw=gzip.decompress(raw)
+ elif str(path).endswith('.xz'):raw=lzma.decompress(raw)
  try:v=json.loads(raw)
  except (ValueError,UnicodeError):return raw
  if isinstance(v,dict) and v.get('review_encoding')=='content-reference-v1':
