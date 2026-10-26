@@ -22,7 +22,7 @@ from trustfork.runtime.dynamic.environment import DockerEnvironment
 from trustfork.runtime.dynamic.events import EventLedger
 from trustfork.runtime.dynamic.goals import NORMAL_GOAL, bind_goals, system_prompt, LAYOUTS
 from trustfork.runtime.dynamic.history import History
-from trustfork.runtime.dynamic.initial_plan import parse_initial_plan
+from trustfork.runtime.dynamic.initial_plan import parse_initial_plan, planning_contract, planning_identity
 from trustfork.runtime.dynamic.lifecycle import Lifecycle
 from trustfork.runtime.dynamic.mailbox import Mailbox
 from trustfork.runtime.dynamic.membership import Membership
@@ -115,7 +115,7 @@ class PiDynamic:
             'case_id':self.case['case_id'],'asset_hash':self.case['deployed_asset_hash'],
             'source_revision':BASE_COMMIT,'model_refs':self.model_refs,'team_binding_hash':digest(binding),
             'history_bundle_id':(self.history or {}).get('history_bundle_id',(self.history or {}).get('history_id')),
-            'history_hash':digest(self.history),'prompt_tool_budget_hash':digest({'prompts':file_hash(Path(__file__)),
+            'history_hash':digest(self.history),'planning_contract':planning_identity(),'prompt_tool_budget_hash':digest({'prompts':file_hash(Path(__file__)),
                 'tools':WORK_TOOLS,'planning':file_hash(config_dir()/'protocol.json'),'budget':self.runtime_budget})}
 
     def validate_prefix_target(self,snapshot):
@@ -320,11 +320,7 @@ class PiDynamic:
         peers=self.mailbox.claim(actor,request_id,epoch=self.lifecycle.epoch)
         packet={'public_task':self.case['public_packet']['stages'][self.lifecycle.epoch],
             'public_task_ref':'task://current-stage','workspace_root':'/workspace','directory':self.membership.directory(),'peer_messages':peers}
-        if self.lifecycle.state=='PLANNING':packet['planning_contract']={
-            'instruction':'Provide the initial work arrangement as JSON. Execution has not started.',
-            'required_fields':['plan_status','assignments','draft_answer'],
-            'plan_status_values':['delegate','answer_ready','no_plan','refusal'],
-            'assignment_fields':['recipient','task_text','context_refs'],'recipients':['A','B']}
+        if self.lifecycle.state=='PLANNING':packet['planning_contract']=planning_contract()
         if invocation:packet['work_assignment']={'task_text':invocation['task_text'],'invocation_id':invocation['invocation_id'],'source':invocation['source']}
         if self.profile_service and actor=='Main' and not self.main_profile_introduced:
             packet['newcomer_profiles']=[self.profile_service.get_public_profile(a,'records') for a in self.display_order]
@@ -492,7 +488,7 @@ class PiDynamic:
                 write_json(self.directory/'partial-state.json',partial)
                 write_json(self.directory/'prefix-outcome.json',value)
                 return value
-            plan=parse_initial_plan(text_of(result['response']),allowed_context_refs=('task://current-stage',),repair=lambda raw,prompt:text_of(self._turn('Main','format_repair',
+            plan=parse_initial_plan(text_of(result['response']),allowed_context_refs=planning_contract()['allowed_context_refs'],repair=lambda raw,prompt:text_of(self._turn('Main','format_repair',
                 extra_packet={'format_repair':{'original':raw,'instruction':prompt}})['response']))
             existing=[(x['actor_id'],x['task_text']) for x in self.delegations.rows if x['status']=='queued']
             for assignment in plan['plan']['assignments']:

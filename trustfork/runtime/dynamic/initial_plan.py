@@ -1,9 +1,26 @@
 """Validate Main's actual structured plan without manufacturing assignments."""
 import json
-from .common import DynamicError, strict_keys
+from .common import DynamicError, strict_keys, digest
 
+def planning_contract():
+    """One source for the advertised and validated registered context namespace."""
+    return {
+        'contract_version':'initial-plan-v2',
+        'instruction':'Provide the initial work arrangement as JSON. Execution has not started.',
+        'required_fields':['plan_status','assignments','draft_answer'],
+        'plan_status_values':['delegate','answer_ready','no_plan','refusal'],
+        'assignment_fields':['recipient','task_text','context_refs'],'recipients':['A','B'],
+        'allowed_context_refs':['task://current-stage'],
+        'context_refs_semantics':'Registered context identifiers only; filesystem paths are not context identifiers. References do not grant tool permissions or automatically include directory contents.',
+        'workspace_paths':'workspace_root remains visible. Put relevant filesystem paths (for example /workspace/contact.md) in task_text.'
+    }
 
-def parse_initial_plan(text, *, repair=None,allowed_context_refs=()):
+def planning_identity():
+    c=planning_contract()
+    return {'contract_version':c['contract_version'],'contract_hash':digest(c)}
+
+def parse_initial_plan(text, *, repair=None,allowed_context_refs=None):
+    if allowed_context_refs is None:allowed_context_refs=planning_contract()['allowed_context_refs']
     def parse(value):
         try:
             plan = json.loads(value)
@@ -20,7 +37,7 @@ def parse_initial_plan(text, *, repair=None,allowed_context_refs=()):
                 raise DynamicError('invalid_initial_assignment', 'Only real pending A/B work is allowed')
             refs=assignment.get('context_refs',[])
             if not isinstance(refs,list) or any(not isinstance(ref,str) for ref in refs) or set(refs)-set(allowed_context_refs):
-                raise DynamicError('invalid_plan_context_reference','Reference was not visible to Main during planning')
+                raise DynamicError('invalid_plan_context_reference','Unregistered context reference: '+repr(refs)+'; allowed registered references: '+repr(list(allowed_context_refs)))
         return plan
     try:
         return {'plan':parse(text), 'raw':text, 'format_repaired':False}

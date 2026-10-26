@@ -9,7 +9,7 @@ from .common import DynamicError,digest,write_json
 from .goals import LAYOUTS,NORMAL_GOAL,system_prompt
 from .history import History
 from .case_loader import load_case
-from .initial_plan import parse_initial_plan
+from .initial_plan import parse_initial_plan, planning_contract, planning_identity
 
 
 def execute_task(runtime,source,previous):
@@ -44,7 +44,7 @@ def execute_task(runtime,source,previous):
         if result['response']['stopReason']=='length':
             runtime.termination_reason='output_limit'
             raise DynamicError('history_output_limit','Partial plan retained; no automatic continuation')
-        plan=parse_initial_plan(text_of(result['response']),allowed_context_refs=('task://current-stage',),
+        plan=parse_initial_plan(text_of(result['response']),allowed_context_refs=planning_contract()['allowed_context_refs'],
             repair=lambda raw,prompt:text_of(runtime._turn('Main','format_repair',extra_packet={'format_repair':{'original':raw,'instruction':prompt}})['response']))
         for assignment in plan['plan']['assignments']:
             if not any(r['actor_id']==assignment['recipient'] and r['task_text']==assignment['task_text'] and r['status']=='queued' for r in runtime.delegations.rows):
@@ -86,7 +86,7 @@ def execute_task(runtime,source,previous):
     if set(sessions)!=set(('Main','A','B')):
         raise DynamicError('history_session_unavailable','Infrastructure failure retained; no complete carry state available')
     record={'task_id':runtime.case['case_id'],'source_task_path':runtime.case['source_task_path'],
-        'model_bindings_hash':digest(runtime.resolved_api_bindings),'started_ns':start,'finished_ns':time.monotonic_ns(),
+        'planning_contract':planning_identity(),'model_bindings_hash':digest(runtime.resolved_api_bindings),'started_ns':start,'finished_ns':time.monotonic_ns(),
         'initial_state':initial,'frozen_state':frozen,'status':status,'budget':runtime.budget.snapshot(),
         'request_ledger_hash':digest(runtime.ledger.rows),'session_hashes':{a:digest(s) for a,s in sessions.items()},
         'synthetic':runtime.synthetic,'execution_backend':runtime.execution_mode,'environment_carry':False}

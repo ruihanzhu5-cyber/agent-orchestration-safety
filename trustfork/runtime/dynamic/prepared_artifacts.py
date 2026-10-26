@@ -8,7 +8,8 @@ from .checkpoints import validate_checkpoint
 def binding_hash(runtime):
  return digest((runtime.resolved_api_bindings or {}).get('logical_bindings',{}).get(runtime.main_model))
 def history_contract(runtime):
- return {'experiment_version':runtime.experiment.experiment_version,'team_model':runtime.main_model,
+ from .initial_plan import planning_identity
+ return {'planning_contract':planning_identity(),'experiment_version':runtime.experiment.experiment_version,'team_model':runtime.main_model,
   'history_pair_id':runtime.experiment.history_pair_id,'task_ids':runtime.history_task_ids,
   'execution_backend':runtime.execution_mode,'team_binding_hash':binding_hash(runtime),'source_asset_hashes':{c:load_case(c)['deployed_asset_hash'] for c in runtime.history_task_ids},
   'generation_config_hash':digest({'normal_goal':__import__('trustfork.runtime.dynamic.goals',fromlist=['NORMAL_GOAL']).NORMAL_GOAL,
