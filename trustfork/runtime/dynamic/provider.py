@@ -91,7 +91,7 @@ class ProviderTransport:
             if policy.get('account_price_upper_bound_confirmed') is not True:
                 raise DynamicError('campaign_pricing_unknown','Actual account price upper bound or supplier quota required')
             from .campaign_budget import CampaignBudget
-            self.campaign=CampaignBudget(policy['path'],campaign_id=policy['campaign_id'],total_cny=policy.get('total_cny',100),phase_limits=policy.get('phase_limits'))
+            self.campaign=CampaignBudget(policy['path'],campaign_id=policy['campaign_id'],total_cny=policy.get('total_cny',100),phase_limits=policy.get('phase_limits'),must_exist=policy.get('must_exist',False),segment_id=policy.get('segment_id'),segment_cny=policy.get('segment_cny'),segment_identity=policy.get('segment_identity'))
             self.campaign_policy=policy
 
     def accounting(self,binding,body):

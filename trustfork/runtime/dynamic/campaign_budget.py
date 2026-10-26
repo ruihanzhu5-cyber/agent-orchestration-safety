@@ -23,8 +23,13 @@ def price_cny(input_tokens,output_tokens,price,usd_to_cny):
             Decimal(output_tokens)*Decimal(str(price['output'])))*Decimal(str(usd_to_cny))/Decimal(1_000_000)
 
 class CampaignBudget:
-    def __init__(self,path,*,campaign_id,total_cny=100,phase_limits=None):
-        self.path=Path(path);self.path.parent.mkdir(parents=True,exist_ok=True)
+    def __init__(self,path,*,campaign_id,total_cny=100,phase_limits=None,must_exist=False,segment_id=None,segment_cny=None,segment_identity=None):
+        self.path=Path(path)
+        if must_exist and not self.path.is_file():raise DynamicError('campaign_original_ledger_missing','Original ledger must exist; never create a fresh continuation ledger')
+        self.path.parent.mkdir(parents=True,exist_ok=True)
+        self.segment_id=segment_id
+        if segment_id is not None and (not isinstance(segment_id,str) or not segment_id or not isinstance(segment_identity,dict) or not segment_identity or segment_cny is None or not 0<micro(segment_cny)<=micro(20)):
+            raise DynamicError('campaign_segment_policy_invalid','Explicit source identity and segment ceiling within CNY20 required')
         phases=phase_limits if phase_limits is not None else {'interface_probe':20}
         policy={'campaign_id':campaign_id,'total_micro_cny':micro(total_cny),
                 'phase_limits':{k:micro(v) for k,v in phases.items()},'version':'campaign-cny-v1'}
@@ -33,6 +38,9 @@ class CampaignBudget:
         if policy['phase_limits'].get('interface_probe',micro(101))>micro(20):
             raise DynamicError('campaign_policy_invalid','Interface phase must be within CNY20')
         with self.tx() as db:
+            if must_exist:
+                if not db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='policy'").fetchone() or not db.execute('SELECT value FROM policy WHERE id=1').fetchone():
+                    raise DynamicError('campaign_original_ledger_missing','Original policy is absent; refusing empty ledger')
             db.execute('CREATE TABLE IF NOT EXISTS policy (id INTEGER PRIMARY KEY CHECK(id=1), value TEXT NOT NULL)')
             db.execute('CREATE TABLE IF NOT EXISTS requests (request_id TEXT PRIMARY KEY, fingerprint TEXT NOT NULL, phase TEXT NOT NULL, status TEXT NOT NULL, reserved INTEGER NOT NULL, settled INTEGER, metadata TEXT NOT NULL, usage TEXT, submitted_at REAL, updated_at REAL NOT NULL)')
             db.execute('CREATE TABLE IF NOT EXISTS rate_slots (request_id TEXT PRIMARY KEY, route TEXT NOT NULL, tokens INTEGER NOT NULL, at REAL NOT NULL)')
@@ -40,6 +48,12 @@ class CampaignBudget:
             previous=db.execute('SELECT value FROM policy WHERE id=1').fetchone()
             if previous and json.loads(previous[0])!=policy:raise DynamicError('campaign_policy_mismatch','Cannot reset or change durable campaign ceilings')
             if not previous:db.execute('INSERT INTO policy VALUES (1,?)',(canonical(policy).decode(),))
+            db.execute('CREATE TABLE IF NOT EXISTS segments (segment_id TEXT PRIMARY KEY, ceiling INTEGER NOT NULL, identity TEXT NOT NULL)')
+            if segment_id is not None:
+                identity=canonical(segment_identity).decode()
+                previous_segment=db.execute('SELECT ceiling,identity FROM segments WHERE segment_id=?',(segment_id,)).fetchone()
+                if previous_segment and tuple(previous_segment)!=(micro(segment_cny),identity):raise DynamicError('campaign_segment_identity_mismatch','Cannot reset segment ceiling or source identity')
+                if not previous_segment:db.execute('INSERT INTO segments VALUES (?,?,?)',(segment_id,micro(segment_cny),identity))
         self.policy=policy
 
     @contextmanager
@@ -57,6 +71,8 @@ class CampaignBudget:
         finally:db.close()
 
     def reserve(self,request_id,*,phase,reserved_cost_cny,metadata):
+        metadata=dict(metadata)
+        if self.segment_id is not None:metadata['segment_id']=self.segment_id
         amount=micro(reserved_cost_cny)
         if amount<=0:raise DynamicError('provider_price_unknown','Zero production reservations forbidden')
         fingerprint=digest({'phase':phase,'amount':amount,'metadata':metadata})
@@ -74,6 +90,11 @@ class CampaignBudget:
                 if role_total+amount>micro(metadata['role_cost_ceiling_cny']):
                     raise DynamicError('provider_cost_budget_exhausted','Persistent role cost ceiling reached')
             if total+amount>self.policy['total_micro_cny']:raise DynamicError('campaign_cost_exhausted','CNY total reservation would exceed ceiling')
+            if self.segment_id is not None:
+                limit=db.execute('SELECT ceiling FROM segments WHERE segment_id=?',(self.segment_id,)).fetchone()[0]
+                used=sum(r['settled'] if r['status']=='settled' else 0 if r['status']=='cancelled_before_send' else r['reserved']
+                    for r in db.execute('SELECT * FROM requests') if json.loads(r['metadata']).get('segment_id')==self.segment_id)
+                if used+amount>limit:raise DynamicError('campaign_segment_cost_exhausted','New segment reservations and settlements exceed its included ceiling')
             if phase in self.policy['phase_limits'] and phase_total+amount>self.policy['phase_limits'][phase]:
                 raise DynamicError('campaign_phase_cost_exhausted','Phase is a subset of campaign total')
             db.execute('INSERT INTO requests VALUES (?,?,?,?,?,?,?,?,?,?)',
@@ -142,3 +163,12 @@ class CampaignBudget:
             'remaining_cny':(self.policy['total_micro_cny']-settled-pending)/SCALE,
             'submitted_attempts':sum(r['submitted_at'] is not None for r in rows),
             'status_counts':{s:sum(r['status']==s for r in rows) for s in sorted({r['status'] for r in rows})}}
+
+    def segment_summary(self):
+        if self.segment_id is None:return None
+        rows=[r for r in self.rows() if r['metadata'].get('segment_id')==self.segment_id]
+        with self.tx() as db:limit=db.execute('SELECT ceiling FROM segments WHERE segment_id=?',(self.segment_id,)).fetchone()[0]
+        settled=sum(r['settled'] or 0 for r in rows if r['status']=='settled')
+        pending=sum(r['reserved'] for r in rows if r['status'] in ('reserved','submitted','charge_unknown'))
+        return {'segment_id':self.segment_id,'ceiling_cny':limit/SCALE,'settled_cny':settled/SCALE,'unsettled_reserved_cny':pending/SCALE,
+            'remaining_cny':(limit-settled-pending)/SCALE,'submitted_attempts':sum(r['submitted_at'] is not None for r in rows)}

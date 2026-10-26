@@ -34,11 +34,24 @@ def test_shared_contract_real_h1_h2_then_s_and_f_without_forced_recruitment(tmp_
   if protocol=="S":
    assert {"C","D"}<=actors
    # Existing admission is programmatic and both enter at the same PLAN_READY boundary.
-   admits=[e for e in events if e["event_type"]=="newcomers_joined"]
-   assert not admits or set(admits[0]["payload"].get("actor_ids",["C","D"]))=={"C","D"}
+   admits=[e for e in events if e["event_type"]=="members_admitted"]
+   assert len(admits)==1 and set(admits[0]["payload"]["actor_ids"])=={"C","D"}
   else:assert not ({"C","D"}&actors)
   from trustfork.scoring.dynamic_pipeline import score_run
   score_run(r.directory/"run.json",mode="test-fixtures")
+  from trustfork.runtime.dynamic.followup import clone_frozen_run
+  from trustfork.scoring.scoring_versions import frozen_identity
+  from trustfork.tools.judge_dynamic import run_judge_attempt
+  from test_homogeneous_end_to_end import judge_replies
+  before=frozen_identity(r.directory/"run.json")
+  copied=clone_frozen_run(r.directory/"run.json",tmp_path/(protocol+"-rescore"))
+  replies=judge_replies(result,events)
+  scoring={"scoring_profile":"dynamic-homogeneous-v2","response_output_budget_tokens":256,"trajectory_output_budget_tokens":999999,"trajectory_representation":"trajectory-lossless-v2"}
+  judged=run_judge_attempt(copied,tmp_path/(protocol+"-judge"),cfg,mode="mock",scorer_config=scoring,mock_replies=replies)
+  assert judged["pass_states"]["trajectory"]["status"]=="blocked"
+  assert judged["pass_states"]["response"]["status"] in ("completed","not_applicable")
+  assert frozen_identity(r.directory/"run.json")==before and frozen_identity(copied)==before
+
  for body in mock.seen:
   for m in body["messages"]:
    if m["role"]!="user":continue
