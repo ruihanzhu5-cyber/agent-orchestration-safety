@@ -1,5 +1,5 @@
 """Inspect/reconcile/resume one bounded reviewed attempt; no automatic legacy replay."""
-import argparse,copy,json,os,sqlite3,subprocess
+import argparse,copy,json,os,sqlite3,subprocess,uuid
 from pathlib import Path
 from trustfork.runtime.dynamic.common import DynamicError,read_json,write_json,digest,file_hash,repo_root,config_dir
 from trustfork.runtime.dynamic.artifacts import atomic_json
@@ -37,11 +37,17 @@ class ReviewRunner:
   cfg=copy.deepcopy(self.config);cfg['campaign_budget']['phase']='interface_probe' if formal else 'engineering_smoke'
   from trustfork.runtime.dynamic.experiment_config import resolve_experiment
   experiment=resolve_experiment('p001',team_model='deepseekflash',judge_binding=cfg['judge_binding']) if kind=='model' else None
-  t=ProviderTransport(cfg,mode=self.mode,journal=Path(out)/('provider-requests.jsonl' if kind=='model' else 'judge-requests.jsonl'),authorize_real=self.mode=='api',max_requests=limit,kind=kind,experiment=experiment,http=self.http_factory(stage) if self.http_factory else None)
+  stem='provider-requests' if kind=='model' else 'judge-requests'
+  journal=Path(out)/(stem+'.jsonl')
+  previous=journal.exists()
+  if previous:journal=Path(out)/(stem+'-relay-'+uuid.uuid4().hex[:16]+'.jsonl')
+  t=ProviderTransport(cfg,mode=self.mode,journal=journal,authorize_real=self.mode=='api',max_requests=limit,kind=kind,experiment=experiment,http=self.http_factory(stage) if self.http_factory else None)
   t.execution_context={'execution_attempt_id':self.attempt.attempt_id,'execution_stage_id':stage,'execution_review_id':REVIEW_ID}
   if kind=='model':t.execution_context['model_generation_group_id']=REVIEW_ID+'/'+stage
   if formal:t.execution_context.update(validation_group_id=REVIEW_ID+'/formal',group_request_limit=24)
   t.request_namespace=self.attempt.request_id(stage,'model')
+  from trustfork.runtime.dynamic.artifacts import append_jsonl
+  append_jsonl(self.path/'diagnostics/transport-invocations.jsonl',{'transport_id':t.transport_id,'execution_attempt_id':self.attempt.attempt_id,'stage':stage,'journal':os.path.relpath(journal,self.path),'previous_journal_preserved':previous,'meaning':'New host relay only; completed/unknown stage guards and original budget remain authoritative'})
   return t
  def freeze_plan(self):
   target=self.path/'formal-plan.json'

@@ -9,8 +9,10 @@ export class RpcOutput {
  enqueue(row:unknown):void {
   if(this.failure)throw this.failure;if(this.closed)throw Error('RPC output closed');
   const raw=Buffer.from(JSON.stringify(row)+'\n');this.accepted+=raw.length;
-  let position=0;while(position<raw.length)position+=writeSync(this.fd,raw,position,raw.length-position,this.written+position);
-  fsyncSync(this.fd);this.written+=raw.length;this.persisted+=raw.length;this.frames++;
+  try{
+   let position=0;while(position<raw.length)position+=writeSync(this.fd,raw,position,raw.length-position,this.written+position);
+   fsyncSync(this.fd);this.written+=raw.length;this.persisted+=raw.length;this.frames++;
+  }catch(error){this.failure=error as Error;throw error;}
   this.highWater=Math.max(this.highWater,this.written-this.read);this.peakRss=Math.max(this.peakRss,process.memoryUsage().rss);
   if(!this.pumping)this.pumping=this.pump();
  }
@@ -24,11 +26,11 @@ export class RpcOutput {
     await new Promise<void>((resolve,reject)=>{this.output.write(buffer.subarray(0,n),error=>error?reject(error):resolve());});
     this.read+=n;this.processed+=n;
    }
-   ftruncateSync(this.fd,0);this.read=0;this.written=0;
+   if(!this.failure){ftruncateSync(this.fd,0);this.read=0;this.written=0;}
   }catch(error){this.failure=error as Error;throw error;}
   finally{this.pumping=null;}
  }
- stats(){return {accepted_bytes:this.accepted,persisted_bytes:this.persisted,processed_bytes:this.processed,pending_disk_bytes:this.written-this.read,queue_high_water_bytes:this.highWater,max_output_buffer_bytes:this.chunkBytes,peak_rss_bytes:this.peakRss,frames:this.frames};}
+ stats(){return {accepted_bytes:this.accepted,persisted_bytes:this.persisted,processed_bytes:this.processed,unpersisted_tail_bytes:this.accepted-this.persisted,pending_disk_bytes:this.written-this.read,queue_high_water_bytes:this.highWater,max_output_buffer_bytes:this.chunkBytes,peak_rss_bytes:this.peakRss,frames:this.frames};}
  async flush(){while(this.pumping)await this.pumping;if(this.failure)throw this.failure;}
  async close(){await this.flush();if(!this.closed){fsyncSync(this.fd);closeSync(this.fd);this.closed=true;}}
 }

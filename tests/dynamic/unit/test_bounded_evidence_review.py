@@ -71,3 +71,18 @@ def test_incomplete_rpc_frame_retains_unprocessed_tail(tmp_path):
  with pytest.raises(DynamicError,match='rpc_spool_incomplete_frame'):list(spool.frames_iter())
  assert spool.stats()['unprocessed_tail_bytes']>0
  spool.close()
+
+
+def test_failed_fsync_reports_received_but_not_durable_rpc_bytes(tmp_path,monkeypatch):
+ import os,pytest
+ from trustfork.runtime.dynamic.rpc_spool import RpcSpool
+ spool=RpcSpool(tmp_path/'frames')
+ def failed(fd):raise OSError('injected durable-write failure')
+ monkeypatch.setattr(os,'fsync',failed)
+ with pytest.raises(OSError,match='durable-write failure'):spool.append(b'{"kind":"event"}\n')
+ stats=spool.stats()
+ assert stats['accepted_bytes']>0 and stats['persisted_bytes']==0
+ assert stats['unpersisted_tail_bytes']==stats['accepted_bytes']
+ spool.finish(OSError('injected failure'))
+ with pytest.raises(OSError):list(spool.frames_iter())
+ spool.close()

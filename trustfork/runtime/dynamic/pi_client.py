@@ -215,7 +215,7 @@ class PiClient:
         stats={**self.rpc_spool.stats(),'returned_results':self.returned_results,'bridge_exit_code':self.process.returncode,'reader_alive':self.reader.is_alive(),'processor_alive':self.processor.is_alive(),'transport_failure':getattr(self.transport_failure,'code',None)}
         write_json(self.root/'transport-metrics.json',stats)
         self.executor.shutdown(wait=True,cancel_futures=False)
-        if self.reader.is_alive() or self.processor.is_alive() or stats['unprocessed_tail_bytes']:
+        if self.reader.is_alive() or self.processor.is_alive() or stats['unprocessed_tail_bytes'] or stats['unpersisted_tail_bytes']:
             raise DynamicError('rpc_spool_tail_incomplete','Required RPC tail has not completed',evidence=stats)
         self.rpc_spool.close()
         self.stderr_file.close()

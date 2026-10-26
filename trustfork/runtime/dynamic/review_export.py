@@ -69,7 +69,7 @@ def allowed(p,root):
  if rel.parts[0] not in ROLE_DIRS:return False
  if rel.parts[0] in ('probes','diagnostics','test-results','analysis','fixtures','actions','tests'):return True
  return (p.name in RUNTIME_NAMES or p.name.endswith(('-prepared.json','-result.json','-error.json')) or
-  (p.name.startswith(('prepared_','history-bundle','prefix-')) and p.suffix=='.json') or
+  (p.name.startswith(('prepared_','history-bundle','prefix-','provider-requests-relay-','judge-requests-relay-')) and p.suffix=='.json') or
   any(s in rel.parts for s in ('scoring','scoring-versions','operation-evidence')) or ('control' in rel.parts and p.suffix=='.jsonl'))
 
 def csv_text(fields,rows):

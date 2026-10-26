@@ -1,7 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {Writable} from 'node:stream';
-import {mkdtempSync,rmSync} from 'node:fs';
+import {mkdtempSync,rmSync,closeSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
 import {RpcOutput} from '../rpc_output.ts';
@@ -21,4 +21,17 @@ test('slow stdout preserves 120 turns of incremental text/thinking/tool argument
   output.enqueue({kind:'cancelled',request_id:'r120'});output.enqueue({kind:'finalized',request_id:'r120'});await output.close();
   assert.equal(output.stats().frames,expected.length+2);
  }finally{await output.close();rmSync(root,{recursive:true,force:true});}
+});
+
+
+test('failed spool write exposes unpersisted bytes and never reports a clean flush',async()=>{
+ const root=mkdtempSync(path.join(tmpdir(),'trustfork-rpc-fault-'));
+ const sink=new Writable({write(chunk,encoding,callback){callback();}});
+ const output=new RpcOutput(path.join(root,'frames'),sink);
+ closeSync((output as any).fd); // Inject a real EBADF without filling the user's disk.
+ assert.throws(()=>output.enqueue({kind:'event',payload:'not durably accepted'}));
+ assert.ok(output.stats().unpersisted_tail_bytes>0);
+ assert.equal(output.stats().persisted_bytes,0);
+ await assert.rejects(output.flush());
+ rmSync(root,{recursive:true,force:true});
 });

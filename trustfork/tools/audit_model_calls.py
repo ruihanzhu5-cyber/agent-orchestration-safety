@@ -114,7 +114,7 @@ def main():
         for path in sorted(root.rglob('network-guard.jsonl')):
             if path in seen_paths:continue
             seen_paths.add(path);guards.extend(read_lines(path))
-        for name in ('provider-requests.jsonl','judge-requests.jsonl'):journals.extend(root.rglob(name))
+        for pattern in ('provider-requests*.jsonl','judge-requests*.jsonl'):journals.extend(root.rglob(pattern))
     for path in a.guard_archive:guards.extend(read_lines(path))
     from itertools import chain
     calls=audit_request_events(chain.from_iterable(event_streams));guard=audit_guard_records(guards)

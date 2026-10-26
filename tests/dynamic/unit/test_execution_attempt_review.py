@@ -200,3 +200,15 @@ def test_new_attempt_reuses_parent_compatible_history_without_selecting_success(
  assert child.reuse_parent_stage('history/H2',{'contract':'compatible'})
  assert child.run('history/H2',{'contract':'compatible'},lambda:pytest.fail('history resampled'))==previous
  assert b.segment_summary()['remaining_cny']==13
+
+
+def test_reconnecting_same_attempt_preserves_old_transport_journal(tmp_path,monkeypatch):
+ runner,b=runner_mock(tmp_path,monkeypatch);runner.http_factory=lambda stage:(lambda *a:pytest.fail('no request expected'))
+ out=runner.path/'deepseek/history';first=runner.transport('history',out,kind='model',limit=240)
+ write_json(first.journal,{'status':'synthetic_previous_connection','requests_complete_in_stage_records':True})
+ original_hash=file_hash(first.journal)
+ second=runner.transport('history',out,kind='model',limit=240)
+ assert second.journal!=first.journal and file_hash(first.journal)==original_hash
+ assert second.execution_context['execution_attempt_id']==runner.attempt.attempt_id
+ assert second.campaign.segment_id==b.segment_id and second.count==0
+ assert not second.journal.exists() and b.segment_summary()['settled_cny']==7

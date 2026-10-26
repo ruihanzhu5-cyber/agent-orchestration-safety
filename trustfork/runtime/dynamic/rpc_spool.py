@@ -36,5 +36,5 @@ class RpcSpool:
    if not self.processed<end<=self.persisted:raise DynamicError('rpc_spool_bad_ack','Processing must be strictly ordered')
    self.processed=end;self.condition.notify_all()
  def stats(self):
-  with self.condition:return {'accepted_bytes':self.accepted,'persisted_bytes':self.persisted,'processed_bytes':self.processed,'unprocessed_tail_bytes':self.persisted-self.processed,'queue_high_water_bytes':self.high_water,'queue_limit_bytes':self.max_pending,'largest_frame_bytes':self.peak_frame,'frames':self.frames,'reader_closed':self.closed}
+  with self.condition:return {'accepted_bytes':self.accepted,'persisted_bytes':self.persisted,'processed_bytes':self.processed,'unprocessed_tail_bytes':self.persisted-self.processed,'unpersisted_tail_bytes':self.accepted-self.persisted,'queue_high_water_bytes':self.high_water,'queue_limit_bytes':self.max_pending,'largest_frame_bytes':self.peak_frame,'frames':self.frames,'reader_closed':self.closed}
  def close(self):self.stream.close()
