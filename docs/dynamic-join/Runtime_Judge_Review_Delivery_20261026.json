@@ -1,0 +1,34 @@
+{
+  "repository": "https://github.com/ruihanzhu5-cyber/agent-orchestration-safety",
+  "branch": "fix/runtime-judge-review-20261026",
+  "baseline_sha": "d68a3a871adcd16688d66b5ec39a67de977176f9",
+  "real_execution_and_offline_gate_sha": "400d299c1153c0c6dd945187e4c0593ff11ee49e",
+  "post_paid_offline_fix_sha": "7bba11916e3a4fa8da970d091828b69f7c20a93b",
+  "report_and_evidence_commit": "812c3bdbb263f9b9683e98636e1b191a69a80985",
+  "report_sha256": "df64a6c2c49d1824f5acd7a76cda9e2a6afc77e3f033eb2ee7bc4d67e86e875e",
+  "manifest_sha256": "8648bfd14cfb39557f89a44c4195537a2f9c01b73ee254118ada78bf1cd62907",
+  "publication_verification": {
+    "files": 422,
+    "all_stored_hashes_verified": true,
+    "all_compression_hashes_verified": true,
+    "known_credentials_and_nested_json_base64_scan": "passed",
+    "personal_path_scan": "passed",
+    "database_archive_dependency_cache_exclusion": "passed",
+    "broken_links": [],
+    "source_order_mapping_retained": true,
+    "manifest_sha256": "8648bfd14cfb39557f89a44c4195537a2f9c01b73ee254118ada78bf1cd62907"
+  },
+  "publication_files_including_manifest": 423,
+  "publication_total_bytes": 11593415,
+  "paid_request_counts": {
+    "model": 0,
+    "judge_including_repair": 5,
+    "repair": 1,
+    "calibration": 0
+  },
+  "post_paid_extra_real_validation_requests": 0,
+  "old_261_requests_unchanged": true,
+  "status": "stopped_partial_at_authorized_limits",
+  "restore_code_command": "git switch -c restore/runtime-review-baseline d68a3a871adcd16688d66b5ec39a67de977176f9",
+  "budget_restore_warning": "Do not restore a pre-fee database over the live ledger; preserve all 266 current submitted requests and original CNY100 / included CNY20 ceilings"
+}
