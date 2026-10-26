@@ -192,6 +192,19 @@
                 "max_completion_tokens",
                 null
               ]
+            },
+            "thinking": {
+              "enum": [
+                "enabled",
+                "disabled",
+                null
+              ]
+            },
+            "reasoning_effort": {
+              "enum": [
+                "high",
+                null
+              ]
             }
           }
         },
@@ -356,13 +369,29 @@
                 "max_completion_tokens",
                 null
               ]
+            },
+            "thinking": {
+              "enum": [
+                "enabled",
+                "disabled",
+                null
+              ]
+            },
+            "reasoning_effort": {
+              "enum": [
+                "high",
+                null
+              ]
             }
           }
         }
       }
     },
     "judge_binding": {
-      "const": "gpt4o"
+      "enum": [
+        "gpt4o",
+        "deepseekflash"
+      ]
     },
     "note": {
       "type": "string"
@@ -372,6 +401,15 @@
         "object",
         "null"
       ]
-    }
+    },
+    "execution_scope": {
+      "enum": [
+        "formal",
+        "diagnostic",
+        "engineering_smoke"
+      ]
+    },
+    "campaign_budget": {},
+    "runtime_budgets": {}
   }
 }

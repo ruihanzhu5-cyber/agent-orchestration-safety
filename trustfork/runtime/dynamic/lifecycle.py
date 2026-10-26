@@ -65,3 +65,26 @@ class Lifecycle:
         self.stage_id = next_stage['id']
         environment.accepting = True
         self.transition('RUNNING', new_session=next_stage['new_session'])
+
+    def capture_partial(self,environment,client,sessions,*,reason):
+        """Stop issuing work and preserve observed state; failed observations stay unknown."""
+        result={'status':'partial','termination_reason':reason,'environment_export':None,'sessions':{},'errors':[]}
+        if self.state not in ('FROZEN','SCORING'):
+            previous=self.state;self.state='CLOSING'
+            self.ledger.append('lifecycle',{'from':previous,'to':'CLOSING','abnormal':True,'reason':reason},stage_id=self.stage_id,stage_epoch=self.epoch)
+        environment.accepting=False
+        try:result['quiesce']=environment.quiesce(time.monotonic()+30)
+        except (DynamicError,OSError) as error:result['errors'].append({'operation':'quiesce','code':getattr(error,'code',type(error).__name__)})
+        for actor,identity in sessions.items():
+            try:result['sessions'][actor]={'status':'observed','snapshot':client.call(identity,'export_session',timeout=10)}
+            except (DynamicError,OSError,TimeoutError) as error:result['sessions'][actor]={'status':'unknown','code':getattr(error,'code',type(error).__name__)}
+        try:
+            result['freeze']=environment.freeze()
+            result['environment_export']=environment.export_state()
+            self.state='FROZEN'
+            self.ledger.append('abnormal_state_frozen',{'reason':reason,'status':'partial'},stage_id=self.stage_id,stage_epoch=self.epoch)
+        except (DynamicError,OSError) as error:
+            result['status']='unknown'
+            result['errors'].append({'operation':'freeze_export','code':getattr(error,'code',type(error).__name__)})
+            self.ledger.append('freeze_failed',{'reason':reason,'status':'unknown','errors':result['errors']},stage_id=self.stage_id,stage_epoch=self.epoch)
+        return result

@@ -368,7 +368,7 @@ class PiDynamic:
             value=self.client.call(self.sessions[actor],'execute_turn',{'messages':[{'role':'user','content':canonical(packet).decode(),'timestamp':int(time.time()*1000)}],
                 'script':self.current_scripts.take(actor,phase,self.lifecycle.epoch),'max_output_tokens':record['max_output_tokens']},
                 request_id=actual_request_id,stage_id=self.lifecycle.stage_id,epoch=self.lifecycle.epoch,
-                invocation_id=invocation['invocation_id'] if invocation else None,timeout=max(0.05,min(self.runtime_budget['http_timeout_seconds']+10,self.budget.deadline-time.monotonic())))
+                invocation_id=invocation['invocation_id'] if invocation else None,timeout=max(0.05,self.budget.deadline-time.monotonic()))
             failure=value.get('transport_failure')
             response=value.get('response')
             if failure:raise TransportFailure(failure['code'],generation_received=failure['generation_received'],
@@ -377,9 +377,10 @@ class PiDynamic:
             if getattr(self,'provider',None):
                 accounting=self.provider.results.get(actual_request_id,{})
                 reported=(accounting.get('usage') or {}).get('completion_tokens')
-                tokens=reported if type(reported) is int else record['max_output_tokens']
+                blocked=(value.get('error') or {}).get('code') in {'provider_capacity_blocked','campaign_cost_exhausted','campaign_phase_cost_exhausted','provider_queue_timeout','request_exceeds_tpm','provider_price_unknown','provider_route_paused'}
+                tokens=reported if type(reported) is int else 0 if blocked else record['max_output_tokens']
                 self.ledger.append('provider_accounting',{'output_tokens':reported,'usage':accounting.get('usage'),
-                    'cost':None,'budget_charge':tokens,'charge_basis':'reported_usage' if type(reported) is int else 'conservative_output_reservation',
+                    'cost':None,'budget_charge':tokens,'charge_basis':'reported_usage' if type(reported) is int else 'blocked_before_http' if blocked else 'conservative_output_reservation',
                     'execution_backend':self.execution_mode},actor_id=actor,stage_id=self.lifecycle.stage_id,
                     stage_epoch=self.lifecycle.epoch,request_id=actual_request_id)
             return {'payload':value,'output_tokens':tokens,
@@ -400,7 +401,11 @@ class PiDynamic:
         actual_request_id=outcome['actual_request_id']
         actual=self._actual_packet(result['actual_input'])
         if digest(actual)!=digest(packet):raise DynamicError('actual_input_mismatch','Scripted provider did not receive the frozen packet')
-        exposed=self.mailbox.confirm(actor,request_id,actual,successful=success,actual_request_id=actual_request_id)
+        received=(self.provider.results.get(actual_request_id,{}) if self.provider else {})
+        submitted=not self.provider or bool(received)
+        if submitted:self.mailbox.advance(actor,request_id,'submitted')
+        visible=success or (received.get('http_status')==200 and bool(response and response.get('content')))
+        exposed=self.mailbox.confirm(actor,request_id,actual,successful=visible,actual_request_id=actual_request_id)
         if success and actor=='Main' and 'newcomer_profiles' in actual:
             self.main_profile_introduced=True
             self.ledger.append('main_profiles_exposed',{'profiles':actual['newcomer_profiles'],'profile_metadata':self.profile_metadata},actor_id=actor,
@@ -411,10 +416,10 @@ class PiDynamic:
         self.ledger.append('model_response',{'status':result['status'],'response':response,'confirmed_message_ids':exposed,'synthetic':self.synthetic,
             'execution_backend':self.execution_mode,
             'generation_finish_reason':response.get('stopReason') if response else None,
-            'completion_status':result.get('completion_status','unavailable')},
+            'completion_status':result.get('completion_status','unavailable'),'error_code':(result.get('error') or {}).get('code'),'logical_request_id':request_id},
             actor_id=actor,stage_id=self.lifecycle.stage_id,stage_epoch=self.lifecycle.epoch,request_id=actual_request_id,
             invocation_id=invocation['invocation_id'] if invocation else None)
-        if not success:raise DynamicError('pi_generation_failed',response.get('errorMessage','Provider failed') if response else 'No completion')
+        if not success:raise DynamicError((result.get('error') or {}).get('code','pi_generation_failed'),(result.get('error') or {}).get('message') or (response.get('errorMessage','Provider failed') if response else 'No completion'))
         result.update(request_id=actual_request_id,logical_request_id=request_id,input_revision=revision)
         if actor!='Main' and invocation and response['stopReason'] in ('stop','length'):
             self._formal(actor,invocation,response,result['request_id'])
@@ -483,6 +488,8 @@ class PiDynamic:
                 self.termination_reason='output_limit'
                 self.ledger.append('resource_termination',{'reason':'output_limit','phase':'planning'})
                 value={'status':'resource_ended','reason':'output_limit','synthetic':self.synthetic}
+                partial=self.lifecycle.capture_partial(self.environment,self.client,self.sessions,reason='output_limit')
+                write_json(self.directory/'partial-state.json',partial)
                 write_json(self.directory/'prefix-outcome.json',value)
                 return value
             plan=parse_initial_plan(text_of(result['response']),allowed_context_refs=('task://current-stage',),repair=lambda raw,prompt:text_of(self._turn('Main','format_repair',
@@ -501,6 +508,7 @@ class PiDynamic:
                 lifecycle=self.lifecycle,history=self.history,bindings={'layout':self.layout,'main_model':self.main_model,'initial_plan':plan,'prefix_identity':self.prefix_identity()})
             return {'status':'triggered','checkpoint':snapshot,'scripts_after_prefix':scripts.clone()}
         except DynamicError as error:
+            write_json(self.directory/'partial-state.json',self.lifecycle.capture_partial(self.environment,self.client,self.sessions,reason=error.code))
             value={'status':'untriggered','reason':error.record(),'synthetic':self.synthetic}
             write_json(self.directory/'prefix-outcome.json',value)
             if error.code.startswith(('initial_plan','invalid_initial','script_fixture')):return value
@@ -579,7 +587,8 @@ class PiDynamic:
         futures={}
         with concurrent.futures.ThreadPoolExecutor(max_workers=5,thread_name_prefix='actor-permit') as executor:
             while True:
-                if self.termination_reason or self.budget.exhausted() or (not futures and not self.budget.available()):
+                normal_final_ready=self.pending_final and (self.protocol=='F' or self.scheduler.final_allowed(hard_limit=False))
+                if self.termination_reason or ((self.budget.exhausted() or (not futures and not self.budget.available())) and not normal_final_ready):
                     self.termination_reason=self.termination_reason or ('time_limit' if time.monotonic()>=self.budget.deadline else 'team_budget')
                     self.scheduler.terminate_startup('global_budget_or_timeout')
                     self.pending_final=self.pending_final or {'text':None,'revision':self.main_revision}
@@ -606,6 +615,26 @@ class PiDynamic:
                 done,_=concurrent.futures.wait(futures,timeout=0.1,return_when=concurrent.futures.FIRST_COMPLETED)
                 for future in done:self._settle(future,futures)
 
+    def _save_run_manifest(self,snapshot,branch,condition):
+        from trustfork.scoring.dynamic_pipeline import scorer_manifest
+        manifest={'schema_version':'1.0','protocol_version':'dynamic-join-v9-trajectory-portfolio','run_id':branch,
+            'block_id':self.block_id,'checkpoint_id':snapshot['checkpoint_id'],'source_revision':BASE_COMMIT,
+            'source_task_path':self.case['source_task_path'],'asset_hash':self.case['deployed_asset_hash'],
+            'case_id':self.case['case_id'],'split':self.case['split'],'layout':self.layout,'main_model':self.main_model,
+            'q':self.q,'r':self.r,'condition':condition,'protocol':self.protocol,'panel':self.panel,
+            'mode':self.execution_mode,'synthetic':self.synthetic,'model_refs':self.model_refs,
+            'resolved_api_bindings':self.resolved_api_bindings,'profile_hashes':{a:digest(self.profile_service.bundles[a]) for a in ('C','D')},
+            'goal_hashes':{a:digest(g) for a,g in self.private_goals.items()},
+            'prompt_hashes':{a:digest(system_prompt(a,self.private_goals[a],task_resources=[])) for a in self.private_goals},
+            'tool_manifest_hash':digest({'Sub':WORK_TOOLS,'Main':'coordination-only','pi':'0.84.1'}),
+            'scorer_hash':scorer_manifest()['manifest_hash'],'budget':self.budget.snapshot(),'comparison_set_id':self.panel,
+            'history_id':(self.history or {}).get('history_id'),
+            'baseline_run_id':None,'repeat_id':self.repeat_id,'strategy':self.strategy,'formal_ready':False}
+        manifest.update(self.experiment_metadata())
+        validate_contract('RunManifest',manifest)
+        write_json(self.directory/'run_manifest.json',manifest)
+        return manifest
+
     def run_branch(self,snapshot,condition,scripts,*,attempt=0):
         validate_checkpoint(snapshot)
         self.validate_prefix_target(snapshot)
@@ -617,7 +646,7 @@ class PiDynamic:
         try:
             self.resources=snapshot['sessions']['Main']['config']['task_resources']
             restored=restore_checkpoint(snapshot,environment=self.environment,client=self.client,ledger=self.ledger,
-                system_prompts={a:system_prompt(a,self.private_goals[a],task_resources=[]) for a in ('Main','A','B')},task_resources=self.resources)
+                system_prompts={a:system_prompt(a,self.private_goals[a],task_resources=[]) for a in ('Main','A','B')},task_resources=self.resources,independent_fork=True)
             for key in ('membership','delegations','mailbox','lifecycle','scheduler','budget','sessions'):setattr(self,key,restored[key])
             self.scheduler.work_available=self._has_pending_work
             self.scheduler.block_id=self.block_id
@@ -664,22 +693,7 @@ class PiDynamic:
             exported=self.lifecycle.finalize(self.environment,stage_deadline=self.budget.deadline,current_revision=lambda:self.main_revision,has_budget=self.budget.available)
             self.lifecycle.transition('SCORING')
             from trustfork.scoring.dynamic_pipeline import scorer_manifest
-            manifest={'schema_version':'1.0','protocol_version':'dynamic-join-v9-trajectory-portfolio','run_id':branch,
-                'block_id':self.block_id,'checkpoint_id':snapshot['checkpoint_id'],'source_revision':BASE_COMMIT,
-                'source_task_path':self.case['source_task_path'],'asset_hash':self.case['deployed_asset_hash'],
-                'case_id':self.case['case_id'],'split':self.case['split'],'layout':self.layout,'main_model':self.main_model,
-                'q':self.q,'r':self.r,'condition':condition,'protocol':self.protocol,'panel':self.panel,
-                'mode':self.execution_mode,'synthetic':self.synthetic,'model_refs':self.model_refs,
-                'resolved_api_bindings':self.resolved_api_bindings,'profile_hashes':{a:digest(self.profile_service.bundles[a]) for a in ('C','D')},
-                'goal_hashes':{a:digest(g) for a,g in self.private_goals.items()},
-                'prompt_hashes':{a:digest(system_prompt(a,self.private_goals[a],task_resources=[])) for a in self.private_goals},
-                'tool_manifest_hash':digest({'Sub':WORK_TOOLS,'Main':'coordination-only','pi':'0.84.1'}),
-                'scorer_hash':scorer_manifest()['manifest_hash'],'budget':self.budget.snapshot(),'comparison_set_id':self.panel,
-                'history_id':(self.history or {}).get('history_id'),
-                'baseline_run_id':None,'repeat_id':self.repeat_id,'strategy':self.strategy,'formal_ready':False}
-            manifest.update(self.experiment_metadata())
-            validate_contract('RunManifest',manifest)
-            write_json(self.directory/'run_manifest.json',manifest)
+            manifest=self._save_run_manifest(snapshot,branch,condition)
             write_json(self.directory/'private_bindings.json',{'goals':self.private_goals,'goal_spec':self.case['goal_spec']})
             write_json(self.directory/'profile_metadata.json',self.profile_metadata)
             write_json(self.directory/'delivery_receipts.json',{'messages':self.mailbox.messages,'delegations':self.delegations.rows,
@@ -703,6 +717,13 @@ class PiDynamic:
             write_json(self.directory/'run.json',result);return result
         except (DynamicError,OSError,concurrent.futures.TimeoutError) as error:
             self.scheduler.terminate_startup('infrastructure_termination')
+            partial=self.lifecycle.capture_partial(self.environment,self.client,self.sessions,reason=getattr(error,'code',type(error).__name__))
+            write_json(self.directory/'partial-state.json',partial)
+            write_json(self.directory/'delivery_receipts.json',{'messages':self.mailbox.messages,'delegations':self.delegations.rows,
+                'membership':self.membership.directory(private=True),'startup':self.scheduler.startup,'queue':list(self.scheduler.queue)})
+            manifest=self._save_run_manifest(snapshot,branch,condition)
+            write_json(self.directory/'private_bindings.json',{'goals':self.private_goals,'goal_spec':self.case['goal_spec']})
+            write_json(self.directory/'profile_metadata.json',self.profile_metadata)
             protocol_error=isinstance(error,DynamicError) and error.code in {'rpc_scope_mismatch','isolation_trap_failed',
                 'actual_input_mismatch','main_work_tool_violation','schema_validation_failed','prejoin_worker_execution','planning_registration_only'}
             failure={'run_id':branch,'block_id':self.block_id,'checkpoint_id':snapshot['checkpoint_id'],'case_id':self.case['case_id'],
@@ -710,7 +731,14 @@ class PiDynamic:
                 'repeat_id':self.repeat_id,'strategy':self.strategy,'comparison_set_id':self.panel,
                 'q':self.q,'r':self.r,'split':self.case['split'],'suite':self.case['suite'],'branch_attempt':attempt,
                 'condition':condition,'run_status':'protocol_error' if protocol_error else 'infra_error','reason':str(error),
-                'synthetic':self.synthetic,'real_model_requests':None,'real_judge_requests':None}
+                'synthetic':self.synthetic,'real_model_requests':None,'real_judge_requests':None,
+                'mode':self.execution_mode,'completion_status':'partial','termination_reason':getattr(error,'code',type(error).__name__),
+                'events_path':'events.jsonl','prefix_events_path':'prefix-events.json',
+                'prefix_export':snapshot['environment']['workspace_export'],'frozen_export':partial.get('environment_export'),
+                'state_observation_status':partial['status'],'scores_status':'not_annotated',
+                'run_manifest_path':'run_manifest.json','run_manifest_hash':digest(manifest),
+                'final_text':None,'formal_deliverables':list(self.formal_deliverables.values()),
+                'duration_sec':time.monotonic()-started,'model_refs':self.model_refs}
             failure.update(self.experiment_metadata())
             write_json(self.directory/'run.json',failure);raise
         finally:self.client.close();self.environment.close()
@@ -729,7 +757,7 @@ class PiDynamic:
         self.resources=snapshot['sessions']['Main']['config']['task_resources']
         try:
             restored=restore_checkpoint(snapshot,environment=self.environment,client=self.client,ledger=self.ledger,
-                system_prompts={a:system_prompt(a,NORMAL_GOAL,task_resources=[]) for a in ('Main','A','B')},task_resources=self.resources)
+                system_prompts={a:system_prompt(a,NORMAL_GOAL,task_resources=[]) for a in ('Main','A','B')},task_resources=self.resources,independent_fork=True)
             for key in ('membership','delegations','mailbox','lifecycle','scheduler','budget','sessions'):setattr(self,key,restored[key])
             self.scheduler.work_available=self._has_pending_work
             self.lifecycle.transition('RUNNING');self._release()

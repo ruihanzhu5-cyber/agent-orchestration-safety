@@ -8,6 +8,7 @@ import os
 import subprocess
 import threading
 import uuid
+import time
 from pathlib import Path
 
 from .common import DynamicError, canonical, digest
@@ -27,6 +28,7 @@ class PiClient:
         if not node.is_file():
             raise DynamicError('missing_locked_node', 'Set TRUSTFORK_NODE_BIN to audited Linux Node 24.15.0')
         self.pending, self.scopes, self.sessions, self.actual_inputs = {}, {}, {}, {}
+        self.request_deadlines={}
         self.lock, self.write_lock = threading.RLock(), threading.RLock()
         self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=12, thread_name_prefix='pi-rpc')
         self.stderr_file = (self.root/'bridge.stderr.log').open('w')
@@ -58,11 +60,12 @@ class PiClient:
                     if future is None:
                         raise DynamicError('unknown_bridge_result', row['rpc_id'])
                     if row.get('error'):
-                        future.set_exception(DynamicError('pi_bridge_error', row['error']))
+                        error=row['error']
+                        future.set_exception(DynamicError(error.get('code','pi_bridge_error'),error.get('message','Bridge error')) if isinstance(error,dict) else DynamicError('pi_bridge_error',error))
                     else:
                         future.set_result(row['payload'])
                 elif row.get('kind') == 'event':
-                    if row.get('operation') in ('model_request_submitted','pi_event','provider_payload'):
+                    if row.get('operation') in ('model_request_submitted','pi_event','provider_payload','tool_visibility'):
                         self._handle_event(row)
                     else:
                         self.executor.submit(self._handle_event, row)
@@ -91,8 +94,15 @@ class PiClient:
         try:
             self._validate_scope(row)
             operation, payload = row['operation'], row['payload']
-            if operation in ('model_request_submitted','pi_event','provider_payload'):
+            if operation in ('model_request_submitted','pi_event','provider_payload','tool_visibility'):
                 if operation=='model_request_submitted':self.actual_inputs[row['request_id']] = copy.deepcopy(payload['actual_input'])
+                if operation=='tool_visibility' and self.ledger:
+                    ids=['op_'+digest({'session':row['opaque_session_id'],'request':row['request_id'],'op':op}) for op in payload['raw_operation_ids']]
+                    raw=[e for e in self.ledger.rows if e['event_type']=='tool_operation_finished' and e.get('tool_call_id') in ids]
+                    payload={**payload,'raw_operation_ids':ids,
+                        'raw_result_refs':[e['payload']['receipt']['raw_result_ref'] for e in raw],
+                        'raw_event_refs':[e['branch_id']+'::'+e['event_id'] for e in raw],
+                        'visibility_policy':'Pi-0.84.1-original-result-no-automatic-full-output-injection'}
                 if self.ledger:
                     self.ledger.append(operation, payload, actor_id=row['actor_id'], stage_id=row['stage_id'],
                         stage_epoch=row['stage_epoch'], request_id=row['request_id'], invocation_id=row['invocation_id'])
@@ -102,7 +112,10 @@ class PiClient:
             if operation=='provider_http':
                 if self.provider is None:raise DynamicError('real_api_disabled','No explicit provider backend')
                 alias=self.model_refs[row['actor_id']]
-                result=self.provider.request(alias,payload,request_id=row['request_id'])
+                result=self.provider.request(alias,payload,request_id=row['request_id'],
+                    deadline=self.request_deadlines.get(row['request_id']),
+                    context={'actor_id':row['actor_id'],'run_id':row['branch_id'],
+                        'purpose':'history' if row['branch_id'].startswith('history_') else 'team'})
             elif operation == 'tool_operation':
                 try:result = self.environment.exec_work_operation(payload['operation'],payload['args'],identity,scope=scope)
                 finally:self._observe_operation(row,identity,payload['operation'],payload['args'])
@@ -122,12 +135,12 @@ class PiClient:
                 raise DynamicError('unknown_bridge_event', operation)
             self._write({'kind':'host_response','rpc_id':row['rpc_id'],'payload':result})
         except (OSError, ValueError, DynamicError, subprocess.SubprocessError) as error:
-            if row['operation'] in ('model_request_submitted','pi_event','provider_payload'):
+            if row['operation'] in ('model_request_submitted','pi_event','provider_payload','tool_visibility'):
                 self._fail_pending(error)
             else:
                 number = error.evidence.get('errno') if isinstance(error,DynamicError) and isinstance(error.evidence,dict) else None
                 self._write({'kind':'host_response','rpc_id':row['rpc_id'],
-                    'error':{'message':str(error),'code':errno.errorcode.get(number) if number else None}})
+                    'error':{'message':str(error),'code':errno.errorcode.get(number) if number else error.code if isinstance(error,DynamicError) else None}})
 
     def _observe_operation(self,row,identity,operation,args):
         if not self.observer or operation not in ('fs.write','process.bash','process.argv','process.stream'):return
@@ -141,6 +154,7 @@ class PiClient:
 
     def call(self, session_id, operation, payload=None, *, request_id=None, stage_id='initial', epoch=0, invocation_id=None, timeout=180):
         config = self.sessions[session_id]
+        if operation=='execute_turn':self.request_deadlines[request_id]=time.monotonic()+timeout
         envelope = {'rpc_id':uuid.uuid4().hex,'opaque_session_id':session_id,'actor_id':config['actor_id'],
                     'branch_id':config['branch_id'],'task_id':config['task_id'],'stage_id':stage_id,'stage_epoch':epoch,
                     'request_id':request_id,'invocation_id':invocation_id,'operation':operation,'payload':payload or {}}

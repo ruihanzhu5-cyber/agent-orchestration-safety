@@ -53,5 +53,35 @@ test('timeout and malformed tool JSON remain errors/validation inputs, never ret
   assert.equal(calls,1);assert.equal(timeout.stopReason,'error');
   const tool=await providerStream(binding,{messages:[]},10,async()=>({status:200,headers:{'content-type':'text/event-stream'},
     body:sse({tool_calls:[{index:0,id:'invalid',type:'function',function:{name:'write',arguments:'{"path":'}}]},'tool_calls')}),()=>{}).result();
-  assert.equal(tool.stopReason,'toolUse');assert.equal((tool.content[0] as any).arguments.content,undefined);
+  assert.equal(tool.stopReason,'error');assert.equal(tool.content.filter(x=>x.type==='toolCall').length,0);
+});
+
+test('DeepSeek high thinking survives serialized session-shaped messages and replays every assistant reasoning',async()=>{
+  const deep:ProviderBinding={...binding,provider:'deepseek',model_id:'deepseek-flash',thinking:'enabled',reasoning_effort:'high',
+    compat:{...binding.compat,supportsReasoningEffort:true,requiresReasoningContentOnAssistantMessages:true}};
+  const first=await providerStream(deep,{messages:[{role:'user',content:'think and answer',timestamp:1}]},100,
+    async wire=>{
+      const p=JSON.parse(wire.body);assert.deepEqual(p.thinking,{type:'enabled'});assert.equal(p.reasoning_effort,'high');assert.ok(!('temperature' in p));
+      return {status:200,headers:{'content-type':'text/event-stream'},body:sse({reasoning_content:'private first',content:'ordinary answer'})};
+    },()=>{}).result();
+  const saved=JSON.parse(JSON.stringify(first));
+  const second=await providerStream(deep,{messages:[{role:'user',content:'think and answer',timestamp:1},saved,
+    {role:'user',content:'now use tool',timestamp:2}]},100,async wire=>{
+      assert.equal(JSON.parse(wire.body).messages.find((m:any)=>m.role==='assistant').reasoning_content,'private first');
+      return {status:200,headers:{'content-type':'text/event-stream'},body:sse({reasoning_content:'private tool',
+        tool_calls:[{index:0,id:'deep-tool',type:'function',function:{name:'read',arguments:'{"path":"/workspace/a"}'}}]},'tool_calls')};
+    },()=>{}).result();
+  assert.equal(second.stopReason,'toolUse');
+  await providerStream(deep,{messages:[{role:'user',content:'first',timestamp:1},saved,JSON.parse(JSON.stringify(second)),
+    {role:'toolResult',toolCallId:'deep-tool',toolName:'read',content:[{type:'text',text:'remote'}],isError:false,timestamp:3}]},100,
+    async wire=>{
+      const a=JSON.parse(wire.body).messages.filter((m:any)=>m.role==='assistant');
+      assert.deepEqual(a.map((m:any)=>m.reasoning_content),['private first','private tool']);
+      return {status:200,headers:{'content-type':'text/event-stream'},body:sse({content:'done'})};
+    },()=>{}).result();
+  const disabled={...deep,thinking:'disabled' as const,reasoning_effort:null};
+  await providerStream(disabled,{messages:[{role:'user',content:'switch check only',timestamp:1}]},10,async wire=>{
+    const p=JSON.parse(wire.body);assert.deepEqual(p.thinking,{type:'disabled'});assert.equal(p.temperature,.2);
+    return {status:200,headers:{'content-type':'text/event-stream'},body:sse({content:'off'})};
+  },()=>{}).result();
 });

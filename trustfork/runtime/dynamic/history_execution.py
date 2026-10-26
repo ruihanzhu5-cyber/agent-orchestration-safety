@@ -41,6 +41,9 @@ def execute_task(runtime,source,previous):
         runtime.client.call(runtime.sessions['Main'],'set_coordination_phase',{'phase':'planning'})
         result=runtime._turn('Main','planning')
         while result['response']['stopReason']=='toolUse' and runtime.budget.available():result=runtime._turn('Main','planning')
+        if result['response']['stopReason']=='length':
+            runtime.termination_reason='output_limit'
+            raise DynamicError('history_output_limit','Partial plan retained; no automatic continuation')
         plan=parse_initial_plan(text_of(result['response']),allowed_context_refs=('task://current-stage',),
             repair=lambda raw,prompt:text_of(runtime._turn('Main','format_repair',extra_packet={'format_repair':{'original':raw,'instruction':prompt}})['response']))
         for assignment in plan['plan']['assignments']:
@@ -53,7 +56,7 @@ def execute_task(runtime,source,previous):
         runtime._release();runtime.scheduler.enqueue_batch(['Main'],reason='history_initial_coordination')
         for index,stage in enumerate(runtime.case['stages']):
             runtime._run_stage()
-            if index+1==len(runtime.case['stages']) or not runtime.budget.available():break
+            if runtime.termination_reason or index+1==len(runtime.case['stages']) or not runtime.budget.available():break
             following=runtime.case['stages'][index+1]
             runtime.lifecycle.close_stage(runtime.environment,next_stage=following,deadline=runtime.budget.deadline,drain=lambda epoch:None,
                 reset=lambda epoch:runtime._stage_reset(epoch,True),migrate=lambda epoch,new:runtime._stage_reset(epoch,False))
@@ -65,18 +68,20 @@ def execute_task(runtime,source,previous):
                     'system_prompt':system_prompt(actor,NORMAL_GOAL,task_resources=[])})
             runtime.client.call(runtime.sessions['Main'],'set_coordination_phase',{'phase':'history'})
             runtime.scheduler.enqueue_batch(['Main'],reason='original_next_stage')
-        status='budget_ended' if runtime.budget.exhausted() else 'completed_unjudged'
+        status='budget_ended' if runtime.budget.exhausted() or runtime.termination_reason else 'completed_unjudged'
         runtime.lifecycle.propose_final(runtime.main_revision)
         frozen=runtime.lifecycle.finalize(runtime.environment,stage_deadline=runtime.budget.deadline,
             current_revision=lambda:runtime.main_revision,has_budget=runtime.budget.available)
     except (DynamicError,OSError) as error:
         status='failed_history_retained'
         runtime.ledger.append('history_execution_failed',{'error_type':type(error).__name__,'code':getattr(error,'code',None)})
-        if runtime.environment.container:
-            runtime.environment.quiesce(time.monotonic()+30)
-            runtime.environment.freeze();frozen=runtime.environment.export_state()
+        partial=runtime.lifecycle.capture_partial(runtime.environment,runtime.client,runtime.sessions,reason=getattr(error,'code',type(error).__name__))
+        write_json(runtime.directory/'partial-state.json',partial);frozen=partial.get('environment_export')
     finally:
-        for actor,session in runtime.sessions.items():sessions[actor]=runtime.client.call(session,'export_session')
+        for actor,session in runtime.sessions.items():
+            try:sessions[actor]=runtime.client.call(session,'export_session')
+            except (DynamicError,OSError,TimeoutError) as error:
+                runtime.ledger.append('history_session_export_failed',{'actor_id':actor,'status':'unknown','code':getattr(error,'code',type(error).__name__)})
         runtime.client.close();runtime.environment.close()
     if set(sessions)!=set(('Main','A','B')):
         raise DynamicError('history_session_unavailable','Infrastructure failure retained; no complete carry state available')

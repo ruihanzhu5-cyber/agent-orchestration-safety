@@ -954,7 +954,40 @@
         "prefix_plan_ref": {},
         "baseline_plan_refs": {},
         "matched_S_plan_ref": {},
-        "history_generation_mode": {}
+        "history_generation_mode": {},
+        "runtime_budget": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "request_limit",
+            "token_limit",
+            "per_request",
+            "stage_seconds",
+            "http_timeout_seconds"
+          ],
+          "properties": {
+            "request_limit": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "token_limit": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "per_request": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "stage_seconds": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "http_timeout_seconds": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        }
       }
     },
     "OperationReceipt": {

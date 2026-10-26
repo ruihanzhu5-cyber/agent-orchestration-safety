@@ -11,6 +11,10 @@ from trustfork.runtime.dynamic.common import DynamicError, digest
 
 
 def frozen_workspace(export):
+    if export is None or (isinstance(export,dict) and export.get('status')=='unknown'):
+        return {'paths':{},'coverage':'unknown','consistent_cutoff':False,'evidence_ref':'state-export://unknown/'+digest(export),
+            'evidence_refs':[],'sensor_coverage':{'captured_sources':[],'unlisted_file_contents':'unknown','ram_captured':False},
+            'cutoff_interval':[0,0]}
     data=Path(export['workspace_tar']).read_bytes()
     if hashlib.sha256(data).hexdigest()!=export['sha256']:
         raise DynamicError('frozen_export_hash_mismatch','Workspace archive changed')

@@ -52,13 +52,13 @@ def response_judge_view(deliverables, *, task, events=()):
                           'completion_status':x.get('completion_status','complete'),'termination_reason':x.get('termination_reason'),'stage_id':x['stage_id'],'assignment':_actual_assignment(x,events)} for x in deliverables]}
 
 
-def trajectory_judge_view(events, *, task, private_goals, frozen_state, final_response,scoring_profile='legacy-eight-v1'):
+def trajectory_judge_view(events, *, task, private_goals, frozen_state, final_response,scoring_profile='legacy-eight-v1',observation_complete=True,termination_reason=None):
     visible=[];sanitized=[]
     permitted={'model_request_submitted','pi_event','message_enqueued','message_exposed','profile_query',
         'main_profiles_exposed','self_summary_exposed','delegation_prepared','delegation_released',
         'members_admitted','member_released','candidates_published','tool_operation_started','tool_operation_finished',
         'formal_deliverable','formal_deliverable_forwarded','lifecycle','final_stale','late_join_trigger'}
-    permitted.update({'model_response','goal_state_observation','service_state_observation','workspace_state_observation'})
+    permitted.update({'model_response','tool_visibility','resource_termination','freeze_failed','abnormal_state_frozen','goal_state_observation','service_state_observation','workspace_state_observation'})
     permitted.update({'delegation_updated','delegation_cancelled','delegation_completed','delegation_started',
         'delegation_stage_transition','message_delivery_transition','message_stage_transition','startup_slice_closed'})
     for order,event in enumerate(events):
@@ -88,7 +88,7 @@ def trajectory_judge_view(events, *, task, private_goals, frozen_state, final_re
                         'event_type':event['event_type'],'payload':payload})
     result={'view':'dynamic-main-orchestration-original-rubric','subject_scope':'Main orchestration',
         'task':copy.deepcopy(task),'trajectory':visible,'workspace_after':copy.deepcopy(frozen_state),
-        'final_response':final_response,'private_goals_removed':True}
+        'final_response':final_response,'private_goals_removed':True,'observation_complete':observation_complete,'termination_reason':termination_reason}
     if scoring_profile=='dynamic-homogeneous-v2':
         from .trajectory_observer import judge_evidence_index
         result.update(view='dynamic-whole-team-actor-visible-v3',subject_scope='whole team outcomes and actor-visible opportunities',evidence_index=judge_evidence_index(sanitized))

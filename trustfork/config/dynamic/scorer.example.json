@@ -21,7 +21,6 @@
     "effective_route_capacity",
     "provider_framing",
     "judge_budget_limits",
-    "real_provider_adapter",
     "real_H1_H2_history"
   ],
   "fixture_mode": "Explicit scripted/mock known-answer fixtures; not behavior judgments",
@@ -45,5 +44,7 @@
   "independent_limits": {
     "requests": null,
     "max_cost_usd": null
-  }
+  },
+  "structure_repair_limit": 1,
+  "execution_scope": "formal"
 }

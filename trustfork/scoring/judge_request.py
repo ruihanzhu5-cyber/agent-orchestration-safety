@@ -38,7 +38,7 @@ def offline_counter():
 
 
 def prepare_judge_request(view,*,rubric,format_instructions,output_budget=None,tools=None,parameters=None,
-                          counter=None,representation='legacy-full',output_token_parameter='max_tokens',judge_binding=None):
+                          counter=None,representation='legacy-full',output_token_parameter='max_tokens',judge_binding=None,execution_scope='formal'):
     if output_budget is not None and (type(output_budget) is not int or output_budget<=0):
         raise DynamicError('invalid_judge_output_budget','Judge output reserve must be explicit positive integer or unknown')
     params=dict(parameters or {})
@@ -53,7 +53,11 @@ def prepare_judge_request(view,*,rubric,format_instructions,output_budget=None,t
     wire_payload={k:v for k,v in request.items() if k!='parameters'}
     wire_payload.update(params)
     route=digest({k:binding.get(k) for k in ('provider','base_url','model_id')}) if all(binding.get(k) for k in ('provider','base_url','model_id')) else None
-    counter_info={'id':'supplied-test-counter','version':'fixture','count_method':'fixture-exact'}
+    if counter is None and execution_scope in ('diagnostic','engineering_smoke'):
+        from trustfork.runtime.dynamic.token_accounting import engineering_counting_policy
+        counter=engineering_counting_policy(binding)['counter']
+        counter_info={'id':'utf8-byte-upper-estimate','version':'v1','count_method':'conservative-estimate'}
+    else:counter_info={'id':'supplied-test-counter','version':'fixture','count_method':'fixture-exact'}
     if counter is None:
         try:
             counter=offline_counter()
@@ -69,7 +73,7 @@ def prepare_judge_request(view,*,rubric,format_instructions,output_budget=None,t
     n=accounting['input_tokens'] if accounting else None
     return {'version':'prepared-judge-request-v2','request':request,'request_hash':digest(request),
         'wire_payload':wire_payload,'wire_payload_hash':digest(wire_payload),
-        'judge_model_id':binding.get('model_id'),'route_fingerprint':route,'judge_binding_ref':'gpt4o',
+        'judge_model_id':binding.get('model_id'),'route_fingerprint':route,'judge_binding_ref':binding.get('logical_alias'),
         'token_accounting':accounting,'representation':representation,'representation_hash':digest(view),'input_tokens':n,
         'message_content_tokens':content_tokens,'tool_and_format_schema_tokens':schema_tokens,
         'wire_serialization_tokens':counter(canonical(request).decode()) if counter else None,
@@ -81,7 +85,7 @@ def prepare_judge_request(view,*,rubric,format_instructions,output_budget=None,t
         'codec_instruction_tokens_separate':counter(INSTRUCTIONS) if counter and representation==VERSION else 0,
         'system_message_tokens':counter(system) if counter else None,
         'component_counts_are_nonadditive':True,
-        'output_budget_scope':'Judge only; independent of agent 4096 and team 48000',
+        'output_budget_scope':'Judge only; independent of resolved model-specific team/request budget',
         'provider_framing_verified':False,'cognitive_equivalence':'not_tested_offline' if representation==VERSION else 'legacy'}
 
 
@@ -158,9 +162,14 @@ def prepare_judge_pass(bundle,pass_name,*,binding,scorer_config,representation=N
     if pass_name=='response':rep='legacy-full'
     params=dict(scorer_config.get('parameters') or {})
     if scorer_config.get('temperature') is not None:params['temperature']=scorer_config['temperature']
+    if binding.get('thinking'):
+        params['thinking']={'type':binding['thinking']}
+        if binding['thinking']=='enabled':
+            params.pop('temperature',None);params['reasoning_effort']=binding['reasoning_effort']
     prepared=prepare_judge_request(view,rubric=bundle['prompts'][pass_name],format_instructions=bundle['formats'][pass_name],
         output_budget=scorer_config.get(pass_name+'_output_budget_tokens'),parameters=params,counter=counter,representation=rep,
-        output_token_parameter=binding.get('output_token_parameter') or 'max_tokens',judge_binding=binding)
+        output_token_parameter=binding.get('output_token_parameter') or 'max_tokens',judge_binding=binding,execution_scope=scorer_config.get('execution_scope','formal'))
+    prepared['judge_binding_ref']=scorer_config.get('judge_binding')
     return {**prepared,'builder_version':bundle['builder_version'],'scoring_profile':bundle['scoring_profile'],
         'scorer_config':scorer_config,'scorer_config_hash':digest(scorer_config),'sanitizer':bundle['sanitizer'],
         'pass_name':pass_name,'not_applicable':pass_name=='response' and not bundle['response_ids']}

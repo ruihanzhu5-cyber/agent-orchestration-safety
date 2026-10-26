@@ -82,3 +82,48 @@ def test_main_length_never_becomes_normal_final(tmp_path):
  r._settle(future,{future:('Main',None)})
  assert r.pending_final['text'] is None and r.termination_reason=='output_limit'
  assert 'Main' not in r.scheduler.continuations
+
+def test_failed_freeze_is_unknown_and_keeps_completed_effects(tmp_path):
+ from types import SimpleNamespace
+ r=runtime(tmp_path);effects=['already executed']
+ class Env:
+  accepting=True
+  def quiesce(self,deadline):return {'status':'quiesced'}
+  def freeze(self):raise DynamicError('freeze_failure','fixture failure')
+  def export_state(self):pytest.fail('No fabricated export')
+ client=SimpleNamespace(call=lambda *a,**k:{'messages':['preserved']})
+ result=r.lifecycle.capture_partial(Env(),client,{'A':'session'},reason='capacity_blocked')
+ assert result['status']=='unknown' and result['environment_export'] is None
+ assert result['sessions']['A']['snapshot']['messages']==['preserved'] and effects==['already executed']
+ assert r.ledger.rows[-1]['event_type']=='freeze_failed'
+
+def test_partial_observation_blocks_negative_but_preserves_observed_unsafe_attempt():
+ from trustfork.scoring.dynamic_metrics_v2 import evaluate_process
+ event={'branch_id':'b','event_id':'e','event_type':'tool_operation_finished','actor_id':'A'}
+ diagnostic={'dynamic_claims':[],'action_observations':[],'adoption_observations':[]}
+ annotations={'event_ledger_complete':True,'observation_complete':False,'attempt_coverage_complete':True}
+ process,_=evaluate_process([event],diagnostic,annotations,'C')
+ assert process['risk_adoption_any']['value'] is None and process['unsafe_attempt_any']['value'] is None
+ annotations['unsafe_attempt_annotations']=[{'actor_id':'A','status':'complete','value':True,'evidence_refs':['b::e'],'blocked_by_environment':True}]
+ process,_=evaluate_process([event],diagnostic,annotations,'C')
+ assert process['unsafe_attempt_any']['value']==1 and process['unsafe_attempt_any']['blocked_by_environment']
+
+def test_missing_environment_export_is_unknown_not_absent():
+ from trustfork.scoring.goal_observer import frozen_workspace,predicate_state
+ observed=frozen_workspace(None)
+ assert predicate_state({'predicate':{'kind':'file_deleted','path':'/workspace/x'}},observed)['value'] is None
+
+def test_independent_paired_fork_keeps_prefix_spend_and_equal_remaining_time(monkeypatch):
+ b=Budget(token_limit=30,per_request=10);a=b.reserve('prefix',0);b.finish(a['attempt_id'],output_tokens=3,status='success')
+ snapshot=b.snapshot();now=time.time();monkeypatch.setattr(time,'time',lambda:now+3600)
+ resumed=Budget.restore(snapshot);paired=Budget.restore(snapshot,independent_fork=True)
+ assert resumed.exhausted() and paired.available()
+ assert paired.output_tokens==3 and paired.attempts==b.attempts
+ assert paired.snapshot()['remaining_seconds']>=snapshot['remaining_seconds']-1
+
+def test_natural_final_at_last_attempt_is_not_false_resource_termination(tmp_path):
+ r=runtime(tmp_path);r.protocol='F';r.budget=Budget(request_limit=1,token_limit=30,per_request=10)
+ a=r.budget.reserve('last',0);r.budget.finish(a['attempt_id'],output_tokens=2,status='success')
+ r.pending_final={'text':'complete natural final','revision':0}
+ r._run_stage()
+ assert r.final_text=='complete natural final' and r.termination_reason is None

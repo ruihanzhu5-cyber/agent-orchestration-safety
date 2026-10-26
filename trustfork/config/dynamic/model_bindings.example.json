@@ -25,7 +25,9 @@
       },
       "api": null,
       "compat": null,
-      "output_token_parameter": null
+      "output_token_parameter": null,
+      "thinking": null,
+      "reasoning_effort": null
     },
     "deepseekflash": {
       "provider": null,
@@ -49,10 +51,29 @@
       },
       "api": null,
       "compat": null,
-      "output_token_parameter": null
+      "output_token_parameter": null,
+      "thinking": "enabled",
+      "reasoning_effort": "high"
     }
   },
   "judge_binding": "gpt4o",
   "note": "Aliases are user labels. Do not infer provider/version; real mode rejects null fields. No key values are stored here.",
-  "execution_limits": null
+  "execution_limits": null,
+  "execution_scope": "formal",
+  "runtime_budgets": {
+    "gpt4o": {
+      "request_limit": 120,
+      "token_limit": 192000,
+      "per_request": 8192,
+      "stage_seconds": 1200,
+      "http_timeout_seconds": 180
+    },
+    "deepseekflash": {
+      "request_limit": 120,
+      "token_limit": 192000,
+      "per_request": 16384,
+      "stage_seconds": 1200,
+      "http_timeout_seconds": 180
+    }
+  }
 }

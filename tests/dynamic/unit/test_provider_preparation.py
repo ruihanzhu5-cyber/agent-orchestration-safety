@@ -9,12 +9,12 @@ from trustfork.scoring.judge_request import prepare_judge_request,capacity_repor
 
 def configuration():
     binding={'provider':'synthetic','base_url':'https://mock.invalid/v1','model_id':'exact-fixture','key_env':'UNUSED_FIXTURE_KEY',
-        'context_window':128000,'max_output_tokens':4096,'supported_parameters':['temperature','max_tokens'],
+        'context_window':128000,'max_output_tokens':16384,'supported_parameters':['temperature','max_tokens'],
         'api':'openai-completions','compat':{k:False for k in ('supportsStore','supportsDeveloperRole','supportsReasoningEffort',
         'supportsUsageInStreaming','supportsFinishReason','requiresToolResultName','requiresAssistantAfterToolResult','requiresThinkingAsText',
         'requiresReasoningContentOnAssistantMessages','supportsStrictMode')},'output_token_parameter':'max_tokens'}
     route=digest({k:binding[k] for k in ('provider','base_url','model_id')})
-    binding['capability']={'status':'verified','effective_context_tokens':128000,'max_output_tokens':4096,
+    binding['capability']={'status':'verified','effective_context_tokens':128000,'max_output_tokens':16384,
         'source':'synthetic://unit-fixture','evidence_hash':digest('fixture'),'verified_at':'2026-10-25','route_fingerprint':route,
         'tokenizer':{'id':'fixture','version':'1','count_method':'fixture-exact','applicable_route':route},'framing_tokens':0,'output_token_parameter':'max_tokens'}
     return {'protocol_version':'dynamic-join-v9-trajectory-portfolio','mode':'offline','real_api_enabled':False,

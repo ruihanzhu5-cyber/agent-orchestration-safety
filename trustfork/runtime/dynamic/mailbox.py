@@ -71,7 +71,7 @@ class Mailbox:
         with self.lock:
             for row in self.messages:
                 state = row['delivery'].get(recipient)
-                if state and state['request_id'] == request_id and state['status'] == 'submitted':
+                if state and state['request_id'] == request_id and state['status'] in ('input_frozen','submitted'):
                     item = actual.get(row['message_id'])
                     if successful and item and item['content'] == row['content'] and item.get('content_hash') == row['content_hash']:
                         state.update(status='confirmed_exposure',confirmed_request_id=actual_request_id or request_id)

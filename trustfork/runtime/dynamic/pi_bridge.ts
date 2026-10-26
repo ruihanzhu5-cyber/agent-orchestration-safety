@@ -66,7 +66,7 @@ class TaskResources implements ResourceLoader {
   async reload(){} // Sources are explicitly re-supplied and versioned by the host.
 }
 type OwnedSession={session:AgentSession;manager:SessionManager;resources:TaskResources;config:any;active:Envelope|null;
-  scripts:Script[];requests:number;actualInputs:any[];events:any[];transport:RemoteTransport;lastResponse:AssistantMessage|null;abortRequested:boolean};
+  scripts:Script[];requests:number;actualInputs:any[];events:any[];transport:RemoteTransport;lastResponse:AssistantMessage|null;abortRequested:boolean;providerError:any};
 const sessions=new Map<string,OwnedSession>();
 function requireSession(e:Envelope){
   const s=sessions.get(e.opaque_session_id);
@@ -117,17 +117,19 @@ async function create(e:Envelope,restore?:any){
     modelsStorePath:path.join(directory,'models-cache.json'),allowModelNetwork:false,refreshOnCreate:false});
   let s:OwnedSession;
   const transport:RemoteTransport={home:e.payload.task_home??'/root',
+    observe:async record=>{if(!s.active)throw Error('No tool visibility scope');
+      send({...s.active,kind:'event',rpc_id:randomUUID(),operation:'tool_visibility',payload:record});},
     request:async(operation,args,opId)=>{if(!s.active)throw Error('No tool permit');return callHost(s.active,'tool_operation',{operation,args,op_id:opId});},
     stream:async(args,opId,onFrame)=>{if(!s.active)throw Error('No stream permit');await callHost(s.active,'tool_stream',{args,op_id:opId},onFrame);},
     cancel:async(opId)=>{if(!s.active)throw Error('No cancellation scope');await callHost(s.active,'tool_cancel',{op_id:opId});},
   };
   const work=e.actor_id==='Main'?[]:createRemoteTools(transport,spoolRoot!);
   const config={...e.payload,actor_id:e.actor_id,branch_id:e.branch_id,task_id:e.task_id};
-  s={session:undefined as unknown as AgentSession,manager,resources,config,active:null,scripts:[],requests:0,actualInputs:[],events:[],transport,lastResponse:null,abortRequested:false};
+  s={session:undefined as unknown as AgentSession,manager,resources,config,active:null,scripts:[],requests:0,actualInputs:[],events:[],transport,lastResponse:null,abortRequested:false,providerError:null};
   const tools=[...work,...coordinateDefinitions(()=>s)];
   const model=e.payload.mode==='scripted-test'?scriptedModel:providerModel(e.payload.provider_binding);
   const created=await createAgentSession({cwd:'/workspace',agentDir:directory,modelRuntime:runtime,model,
-    thinkingLevel:'off',resourceLoader:resources,sessionManager:manager,settingsManager:settings,
+    thinkingLevel:e.payload.provider_binding?.thinking==='enabled'?'high':'off',resourceLoader:resources,sessionManager:manager,settingsManager:settings,
     noTools:'builtin',tools:tools.map(x=>x.name),customTools:tools});
   if(created.modelFallbackMessage)throw Error('Unexpected model fallback');
   s.session=created.session;
@@ -141,12 +143,12 @@ async function create(e:Envelope,restore?:any){
     const actual={systemPrompt:context.systemPrompt,messages:context.messages,
       tools:(context.tools??[]).map(t=>({name:t.name,description:t.description,parameters:t.parameters})),
       provider_parameters:{maxRetries:0,maxTokens:active.payload.max_output_tokens??4096,
-        ...(s.config.mode==='scripted-test'?{}:{temperature:0.2})}};
+        ...(s.config.mode==='scripted-test'?{}:s.config.provider_binding.thinking==='enabled'?{thinking:'enabled',reasoning_effort:'high'}:{temperature:0.2})}};
     s.actualInputs.push(structuredClone(actual));
     send({...active,kind:'event',rpc_id:randomUUID(),operation:'model_request_submitted',payload:{actual_input:actual,synthetic:s.config.mode!=='api',execution_backend:s.config.mode}});
     if(s.config.mode!=='scripted-test')return providerStream(s.config.provider_binding,context,active.payload.max_output_tokens??4096,
       value=>callHost(active,'provider_http',value),payload=>send({...active,kind:'event',rpc_id:randomUUID(),
-        operation:'provider_payload',payload:{request:payload,execution_backend:s.config.mode,synthetic:s.config.mode!=='api'}}),options?.signal);
+        operation:'provider_payload',payload:{request:payload,execution_backend:s.config.mode,synthetic:s.config.mode!=='api'}}),options?.signal,error=>{s.providerError={code:error.code??'provider_transport_unknown',message:String(error)};});
     const script=s.scripts.shift();
     const produce=()=>{
       const failure=!script;
@@ -186,7 +188,7 @@ async function dispatch(e:Envelope){
   if(e.operation==='cancel'){s.abortRequested=!!s.active;s.session.agent.abort();return{status:'cancel_requested'};}
   if(e.operation==='execute_turn'){
     if(s.active)throw Error('Actor already has an active permit');
-    s.active=e;s.scripts=[e.payload.script];s.lastResponse=null;s.abortRequested=false;
+    s.active=e;s.scripts=[e.payload.script];s.lastResponse=null;s.abortRequested=false;s.providerError=null;
     const before=s.requests,start=s.events.length;
     try{
       if(e.payload.messages?.length) await s.session.agent.prompt(e.payload.messages);
@@ -201,7 +203,7 @@ async function dispatch(e:Envelope){
       const transport=e.payload.script?.transportFailure;
       const generated=!!response?.content.length;
       const effects=s.events.slice(start).some(x=>x.type==='tool_execution_start');
-      return {status,response,generation_finish_reason:response?.stopReason??null,
+      return {status,response,error:s.providerError,generation_finish_reason:response?.stopReason??null,
         completion_status:status!=='success'?'unavailable':response?.stopReason==='length'?'partial':'complete',
         termination_reason:response?.stopReason==='length'?'output_limit':null,
         termination_status:s.abortRequested?'cancelled':status==='success'?(response?.stopReason==='length'?'resource_ended':'completed'):'provider_error',events:s.events.slice(start),requests:s.requests-before,
@@ -255,6 +257,6 @@ lines.on('line',line=>{
     return;
   }
   try{assertBridgeEnvelope(e);}catch(error){send({kind:'fatal',error:String(error)});return;}
-  void dispatch(e).then(payload=>send({...e,kind:'result',payload}),error=>send({...e,kind:'result',error:String(error),payload:null}));
+  void dispatch(e).then(payload=>send({...e,kind:'result',payload}),error=>send({...e,kind:'result',error:{message:String(error),code:(error as any).code??'pi_bridge_error'},payload:null}));
 });
 lines.on('close',()=>{for(const s of sessions.values())s.session.dispose();});

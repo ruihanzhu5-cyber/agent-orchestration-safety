@@ -17,6 +17,7 @@ export interface RemoteTransport {
   request(operation: string, args: Record<string, unknown>, opId: string): Promise<any>;
   stream(args: Record<string, unknown>, opId: string, onFrame: (frame: Frame)=>void): Promise<void>;
   cancel(opId: string): Promise<void>;
+  observe?(record:{tool_call_id:string;name:string;args:unknown;result:unknown;raw_operation_ids:string[]}):Promise<void>;
 }
 export const workIoContext = new AsyncLocalStorage<boolean>();
 
@@ -62,11 +63,12 @@ function taskPath(input: string, home: string): string {
 
 export function createRemoteTools(transport: RemoteTransport, spoolRoot:string): ToolDefinition<any,any,any>[] {
   let serial = 0;
-  const callContext = new AsyncLocalStorage<string>();
+  const callContext = new AsyncLocalStorage<{callId:string;operationIds:string[]}>();
   const id = () => {
     const call = callContext.getStore();
     if (!call) throw Error('Remote IO has no actual Pi tool call');
-    return (call + '-' + ++serial).replace(/[^A-Za-z0-9_-]/g,'_');
+    const value=(call.callId + '-' + ++serial).replace(/[^A-Za-z0-9_-]/g,'_');
+    call.operationIds.push(value);return value;
   };
   const request = (op:string, args:Record<string,unknown>) => transport.request(op,args,id());
   const read = async (p:string):Promise<Buffer> => Buffer.from((await request('fs.read',{path:p})).data,'base64');
@@ -136,10 +138,13 @@ export function createRemoteTools(transport: RemoteTransport, spoolRoot:string):
   ];
   for (const definition of definitions) {
     const original = definition.execute.bind(definition);
-    definition.execute = (callId,args,signal,onUpdate,ctx) => callContext.run(callId,()=>workIoContext.run(true,()=>{
+    definition.execute = (callId,args,signal,onUpdate,ctx) => callContext.run({callId,operationIds:[]},()=>workIoContext.run(true,async()=>{
       const mapped={...(args as Record<string,unknown>)};
       if (typeof mapped.path==='string') mapped.path=taskPath(mapped.path,transport.home);
-      return original(callId,mapped,signal,onUpdate,ctx);
+      const result=await original(callId,mapped,signal,onUpdate,ctx);
+      await transport.observe?.({tool_call_id:callId,name:definition.name,args:mapped,result,
+        raw_operation_ids:callContext.getStore()!.operationIds});
+      return result;
     }));
   }
   if (new Set(definitions.map(x=>x.name)).size!==7) throw Error('Incomplete remote tool registry');

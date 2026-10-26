@@ -8,7 +8,7 @@ from trustfork.scoring.judge_client import JudgeClient
 from trustfork.scoring.judge_request import build_judge_bundle,prepare_judge_pass
 from trustfork.scoring.dynamic_pipeline import load_events,scorer_manifest
 from trustfork.scoring.dynamic_adapter import extract_formal_deliverables
-def run_judge_attempt(run_path,out,config,*,mode,scorer_config,semantic_goals=False,representation=None,mock_replies=None,max_requests=2,authorize_real=False,passes=('response','trajectory'),prior_attempt=None,trajectory_view_override=None):
+def run_judge_attempt(run_path,out,config,*,mode,scorer_config,semantic_goals=False,representation=None,mock_replies=None,max_requests=4,authorize_real=False,passes=('response','trajectory'),prior_attempt=None,trajectory_view_override=None):
  out=Path(out);run_path=Path(run_path)
  if out.exists():raise DynamicError('judge_output_exists','Choose a new attempt; team remains frozen')
  run=read_json(run_path);events=load_events(run_path.parent,run);refs={e['branch_id']+'::'+e['event_id'] for e in events}
@@ -37,7 +37,7 @@ def run_judge_attempt(run_path,out,config,*,mode,scorer_config,semantic_goals=Fa
   if key not in passes and not value['not_applicable']:
    if prior_attempt is None:raise DynamicError('judge_prior_pass_required','Explicit prior successful pass required')
    prior=Path(prior_attempt);old=read_json(prior/(key+'-prepared.json'));saved=read_json(prior/(key+'-result.json'))
-   if old['request_hash']!=value['request_hash'] or old['wire_payload_hash']!=value['wire_payload_hash'] or saved['request_hash']!=value['request_hash'] or saved['synthetic']!=transport.synthetic:raise DynamicError('judge_prior_pass_mismatch','Prior pass differs from exact frozen request')
+   if old['request_hash']!=value['request_hash'] or old['wire_payload_hash']!=value['wire_payload_hash'] or saved.get('original_request_hash',saved['request_hash'])!=value['request_hash'] or saved['synthetic']!=transport.synthetic:raise DynamicError('judge_prior_pass_mismatch','Prior pass differs from exact frozen request')
    from trustfork.scoring.judge_client import validate_judge_result,prepared_evidence_index
    validate_judge_result(saved['result'],pass_name=key,response_ids=ids,evidence_refs=refs,scoring_profile=profile,evidence_index=prepared_evidence_index(value))
  try:
@@ -50,14 +50,14 @@ def run_judge_attempt(run_path,out,config,*,mode,scorer_config,semantic_goals=Fa
   if key not in passes and not value['not_applicable']:
    if prior_attempt is None:raise DynamicError('judge_prior_pass_required','Retry only failed passes with an explicit prior attempt')
    prior=Path(prior_attempt);stored=read_json(prior/(key+'-prepared.json'));saved=read_json(prior/(key+'-result.json'))
-   if stored['request_hash']!=value['request_hash'] or stored['wire_payload_hash']!=value['wire_payload_hash'] or saved['request_hash']!=value['request_hash'] or saved['synthetic']!=transport.synthetic:raise DynamicError('judge_prior_pass_mismatch','Prior successful pass must bind the exact request and provenance')
+   if stored['request_hash']!=value['request_hash'] or stored['wire_payload_hash']!=value['wire_payload_hash'] or saved.get('original_request_hash',saved['request_hash'])!=value['request_hash'] or saved['synthetic']!=transport.synthetic:raise DynamicError('judge_prior_pass_mismatch','Prior successful pass must bind the exact request and provenance')
    from trustfork.scoring.judge_client import validate_judge_result,prepared_evidence_index
    validate_judge_result(saved['result'],pass_name=key,response_ids=ids,evidence_refs=refs,scoring_profile=profile,evidence_index=prepared_evidence_index(value))
    annotation.update(saved['result']);annotation['judge_passes'][key]={'prepared':value,'result_hash':digest(saved),'semantic_goals':False,'synthetic':transport.synthetic,'prior_attempt_result_hash':digest(saved)}
    continue
   if value['not_applicable']:
    write_json(out/(key+'-result.json'),{'status':'not_applicable','reason':'No formal deliveries'});continue
-  try:result=client.send(value,request_id='judge_'+uuid.uuid4().hex,pass_name=key,response_ids=ids,evidence_refs=refs)
+  try:result=client.send_with_repair({**value,'behavior_run_id':run['run_id']},request_id='judge_'+uuid.uuid4().hex,pass_name=key,response_ids=ids,evidence_refs=refs)
   except DynamicError as error:
    write_json(out/(key+'-error.json'),error.record());write_json(out/'partial_annotations.json',annotation);raise
   annotation['judge_passes'][key]={'prepared':value,'result_hash':digest(result),'semantic_goals':bool(semantic and key=='trajectory'),'synthetic':transport.synthetic}

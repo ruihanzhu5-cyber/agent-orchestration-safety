@@ -80,10 +80,23 @@ class JudgeClient:
         if transport.kind!='judge':raise DynamicError('judge_independent_budget_required','Use a Judge transport budget')
         self.transport=transport
 
+    def _capacity(self,prepared):
+        alias=self.transport.config['judge_binding'];binding=self.transport.config['logical_bindings'][alias]
+        if self.transport.scope not in ('diagnostic','engineering_smoke'):
+            return capacity_report(prepared,binding_capability(binding),sender_enabled=True,mode=self.transport.mode,authorized=self.transport.mode=='api')
+        c=binding_capability(binding);a=self.transport.accounting(binding,prepared['wire_payload'])
+        n=a['estimated_total_input_tokens'];out=prepared['output_budget'];margin=max(2048,(n+9)//10)
+        fits=(prepared.get('route_fingerprint')==c['route_fingerprint'] and c['status'] in ('declared','verified') and
+            type(out) is int and out>0 and out<=binding['max_output_tokens'] and
+            (c['max_output_tokens'] is None or out<=c['max_output_tokens']) and n+out+margin<=c['effective_context_tokens'])
+        return {'fits':fits,'can_send':fits and self.transport.mode=='api','reason':'ready' if fits else 'judge_input_overflow',
+            'capacity_status':c['status'],'counting_status':'estimated','input_tokens':n,'output_reserved':out,'margin_tokens':margin,
+            'scope':self.transport.scope,'full_window_verified':False,'request_hash':prepared['request_hash']}
+
     def preflight(self,prepared):
         alias=self.transport.config['judge_binding'];binding=self.transport.config['logical_bindings'][alias]
         if prepared.get('not_applicable'):return {'fits':True,'reason':'not_applicable'}
-        report=capacity_report(prepared,binding_capability(binding),sender_enabled=True,mode=self.transport.mode,authorized=self.transport.mode=='api')
+        report=self._capacity(prepared)
         for key in prepared['request']['parameters']:
             if key not in binding['supported_parameters']:raise DynamicError('judge_parameter_unsupported',key)
         if report['fits'] is not True:raise DynamicError(report['reason'],'Preflight every pass before any transmission')
@@ -100,14 +113,14 @@ class JudgeClient:
         original.update(prepared['request']['parameters'])
         if digest(original)!=prepared['wire_payload_hash']:
             raise DynamicError('judge_wire_payload_mismatch','No extra or omitted content may be sent')
-        report=capacity_report(prepared,binding_capability(binding),sender_enabled=True,
-            mode='api' if self.transport.mode=='api' else 'mock',authorized=self.transport.mode=='api')
+        report=self._capacity(prepared)
         if self.transport.mode=='api' and not report['can_send']:
             raise DynamicError(report['reason'],'Judge capacity/budget unresolved; team behavior is retained')
         if self.transport.mode=='mock' and report['fits'] is not True:
             raise DynamicError(report['reason'],'Mock must also exercise the capacity gate with explicit fixture evidence')
         reply=self.transport.request(alias,{'url':binding['base_url'].rstrip('/')+'/chat/completions',
-            'method':'POST','body':canonical(prepared['wire_payload']).decode()},request_id=request_id)
+            'method':'POST','body':canonical(prepared['wire_payload']).decode()},request_id=request_id,
+            context={'purpose':'judge_repair' if prepared.get('repair_of') else 'judge','run_id':prepared.get('behavior_run_id','frozen-judge-pass')})
         if reply['status']!=200 or reply.get('read_error'):raise DynamicError('judge_transport_failed','Retain original run; retry Judge only under a new attempt')
         try:
             response=json.loads(reply['body']);choice=response['choices'][0]
@@ -118,3 +131,43 @@ class JudgeClient:
             'result':validate_judge_result(value,pass_name=pass_name,response_ids=response_ids,evidence_refs=evidence_refs,scoring_profile=prepared.get('scoring_profile','legacy-eight-v1'),evidence_index=prepared_evidence_index(prepared)),
             'usage':response.get('usage'),'synthetic':self.transport.synthetic,
             'provider_request_id':reply['headers'].get('x-request-id'),'capacity':report}
+
+    def send_with_repair(self,prepared,*,request_id,**kwargs):
+        """At most one structural repair on the same frozen evidence; never reruns a team."""
+        from copy import deepcopy
+        from trustfork.runtime.dynamic.artifacts import append_jsonl
+        structural={'judge_invalid_json','judge_incomplete_output','judge_pass_schema','judge_json_object_required',
+            'judge_response_ids_mismatch','judge_anchor_set_mismatch','judge_anchor_schema','judge_evidence_invalid',
+            'invalid_anchor','judge_unknown_fields','schema_validation_failed','unknown_claim_annotation',
+            'claim_annotation_content_mismatch','annotation_subject_mismatch','unexposed_adoption_claim',
+            'unknown_action_annotation','lineage_claim_invalid','risk_coverage_invalid'}
+        try:return {**self.send(prepared,request_id=request_id,**kwargs),'structure_attempts':1}
+        except DynamicError as error:
+            if error.code not in structural:raise
+            first_error=error.record()
+        # Keep prior invalid score bounded; the original frozen task evidence remains untouched.
+        content='';reasoning=''
+        for line in self.transport.journal.read_text().splitlines():
+            row=json.loads(line)
+            if row.get('request_id')==request_id and row.get('status')=='response':
+                try:
+                    previous=json.loads(row['response']['body'])['choices'][0]['message']
+                    content=previous.get('content') or '';reasoning=previous.get('reasoning_content') or ''
+                except (ValueError,KeyError,IndexError,TypeError):content=''
+        fixed=deepcopy(prepared)
+        binding=self.transport.config['logical_bindings'][self.transport.config['judge_binding']]
+        previous_message={'role':'assistant','content':content[:4096]}
+        if binding.get('thinking')=='enabled':previous_message['reasoning_content']=reasoning
+        fixed['request']['messages'] += [previous_message,
+            {'role':'user','content':'Repair the previous scoring JSON structure and evidence references using exactly the same frozen evidence and supplied schema. Do not infer missing observations. Return only complete JSON. Validation error: '+first_error['code']}]
+        fixed['wire_payload']={k:v for k,v in fixed['request'].items() if k!='parameters'}
+        fixed['wire_payload'].update(fixed['request']['parameters'])
+        fixed['request_hash']=digest(fixed['request']);fixed['wire_payload_hash']=digest(fixed['wire_payload']);fixed['repair_of']=prepared['request_hash']
+        binding=self.transport.config['logical_bindings'][self.transport.config['judge_binding']]
+        counted=self.transport.accounting(binding,fixed['wire_payload'])
+        fixed['input_tokens']=counted['input_tokens'];fixed['token_accounting']=counted
+        fixed['behavior_run_id']=prepared.get('behavior_run_id','frozen-judge-pass')
+        append_jsonl(self.transport.journal.with_name('judge-structure-repairs.jsonl'),
+            {'first_request_id':request_id,'repair_request_id':request_id+'.repair1','first_error':first_error,'prepared':fixed,
+             'frozen_representation_hash':prepared['representation_hash'],'previous_invalid_score_char_limit':4096})
+        return {**self.send(fixed,request_id=request_id+'.repair1',**kwargs),'structure_attempts':2,'first_error':first_error,'original_request_hash':prepared['request_hash']}

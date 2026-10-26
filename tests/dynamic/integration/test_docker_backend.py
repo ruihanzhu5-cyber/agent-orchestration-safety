@@ -54,7 +54,7 @@ def test_actual_container_operations_mock_and_host_isolation(task, tmp_path):
     assert base64.b64decode(ops('fs.read', {'path': '/workspace/ack.txt'}, 'ack-read')['data']) == b'once\n'
 
 
-@pytest.mark.parametrize('case_id', ['p001', 'p024', 'p028'])
+@pytest.mark.parametrize('case_id', ['p001', 'p002', 'p007', 'p024', 'p028'])
 def test_source_task_snapshot_restore_after_real_work(tmp_path, case_id):
     first = DockerEnvironment(tmp_path / 'original')
     second = DockerEnvironment(tmp_path / 'restored')

@@ -66,9 +66,10 @@ class Budget:
                 'attempts': copy.deepcopy(self.attempts), 'output_tokens': self.output_tokens}
 
     @classmethod
-    def restore(cls, snapshot):
+    def restore(cls, snapshot, *, independent_fork=False):
         obj = cls(**{k: snapshot[k] for k in ('request_limit', 'token_limit', 'per_request', 'stage_seconds')})
-        obj.deadline = time.monotonic() + max(0,min(snapshot['remaining_seconds'],snapshot.get('deadline_wall',time.time()+snapshot['remaining_seconds'])-time.time()))
+        remaining=snapshot['remaining_seconds'] if independent_fork else max(0,min(snapshot['remaining_seconds'],snapshot.get('deadline_wall',time.time()+snapshot['remaining_seconds'])-time.time()))
+        obj.deadline = time.monotonic() + remaining
         obj.attempts, obj.output_tokens = copy.deepcopy(snapshot['attempts']), snapshot['output_tokens']
         return obj
 

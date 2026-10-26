@@ -150,12 +150,12 @@ def validate_operation_evidence(events,directory,run):
 
 
 def _score_run(path,*,mode='formal',output_override=None,rescore=None,frozen_identity=None):
-    if mode not in ('formal','test-fixtures'):raise DynamicError('invalid_score_mode',mode)
+    if mode not in ('formal','test-fixtures','engineering-smoke'):raise DynamicError('invalid_score_mode',mode)
     directory=Path(path).parent;run=read_json(path)
     from .metric_registry import resolve_scoring_profile
     scoring_profile=resolve_scoring_profile(run.get('experiment_version'),(rescore or {}).get('scoring_profile'))
-    if mode=='formal' and run.get('synthetic'):raise DynamicError('synthetic_formal_rejected','Scripted data cannot enter formal analysis')
-    if run['run_status']!='valid_behavior':
+    if mode in ('formal','engineering-smoke') and run.get('synthetic'):raise DynamicError('synthetic_formal_rejected','Scripted data cannot enter formal analysis')
+    if run['run_status'] not in ('valid_behavior','resource_ended') and not run.get('run_manifest_path'):
         from trustfork.tools.generate_dynamic_manifest_legacy import MECHANISM_LAYOUTS,MAINS
         mechanism=run['panel']=='primary' and run['protocol']=='S' and run['case_id'] in MECHANISM_LAYOUTS and run['layout']==MECHANISM_LAYOUTS[run['case_id']][MAINS.index(run['main_model'])]
         if run.get('experiment_version')=='dynamic-join-homogeneous-v1':
@@ -172,7 +172,7 @@ def _score_run(path,*,mode='formal',output_override=None,rescore=None,frozen_ide
         if not manifest['formal_ready'] or manifest['resolved_api_bindings'] is None:
             raise DynamicError('unresolved_formal_bindings','Formal records require their complete frozen model bindings')
         validate_bindings(manifest['resolved_api_bindings'],formal=True,required_aliases=set(manifest['model_refs'].values()))
-    events=load_events(directory,run);refs={event_ref(e) for e in events};case=load_case(run['case_id'])
+    events=load_events(directory,run);observation_complete=run['run_status']=='valid_behavior' and not any(e['event_type']=='model_response' and ((e['payload'].get('response') or {}).get('stopReason') in ('length','error','aborted')) for e in events);refs={event_ref(e) for e in events};case=load_case(run['case_id'])
     validate_operation_evidence(events,directory,run)
     if mode=='formal' and any(e['payload'].get('synthetic') is True or (e['event_type']=='model_response' and
         (e['payload'].get('response') or {}).get('provider')=='scripted') for e in events):
@@ -249,7 +249,7 @@ def _score_run(path,*,mode='formal',output_override=None,rescore=None,frozen_ide
     if run.get('experiment_version')=='dynamic-join-homogeneous-v1' or (rescore or {}).get('scoring_profile')=='dynamic-homogeneous-v2':
         from .dynamic_metrics_v2 import evaluate_process,process_annotation_status
         from .dynamic_adapter import aggregate_dynamic_scores
-        process,opportunities=evaluate_process(events,diagnostics,{**annotations,'event_ledger_complete':True},run['q'])
+        process,opportunities=evaluate_process(events,diagnostics,{**annotations,'event_ledger_complete':True,'observation_complete':observation_complete},run['q'])
         assessment=process_annotation_status(diagnostics,process,opportunities)
         scores=aggregate_dynamic_scores(deliverables,annotations.get('response_judgements',{}),annotations.get('trajectory_judgements',{}),opportunities=opportunities,process=process,goal=goal,assignment_ids={x['response_id'] for x in response_judge_view(deliverables,task=case['public_packet'],events=events)['responses'] if x['assignment'] is not None})
         for value in scores['scores'].values():value['scorer_manifest_hash']=score_manifest['manifest_hash']
@@ -275,7 +275,7 @@ def _score_run(path,*,mode='formal',output_override=None,rescore=None,frozen_ide
             actor.update(RTF=own['RTF']['value'],RSR=own['RSR']['value'],score_status={'RTF':own['RTF']['status'],'RSR':own['RSR']['status']})
     task=case['public_packet']
     response_input=response_judge_view(deliverables,task=task,events=events)
-    trajectory_input=trajectory_judge_view(events,task=task,private_goals=bindings['goals'],frozen_state=terminal,final_response=run['final_text'],scoring_profile=scoring_profile)
+    trajectory_input=trajectory_judge_view(events,task=task,private_goals=bindings['goals'],frozen_state=terminal,final_response=run['final_text'],scoring_profile=scoring_profile,observation_complete=observation_complete,termination_reason=run.get('termination_reason'))
     from .judge_request import build_judge_bundle,prepare_judge_pass
     profile=scoring_profile
     config=read_json(repo_root()/'trustfork/config/dynamic/scorer.example.json')
@@ -347,6 +347,7 @@ def _score_run(path,*,mode='formal',output_override=None,rescore=None,frozen_ide
         'scores':scores['scores'],'scorer_manifest_hash':score_manifest['manifest_hash'],'score_input_refs':input_refs,
         'process_annotation_status':assessment,'scoring_mode':mode,'synthetic':bool(run['synthetic'] or mode=='test-fixtures'),
         'request_billing':request_billing,
+        'observation_complete':observation_complete,'engineering_smoke':mode=='engineering-smoke',
         'numeric_fixtures_are_behavior_judgments':False if mode=='test-fixtures' else None,
         'judge_capacity':capacities,'formal_ready':False,
         'actual_call_audit':calls,'actual_request_records':calls['request_records'],
@@ -365,8 +366,8 @@ def _score_run(path,*,mode='formal',output_override=None,rescore=None,frozen_ide
 def score_run(path,*,mode='formal',rescore=None):
     """Publish a fully built version last; failed scoring leaves current intact."""
     run=read_json(path)
-    if mode=='formal' and run.get('synthetic'):
+    if mode in ('formal','engineering-smoke') and run.get('synthetic'):
         raise DynamicError('synthetic_formal_rejected','Scripted data cannot enter formal analysis')
-    if run.get('run_status')!='valid_behavior':return _score_run(path,mode=mode)
+    if run.get('run_status') not in ('valid_behavior','resource_ended') and not run.get('run_manifest_path'):return _score_run(path,mode=mode)
     from .scoring_versions import publish_score
     return publish_score(path,mode=mode,rescore=rescore,score=_score_run)

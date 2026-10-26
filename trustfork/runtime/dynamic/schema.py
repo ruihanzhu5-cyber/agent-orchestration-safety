@@ -52,23 +52,26 @@ def validate_schema(value: dict, schema: dict) -> dict:
 
 
 def validate_bindings(config: dict, *, formal: bool, required_aliases=None, role_scope=None) -> dict:
-    strict_keys(config, {"protocol_version", "mode", "real_api_enabled", "logical_bindings", "judge_binding"}, {"note","execution_limits"})
+    strict_keys(config, {"protocol_version", "mode", "real_api_enabled", "logical_bindings", "judge_binding"}, {"note","execution_limits","runtime_budgets","execution_scope","campaign_budget"})
     if config["protocol_version"] != PROTOCOL_VERSION:
         raise DynamicError("wrong_protocol", config["protocol_version"])
     if config["mode"] not in {"offline", "scripted-test", "api"}:
         raise DynamicError("invalid_mode", str(config["mode"]))
-    if set(config["logical_bindings"]) != {"gpt4o", "deepseekflash"} or config["judge_binding"] != "gpt4o":
-        raise DynamicError("invalid_model_aliases", "Only the two specified aliases and gpt4o judge are defined")
+    if set(config["logical_bindings"]) != {"gpt4o", "deepseekflash"} or config["judge_binding"] not in {"gpt4o","deepseekflash"}:
+        raise DynamicError("invalid_model_aliases", "Only the two specified aliases and candidate judges are defined")
     if role_scope=='judge':required_aliases={config['judge_binding']}
     active=set(config['logical_bindings']) if required_aliases is None else set(required_aliases)
     if not active or not active<=set(config['logical_bindings']):raise DynamicError('invalid_active_aliases','Unknown or empty role scope')
     required = {"provider", "base_url", "model_id", "key_env", "context_window", "max_output_tokens", "supported_parameters"}
     unresolved = []
     for alias, binding in config["logical_bindings"].items():
-        strict_keys(binding, required, {'capability','api','compat','output_token_parameter'})
+        strict_keys(binding, required, {'capability','api','compat','output_token_parameter','thinking','reasoning_effort'})
         unresolved += [f"{alias}.{key}" for key in required if binding[key] is None]
         for key in ('api','compat','output_token_parameter'):
             if binding.get(key) is None:unresolved.append(alias+'.'+key)
+        if binding.get('thinking') not in (None,'enabled','disabled'):raise DynamicError('invalid_thinking_mode',alias)
+        if binding.get('reasoning_effort') not in (None,'high'):raise DynamicError('invalid_thinking_effort',alias)
+        if alias=='gpt4o' and binding.get('thinking')=='enabled':raise DynamicError('invalid_thinking_mode','GPT4o cannot use DeepSeek thinking')
         for key in ('provider','base_url','model_id','key_env'):
             if binding[key] is not None and (not isinstance(binding[key],str) or not binding[key].strip()):
                 raise DynamicError('invalid_model_binding',alias+'.'+key)

@@ -53,7 +53,7 @@ def validate_checkpoint(snapshot):
     return snapshot
 
 
-def restore_checkpoint(snapshot, *, environment, client, ledger, system_prompts, task_resources):
+def restore_checkpoint(snapshot, *, environment, client, ledger, system_prompts, task_resources, independent_fork=False):
     validate_checkpoint(snapshot)
     verified=environment.restore(snapshot['environment'])
     membership=Membership(ledger)
@@ -77,5 +77,5 @@ def restore_checkpoint(snapshot, *, environment, client, ledger, system_prompts,
             system_prompt=system_prompts[actor],task_resources=task_resources,snapshot=state)
         sessions[actor]=identity
     return {'membership':membership,'delegations':delegations,'mailbox':mailbox,'lifecycle':lifecycle,
-            'scheduler':scheduler,'budget':Budget.restore(snapshot['budget']),'sessions':sessions,
+            'scheduler':scheduler,'budget':Budget.restore(snapshot['budget'],independent_fork=independent_fork),'sessions':sessions,
             'environment_verification':verified,'history':copy.deepcopy(snapshot['history'])}

@@ -10,11 +10,13 @@ from trustfork.runtime.dynamic.common import DynamicError
 
 @pytest.fixture
 def live(tmp_path):
-    env=DockerEnvironment(tmp_path/'task')
+    from trustfork.runtime.dynamic.events import EventLedger
+    ledger=EventLedger(tmp_path/'events.jsonl','b','p001')
+    env=DockerEnvironment(tmp_path/'task',branch_id='b',ledger=ledger)
     client=None
     try:
         env.prepare(load_case('p001'))
-        client=PiClient(tmp_path/'control',env,coordination=lambda actor,name,args,scope:{'status':'queued','sender':actor})
+        client=PiClient(tmp_path/'control',env,ledger=ledger,coordination=lambda actor,name,args,scope:{'status':'queued','sender':actor})
         yield env,client,tmp_path
     finally:
         if client:client.close()
@@ -68,3 +70,23 @@ def test_error_and_aborted_are_not_successful_empty_completions(live):
             'script':{'text':'','stopReason':reason,'errorMessage':'injected' if reason!='stop' else None}},request_id=reason)
         assert result['status']==('success' if reason=='stop' else 'infra_error')
         assert result['response']['stopReason']==reason
+
+def test_original_tool_truncation_raw_spool_and_followup_page(live):
+ env,client,_=live
+ session,_=client.create_session('C',branch_id='b',task_id='p001',system_prompt='offline output probe')
+ data=''.join(f'LINE_{i}\n' for i in range(6000))
+ data=data.replace('LINE_3000','RISK_OUTSIDE_FIRST_PAGE')
+ env.exec_work_operation('fs.write',{'path':'/workspace/long.txt','data':base64.b64encode(data.encode()).decode()},'long-fixture')
+ first=client.call(session,'probe_tool',{'name':'read','args':{'path':'/workspace/long.txt'},'tool_call_id':'read-first'},request_id='read-first')['result']
+ assert first['details']['truncation']['truncated'] and 'RISK_OUTSIDE_FIRST_PAGE' not in first['content'][0]['text']
+ page=client.call(session,'probe_tool',{'name':'read','args':{'path':'/workspace/long.txt','offset':2999,'limit':5},'tool_call_id':'read-page'},request_id='read-page')['result']
+ assert 'RISK_OUTSIDE_FIRST_PAGE' in page['content'][0]['text']
+ bash=client.call(session,'probe_tool',{'name':'bash','args':{'command':"python -c \"for i in range(6000): print('BASH_'+str(i))\""},'tool_call_id':'long-bash'},request_id='long-bash')['result']
+ assert bash['details']['truncation']['truncated'] and bash['details']['fullOutputPath'].startswith('/tmp/pi-bash-')
+ replay=client.call(session,'probe_tool',{'name':'read','args':{'path':bash['details']['fullOutputPath'],'offset':1,'limit':2},'tool_call_id':'bash-page'},request_id='bash-page')['result']
+ assert 'BASH_0' in replay['content'][0]['text']
+ views=[e['payload'] for e in env.ledger.rows if e['event_type']=='tool_visibility']
+ assert views and all(v['raw_result_refs'] for v in views)
+ raw=[json.loads(p.read_text()) for p in env.operation_evidence.root.glob('*.json')]
+ assert any(isinstance(v,dict) and 'data' in v and b'RISK_OUTSIDE_FIRST_PAGE' in base64.b64decode(v['data']) for v in raw)
+ assert all(v['visibility_policy'].startswith('Pi-0.84.1') for v in views)
