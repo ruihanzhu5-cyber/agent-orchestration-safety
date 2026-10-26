@@ -115,7 +115,7 @@ class PiDynamic:
             'case_id':self.case['case_id'],'asset_hash':self.case['deployed_asset_hash'],
             'source_revision':BASE_COMMIT,'model_refs':self.model_refs,'team_binding_hash':digest(binding),
             'history_bundle_id':(self.history or {}).get('history_bundle_id',(self.history or {}).get('history_id')),
-            'history_hash':digest(self.history),'planning_contract':planning_identity(),'prompt_tool_budget_hash':digest({'prompts':file_hash(Path(__file__)),
+            'history_hash':digest(self.history),'planning_contract':planning_identity(),'coordination_contract':__import__('trustfork.runtime.dynamic.coordination_contract',fromlist=['coordination_identity']).coordination_identity(),'prompt_tool_budget_hash':digest({'prompts':file_hash(Path(__file__)),
                 'tools':WORK_TOOLS,'planning':file_hash(config_dir()/'protocol.json'),'budget':self.runtime_budget})}
 
     def validate_prefix_target(self,snapshot):
@@ -162,7 +162,7 @@ class PiDynamic:
         self.membership=Membership(self.ledger);self.delegations=Delegations(self.ledger,self.membership)
         self.mailbox=Mailbox(self.ledger,self.membership);self.lifecycle=Lifecycle(self.ledger,self.case['stages'][0]['id'])
         self.scheduler=Scheduler(self.block_id,self.ledger,self.membership,self.lifecycle);self.budget=Budget(**{k:v for k,v in self.runtime_budget.items() if k!='http_timeout_seconds'})
-        self.scheduler.work_available=self._has_pending_work
+        self._bind_coordination()
         self.delegations.startup_protected=self.scheduler.protects_delegation
         self.sessions={};self.profile_service=None;self.main_revision=0;self.request_serial=0
         self.pending_final=None;self.current_scripts=None;self.final_text=None
@@ -174,6 +174,18 @@ class PiDynamic:
             provider=getattr(self,'provider',None),model_refs=self.model_refs)
         self.private_goals={a:NORMAL_GOAL for a in ('Main','A','B','C','D')}
         self.formal_deliverables={}
+
+    def _bind_coordination(self):
+        # Only coordination state shares this short lock; actor/tool execution remains parallel.
+        for component in (self.membership,self.delegations,self.mailbox):component.lock=self.scheduler.lock
+        self.ledger.listeners=[self.scheduler.observe_event]
+        self.scheduler.work_available=self._has_pending_work
+        self.wait_intents={}
+
+    def _wait_pending(self,actor):
+        return (any(r['stage_epoch']==self.lifecycle.epoch and r['status']!='terminal' and
+                    (actor=='Main' or r['actor_id']==actor) for r in self.delegations.rows) or
+                any(m['stage_epoch']==self.lifecycle.epoch and m['delivery'].get(actor,{}).get('status')=='queued' for m in self.mailbox.messages))
 
     def _observe_goal(self,scope,operation_id,operation,args):
         predicate=self.case['goal_spec'].get('predicate')
@@ -230,6 +242,14 @@ class PiDynamic:
             self.scheduler.enqueue_batch(args['recipients'],reason='peer_message')
             return {'status':'queued','message_id':row['message_id'],'recipients':row['recipients']}
         if name=='get_team_directory':return self.membership.directory()
+        if name=='get_work_status':
+            with self.scheduler.lock:return {'version':self.scheduler.observable_version(actor),'delegations':self.delegations.work_status(actor,epoch=epoch)}
+        if name=='wait_for_update':
+            with self.scheduler.lock:
+                pending=self._wait_pending(actor)
+                value=self.scheduler.wait_intent(actor,after_version=args['after_version'],timeout_seconds=args.get('timeout_seconds',30),pending_work=pending)
+                self.wait_intents[scope['request_id']]={'state':'waiting','after_version':args['after_version'],'timeout_seconds':args.get('timeout_seconds',30),'pending_work':pending}
+                return value
         if name=='deliver_work':
             forward=args.get('forward_of')
             if forward:
@@ -320,6 +340,9 @@ class PiDynamic:
         peers=self.mailbox.claim(actor,request_id,epoch=self.lifecycle.epoch)
         packet={'public_task':self.case['public_packet']['stages'][self.lifecycle.epoch],
             'public_task_ref':'task://current-stage','workspace_root':'/workspace','directory':self.membership.directory(),'peer_messages':peers}
+        with self.scheduler.lock:
+            packet['coordination_version']=self.scheduler.observable_version(actor)
+            if actor in self.scheduler.wake_results:packet['coordination_update']=self.scheduler.wake_results.pop(actor)
         if self.lifecycle.state=='PLANNING':packet['planning_contract']=planning_contract()
         if invocation:packet['work_assignment']={'task_text':invocation['task_text'],'invocation_id':invocation['invocation_id'],'source':invocation['source']}
         if self.profile_service and actor=='Main' and not self.main_profile_introduced:
@@ -417,6 +440,8 @@ class PiDynamic:
             invocation_id=invocation['invocation_id'] if invocation else None)
         if not success:raise DynamicError((result.get('error') or {}).get('code','pi_generation_failed'),(result.get('error') or {}).get('message') or (response.get('errorMessage','Provider failed') if response else 'No completion'))
         result.update(request_id=actual_request_id,logical_request_id=request_id,input_revision=revision)
+        from trustfork.runtime.dynamic.turn_outcome import turn_outcome
+        result['turn_outcome']=turn_outcome(result,self.wait_intents.pop(actual_request_id,None))
         if actor!='Main' and invocation and response['stopReason'] in ('stop','length'):
             self._formal(actor,invocation,response,result['request_id'])
         return result
@@ -561,13 +586,14 @@ class PiDynamic:
     def _settle(self,future,futures):
         actor,invocation=futures.pop(future)
         result=future.result()
-        unfinished=result['response']['stopReason']=='toolUse'
+        outcome=result.get('turn_outcome',{'state':'continue' if result['response']['stopReason']=='toolUse' else 'resource_ended' if result['response']['stopReason']=='length' else 'completed'})
+        unfinished=outcome['state'] in ('continue','waiting')
         if (invocation and invocation['source']=='runtime_startup' and invocation['status']=='terminal'
                 and self.scheduler.startup.get(actor,{}).get('status')=='open'):
             self.scheduler._close_startup(actor,'initial_invocation_completed')
         if actor=='Main' and unfinished:self.confirming_final=False
         partial=result['response']['stopReason']=='length'
-        self.scheduler.complete(actor,unfinished=unfinished,terminal_status='resource_ended' if partial else None)
+        self.scheduler.complete(actor,unfinished=unfinished,terminal_status='resource_ended' if partial else None,outcome=outcome)
         if partial and actor=='Main':
             self.termination_reason='output_limit'
             self.pending_final={'text':None,'revision':result['input_revision']}
@@ -583,9 +609,11 @@ class PiDynamic:
         futures={}
         with concurrent.futures.ThreadPoolExecutor(max_workers=5,thread_name_prefix='actor-permit') as executor:
             while True:
+                self.scheduler.poll_waiters()
                 normal_final_ready=self.pending_final and (self.protocol=='F' or self.scheduler.final_allowed(hard_limit=False))
                 if self.termination_reason or ((self.budget.exhausted() or (not futures and not self.budget.available())) and not normal_final_ready):
-                    self.termination_reason=self.termination_reason or ('time_limit' if time.monotonic()>=self.budget.deadline else 'team_budget')
+                    self.termination_reason=self.termination_reason or self.budget.termination_reason()
+                    self.scheduler.cancel_waits('resource_ended',requeue=False)
                     self.scheduler.terminate_startup('global_budget_or_timeout')
                     self.pending_final=self.pending_final or {'text':None,'revision':self.main_revision}
                 if self.pending_final and (self.protocol=='F' or self.scheduler.final_allowed(hard_limit=bool(self.termination_reason) or self.budget.exhausted())):
@@ -603,9 +631,13 @@ class PiDynamic:
                         futures[executor.submit(self._turn,actor,'running',invocation,reservation)]=(actor,invocation)
                 if not futures:
                     if self.pending_final:continue
+                    if self.scheduler.waiting:
+                        with self.scheduler.changed:self.scheduler.changed.wait(timeout=0.05)
+                        continue
                     if not self.scheduler.neutral_wake(self.main_revision):
                         self.ledger.append('behavioral_termination',{'reason':'coordination_stalled'})
                         self.final_text=None
+                        self.termination_reason='coordination_stalled'
                         return
                     continue
                 done,_=concurrent.futures.wait(futures,timeout=0.1,return_when=concurrent.futures.FIRST_COMPLETED)
@@ -644,7 +676,7 @@ class PiDynamic:
             restored=restore_checkpoint(snapshot,environment=self.environment,client=self.client,ledger=self.ledger,
                 system_prompts={a:system_prompt(a,self.private_goals[a],task_resources=[]) for a in ('Main','A','B')},task_resources=self.resources,independent_fork=True)
             for key in ('membership','delegations','mailbox','lifecycle','scheduler','budget','sessions'):setattr(self,key,restored[key])
-            self.scheduler.work_available=self._has_pending_work
+            self._bind_coordination()
             self.scheduler.block_id=self.block_id
             self.client.call(self.sessions['Main'],'set_coordination_phase',{'phase':'collaboration'})
             write_json(self.directory/'prefix-events.json',snapshot['prefix_events'])
@@ -665,11 +697,13 @@ class PiDynamic:
                     self.scheduler.bind_startup(startup)
             self.lifecycle.transition('COORDINATING')
             self.scheduler.consume_ready_marker('Main')
+            self.scheduler.enqueue_batch(['Main'],reason='coordination_turn')
+            self.scheduler.permit(actors=('Main',))
             coordinated=self._turn('Main','coordinating')
             if coordinated['response']['stopReason']=='length':self.termination_reason='output_limit'
             if coordinated['response']['stopReason']!='toolUse':self.pending_final={'text':None if self.termination_reason else text_of(coordinated['response']),'revision':coordinated['input_revision']}
+            self.scheduler.complete('Main',outcome=coordinated['turn_outcome'])
             self.lifecycle.transition('RUNNING');self._release()
-            if coordinated['response']['stopReason']=='toolUse':self.scheduler.enqueue_batch(['Main'],reason='unfinished_coordination_turn')
             for stage_index in range(self.lifecycle.epoch,len(self.case['stages'])):
                 self._run_stage()
                 if self.termination_reason or stage_index+1==len(self.case['stages']) or not self.budget.available():break
@@ -755,7 +789,7 @@ class PiDynamic:
             restored=restore_checkpoint(snapshot,environment=self.environment,client=self.client,ledger=self.ledger,
                 system_prompts={a:system_prompt(a,NORMAL_GOAL,task_resources=[]) for a in ('Main','A','B')},task_resources=self.resources,independent_fork=True)
             for key in ('membership','delegations','mailbox','lifecycle','scheduler','budget','sessions'):setattr(self,key,restored[key])
-            self.scheduler.work_available=self._has_pending_work
+            self._bind_coordination()
             self.lifecycle.transition('RUNNING');self._release()
             deadline=min(time.monotonic()+120,self.budget.deadline)
             trigger=None;futures={}
@@ -769,7 +803,7 @@ class PiDynamic:
                     done,_=concurrent.futures.wait(futures,timeout=0.1,return_when=concurrent.futures.FIRST_COMPLETED)
                     for future in done:
                         actor,invocation=futures.pop(future);result=future.result()
-                        self.scheduler.complete(actor,unfinished=result['response']['stopReason']=='toolUse')
+                        self.scheduler.complete(actor,outcome=result['turn_outcome'])
                         tools=[event for event in result['events'] if event['type']=='tool_execution_end']
                         explicit_report=text_of(result['response']).strip() and result['response']['stopReason'] in ('stop','length')
                         if tools or explicit_report:

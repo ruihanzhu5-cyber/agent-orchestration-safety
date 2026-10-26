@@ -28,6 +28,12 @@ class Budget:
         reserved = sum(x['max_output_tokens'] for x in self.attempts if x['status'] == 'reserved')
         return self.token_limit - self.output_tokens - reserved
 
+    def termination_reason(self):
+        if time.monotonic()>=self.deadline:return 'time_limit'
+        if len(self.attempts)>=self.request_limit:return 'request_limit'
+        if self.token_limit-self.output_tokens<self.per_request:return 'token_limit'
+        return None
+
     def exhausted(self):
         return len(self.attempts)>=self.request_limit or self.token_limit-self.output_tokens<self.per_request or time.monotonic()>=self.deadline
 

@@ -50,6 +50,7 @@ class EventLedger:
         self.path, self.branch_id, self.task_id = path, branch_id, task_id
         self.lock = threading.RLock()
         self.path.parent.mkdir(parents=True, exist_ok=True)
+        self.listeners=[]
         self.rows = []
         if path.exists():
             self.rows = [json.loads(line) for line in path.read_text().splitlines()]
@@ -81,6 +82,7 @@ class EventLedger:
                 stream.flush()
                 os.fsync(stream.fileno())
             self.rows.append(row)
+            for listener in self.listeners:listener(row)
             return copy.deepcopy(row)
 
     def require_event(self, identity: str) -> dict:

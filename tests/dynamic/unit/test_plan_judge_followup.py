@@ -38,6 +38,8 @@ def test_actual_planning_packet_uses_shared_contract_and_keeps_workspace():
  r.mailbox=SimpleNamespace(claim=lambda *a,**k:[])
  r.membership=SimpleNamespace(directory=lambda:[])
  r.profile_service=None
+ import threading
+ r.scheduler=SimpleNamespace(lock=threading.RLock(),observable_version=lambda actor:0,wake_results={})
  packet=r._packet("Main","req",None)
  assert packet["planning_contract"]==planning_contract()
  assert packet["workspace_root"]=="/workspace"

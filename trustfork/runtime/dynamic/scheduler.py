@@ -2,6 +2,8 @@
 from __future__ import annotations
 import hashlib
 import threading
+import time
+import copy
 from collections import deque
 from .common import DynamicError
 
@@ -13,6 +15,8 @@ class Scheduler:
         self.startup = {a:{'requests':0, 'status':'not_admitted'} for a in ('C', 'D')}
         self.idle_versions, self.lock = set(), threading.RLock()
         self.continuations=set();self.work_available=None
+        self.waiting={};self.versions={a:0 for a in ("Main","A","B","C","D")};self.wake_results={}
+        self.changed=threading.Condition(self.lock)
 
     def enqueue_batch(self, actors, *, reason, maintenance=False):
         with self.lock:
@@ -87,13 +91,16 @@ class Scheduler:
             'terminal_status':reason,'message_status':'message_queued' if had_message else 'no_message_at_slice_end'},
             actor_id=actor,stage_id=self.lifecycle.stage_id,stage_epoch=self.lifecycle.epoch)
 
-    def complete(self, actor, *, unfinished=False, terminal_status=None):
+    def complete(self, actor, *, unfinished=False, terminal_status=None, outcome=None):
         with self.lock:
             if actor not in self.active:
                 raise DynamicError('actor_not_active', actor)
             row = self.active.pop(actor)
             if row['stage_epoch'] != self.lifecycle.epoch:
                 raise DynamicError('late_old_epoch_completion', actor)
+            if outcome is not None:
+                unfinished=outcome['state'] in ('continue','waiting')
+                if outcome['state']=='resource_ended':terminal_status='resource_ended'
             startup = self.startup.get(actor)
             if startup and startup['status'] == 'open' and not row['maintenance']:
                 if terminal_status or not unfinished:
@@ -102,10 +109,77 @@ class Scheduler:
                     startup['status'] = 'four_request_limit'
                 if startup['status']!='open':
                     self._close_startup(actor,startup['status'])
+            if outcome is not None:
+                state=outcome['state']
+                if state=='waiting' and not terminal_status:
+                    self.continuations.add(actor)
+                    intent=self.wait_intent(actor,after_version=outcome['after_version'],timeout_seconds=outcome['timeout_seconds'],pending_work=outcome['pending_work'])
+                    if intent['status']=='wait_requested':
+                        self.waiting[actor]={'after_version':intent['version'],'deadline_wall':time.time()+intent['timeout_seconds'],'stage_epoch':self.lifecycle.epoch}
+                        self.ledger.append('actor_wait_registered',{'version':intent['version'],'deadline_wall':self.waiting[actor]['deadline_wall']},actor_id=actor,stage_epoch=self.lifecycle.epoch)
+                        return 'waiting'
+                    self.wake_results[actor]={'reason':intent['status'],'version':self.versions[actor]}
+                    self.enqueue_batch([actor],reason=intent['status'])
+                    return intent['status']
+                unfinished=state=='continue'
+                terminal_status='resource_ended' if state=='resource_ended' else terminal_status
             if unfinished and not terminal_status:
                 self.continuations.add(actor)
                 self.enqueue_batch([actor], reason='unfinished_work')
             else:self.continuations.discard(actor)
+
+    def observable_version(self,actor):
+        with self.lock:return self.versions[actor]
+
+    def wait_intent(self,actor,*,after_version,timeout_seconds,pending_work):
+        with self.lock:
+            if type(after_version) is not int or after_version<0 or after_version>self.versions[actor] or type(timeout_seconds) not in (int,float) or not 0<timeout_seconds<=300:
+                raise DynamicError('invalid_wait_parameters','after_version must be an observed integer; timeout_seconds in (0,300]')
+            status='changed' if after_version<self.versions[actor] else 'no_pending_work' if not pending_work else 'wait_requested'
+            return {'status':status,'version':self.versions[actor],'timeout_seconds':timeout_seconds}
+
+    def notify(self,actors,reason):
+        with self.lock:
+            for actor in set(actors):
+                self.versions[actor]+=1
+                if actor in self.waiting:
+                    self.waiting.pop(actor)
+                    self.wake_results[actor]={'reason':reason,'version':self.versions[actor]}
+                    if self.membership.admitted(actor):self.enqueue_batch([actor],reason='wait_'+reason)
+            self.changed.notify_all()
+
+    def observe_event(self,row):
+        kind=row['event_type'];p=row['payload']
+        if kind=='message_enqueued':self.notify(p['recipients'],'message')
+        elif kind.startswith('delegation_'):
+            self.notify(['Main',p['actor_id']],'delegation_'+p['status'])
+        elif kind in ('members_admitted','member_released','candidates_published'):
+            if kind=='member_released':self.cancel_waits('member_released',actors=[p['actor_id']],requeue=False)
+            self.notify(list(self.versions),'membership')
+
+    def poll_waiters(self,*,now=None):
+        with self.lock:
+            now=time.time() if now is None else now
+            for actor,row in list(self.waiting.items()):
+                if now>=row['deadline_wall']:self.cancel_waits('timeout',actors=[actor])
+
+    def cancel_waits(self,reason,*,actors=None,requeue=True):
+        with self.lock:
+            for actor in list(self.waiting):
+                if actors is not None and actor not in actors:continue
+                self.waiting.pop(actor);self.wake_results[actor]={'reason':reason,'version':self.versions[actor]}
+                self.ledger.append('actor_wait_ended',self.wake_results[actor],actor_id=actor,stage_epoch=self.lifecycle.epoch)
+                if requeue and self.membership.admitted(actor):self.enqueue_batch([actor],reason='wait_'+reason)
+            self.changed.notify_all()
+
+    def coordination_snapshot(self):
+        with self.lock:return copy.deepcopy({'waiting':self.waiting,'versions':self.versions,'wake_results':self.wake_results})
+
+    def restore_coordination(self,value):
+        with self.lock:
+            for key in ('waiting','versions','wake_results'):
+                if key in value:setattr(self,key,copy.deepcopy(value[key]))
+            self.poll_waiters()
 
     def terminate_startup(self, reason):
         for actor,value in self.startup.items():
@@ -116,7 +190,7 @@ class Scheduler:
         return hard_limit or all(x['status'] != 'open' for x in self.startup.values())
 
     def neutral_wake(self, state_version):
-        if self.active or self.queue or state_version in self.idle_versions:
+        if self.active or self.queue or self.waiting or state_version in self.idle_versions:
             return False
         self.idle_versions.add(state_version)
         self.enqueue_batch(['Main'], reason='neutral_idle_wake')
@@ -125,6 +199,7 @@ class Scheduler:
     def reset_epoch(self, epoch):
         if self.active:
             raise DynamicError('active_epoch_reset', 'Drain or cancel active turns first')
+        self.cancel_waits("stage_deadline",requeue=False)
         self.queue = deque(x for x in self.queue if x['stage_epoch'] != epoch)
         self.continuations.clear()
 

@@ -68,12 +68,14 @@ def execute_task(runtime,source,previous):
                     'system_prompt':system_prompt(actor,NORMAL_GOAL,task_resources=[])})
             runtime.client.call(runtime.sessions['Main'],'set_coordination_phase',{'phase':'history'})
             runtime.scheduler.enqueue_batch(['Main'],reason='original_next_stage')
-        status='budget_ended' if runtime.budget.exhausted() or runtime.termination_reason else 'completed_unjudged'
+        runtime.termination_reason=runtime.termination_reason or runtime.budget.termination_reason()
+        status='budget_ended' if runtime.termination_reason else 'completed_unjudged'
         runtime.lifecycle.propose_final(runtime.main_revision)
         frozen=runtime.lifecycle.finalize(runtime.environment,stage_deadline=runtime.budget.deadline,
             current_revision=lambda:runtime.main_revision,has_budget=runtime.budget.available)
     except (DynamicError,OSError) as error:
         status='failed_history_retained'
+        runtime.termination_reason=runtime.termination_reason or getattr(error,'code','infra_failure')
         runtime.ledger.append('history_execution_failed',{'error_type':type(error).__name__,'code':getattr(error,'code',None)})
         partial=runtime.lifecycle.capture_partial(runtime.environment,runtime.client,runtime.sessions,reason=getattr(error,'code',type(error).__name__))
         write_json(runtime.directory/'partial-state.json',partial);frozen=partial.get('environment_export')
@@ -87,7 +89,7 @@ def execute_task(runtime,source,previous):
         raise DynamicError('history_session_unavailable','Infrastructure failure retained; no complete carry state available')
     record={'task_id':runtime.case['case_id'],'source_task_path':runtime.case['source_task_path'],
         'planning_contract':planning_identity(),'model_bindings_hash':digest(runtime.resolved_api_bindings),'started_ns':start,'finished_ns':time.monotonic_ns(),
-        'initial_state':initial,'frozen_state':frozen,'status':status,'budget':runtime.budget.snapshot(),
+        'initial_state':initial,'frozen_state':frozen,'status':status,'termination_reason':runtime.termination_reason,'budget':runtime.budget.snapshot(),
         'request_ledger_hash':digest(runtime.ledger.rows),'session_hashes':{a:digest(s) for a,s in sessions.items()},
         'synthetic':runtime.synthetic,'execution_backend':runtime.execution_mode,'environment_carry':False}
     record['history_id']='history_'+digest(record);write_json(runtime.directory/'history-execution.json',record)

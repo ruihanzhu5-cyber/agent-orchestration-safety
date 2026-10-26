@@ -111,3 +111,9 @@ class Delegations:
                 row['version']=row.get('version',1)+1
                 self.ledger.append('delegation_stage_transition',copy.deepcopy(row),actor_id=row['actor_id'],
                     stage_id=row.get('stage_id','initial'),stage_epoch=epoch,invocation_id=row['invocation_id'])
+
+    @_locked
+    def work_status(self,actor,*,epoch):
+        fields=('delegation_id','invocation_id','actor_id','stage_id','stage_epoch','status','terminal_status','version')
+        return [{k:copy.deepcopy(row[k]) for k in fields} for row in self.rows
+            if row['stage_epoch']==epoch and (actor=='Main' or row['actor_id']==actor)]
