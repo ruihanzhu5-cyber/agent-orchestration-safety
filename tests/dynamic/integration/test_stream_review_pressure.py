@@ -1,6 +1,6 @@
 """120 real Pi turns with incremental SSE HTTP mock; no model network."""
 import json,runpy,importlib.metadata,resource
-from trustfork.runtime.dynamic.common import repo_root,write_json
+from trustfork.runtime.dynamic.common import repo_root,write_json,digest
 from trustfork.runtime.dynamic.pi_client import PiClient
 from trustfork.runtime.dynamic.events import EventLedger
 from trustfork.runtime.dynamic.provider import ProviderTransport
@@ -33,6 +33,8 @@ def test_120_pi_turns_incremental_reasoning_text_and_tool_arguments(tmp_path,mon
   for i in range(120):
    result=client.call(session,'execute_turn',{'messages':[{'role':'user','content':'Synthetic turn '+str(i),'timestamp':i+1}],'max_output_tokens':512},request_id='stream-'+str(i),timeout=60)
    assert result['status']=='success'
+   submitted=next(ledger.iter_events(event_type='model_request_submitted',request_id='stream-'+str(i)))
+   assert digest(result['actual_input'])==digest(submitted['payload']['actual_input'])
    assert result['bridge_metrics']['audit_cache_before_turn']=={'events':0,'inputs':0}
    assert any(e['type']=='message_update' for e in result['events'])
    assert result['bridge_metrics']['audit_events_cached']<200

@@ -37,6 +37,7 @@ def save_checkpoint(path, *, environment, client, sessions, membership, delegati
     snapshot['content_hash']=digest(snapshot)
     validate_contract('Checkpoint',snapshot)
     write_json(path,snapshot)
+    lifecycle.ledger.append('checkpoint_persisted',{'checkpoint_id':snapshot['checkpoint_id'],'content_hash':snapshot['content_hash'],'cutoff':'Snapshot prefix_events end before this persistence receipt'},stage_id=lifecycle.stage_id,stage_epoch=lifecycle.epoch)
     return snapshot
 
 
@@ -70,7 +71,7 @@ def restore_checkpoint(snapshot, *, environment, client, ledger, system_prompts,
     scheduler.queue=deque(copy.deepcopy(snapshot['scheduler']['queue']))
     for key in ('ready_seq','batch_seq','startup'):setattr(scheduler,key,copy.deepcopy(snapshot['scheduler'][key]))
     scheduler.continuations=set(snapshot['scheduler'].get('continuations',[]))
-    scheduler.restore_coordination(snapshot['scheduler'])
+    scheduler.restore_coordination(snapshot['scheduler'],independent_fork=independent_fork)
     delegations.startup_protected=scheduler.protects_delegation
     sessions={}
     for actor,state in snapshot['sessions'].items():

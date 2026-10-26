@@ -149,7 +149,7 @@ async function create(e:Envelope,restore?:any){
       tools:(context.tools??[]).map(t=>({name:t.name,description:t.description,parameters:t.parameters})),
       provider_parameters:{maxRetries:0,maxTokens:active.payload.max_output_tokens??4096,
         ...(s.config.mode==='scripted-test'?{}:s.config.provider_binding.thinking==='enabled'?{thinking:'enabled',reasoning_effort:'high'}:{temperature:0.2})}};
-    s.actualInput=actual;
+    s.actualInput=structuredClone(actual);
     send({...active,kind:'event',rpc_id:randomUUID(),operation:'model_request_submitted',payload:{actual_input:actual,synthetic:s.config.mode!=='api',execution_backend:s.config.mode}});
     if(s.config.mode!=='scripted-test')return providerStream(s.config.provider_binding,context,active.payload.max_output_tokens??4096,
       value=>callHost(active,'provider_http',value),payload=>send({...active,kind:'event',rpc_id:randomUUID(),

@@ -4,11 +4,12 @@ from pathlib import Path
 from trustfork.runtime.dynamic.common import read_json,write_json,DynamicError,digest,config_dir
 from trustfork.runtime.dynamic.provider import ProviderTransport
 from trustfork.runtime.dynamic.case_loader import load_case
+from trustfork.runtime.dynamic.events import events_digest
 from trustfork.scoring.judge_client import JudgeClient
 from trustfork.scoring.judge_request import build_judge_bundle,prepare_judge_pass
 from trustfork.scoring.dynamic_pipeline import load_events,scorer_manifest
 from trustfork.scoring.dynamic_adapter import extract_formal_deliverables
-def run_judge_attempt(run_path,out,config,*,mode,scorer_config,semantic_goals=False,representation=None,mock_replies=None,max_requests=4,authorize_real=False,passes=('response','trajectory'),prior_attempt=None,trajectory_view_override=None):
+def run_judge_attempt(run_path,out,config,*,mode,scorer_config,semantic_goals=False,representation=None,mock_replies=None,max_requests=4,authorize_real=False,passes=('response','trajectory'),prior_attempt=None,trajectory_view_override=None,request_namespace=None,execution_context=None,mock_http=None):
  from copy import deepcopy
  from trustfork.runtime.dynamic.common import file_hash
  from trustfork.scoring.judge_client import validate_judge_result,prepared_evidence_index
@@ -29,7 +30,7 @@ def run_judge_attempt(run_path,out,config,*,mode,scorer_config,semantic_goals=Fa
  response=read_json(run_path.parent/'scoring/response_input.json')['data'];trajectory=read_json(run_path.parent/'scoring/trajectory_input.json')['data']
  if trajectory_view_override is not None:
   trajectory=trajectory_view_override
-  if trajectory.get('_sanitizer',{}).get('source_events_hash')!=digest(events):raise DynamicError('judge_view_source_mismatch','Derived view must bind the same frozen raw events')
+  if trajectory.get('_sanitizer',{}).get('source_events_hash')!=events_digest(events):raise DynamicError('judge_view_source_mismatch','Derived view must bind the same frozen raw events')
  semantic=semantic_goals or profile=='dynamic-homogeneous-v2'
  goal=load_case(run['case_id'])['goal_spec'] if semantic else None
  bundle=build_judge_bundle(response,trajectory,scoring_profile=profile,goal_spec=goal,annotation_schema=read_json(config_dir()/'annotation.schema.json') if semantic else None)
@@ -37,9 +38,10 @@ def run_judge_attempt(run_path,out,config,*,mode,scorer_config,semantic_goals=Fa
  if scorer_config.get('judge_binding',config['judge_binding'])!=config['judge_binding']:raise DynamicError('judge_binding_mismatch','Scorer and actual Judge binding must agree')
  prepared={key:prepare_judge_pass(bundle,key,binding=binding,scorer_config=scorer_config,representation=representation) for key in ('response','trajectory')}
  current=[None]
- transport=ProviderTransport(config,mode=mode,journal=out/'judge-requests.jsonl',authorize_real=authorize_real,http=(lambda *unused:mock_replies[current[0]]) if mode=='mock' else None,max_requests=max_requests,kind='judge')
+ transport=ProviderTransport(config,mode=mode,journal=out/'judge-requests.jsonl',authorize_real=authorize_real,http=(mock_http if mock_http is not None else (lambda *unused:mock_replies[current[0]])) if mode=='mock' else None,max_requests=max_requests,kind='judge')
+ transport.execution_context=execution_context or {}
  client=JudgeClient(transport);scorer_hash=scorer_manifest()['manifest_hash']
- source_hash=digest({'run':file_hash(run_path),'events':digest(events),'states':digest(states),'view':digest(trajectory)})
+ source_hash=digest({'run':file_hash(run_path),'events':events_digest(events),'states':digest(states),'view':digest(trajectory)})
  annotation={'response_judgements':{},'trajectory_judgements':{},'scorer_manifest_hash':scorer_hash,'synthetic':transport.synthetic,'scoring_profile':profile,'judge_passes':{}}
  statuses={};estimate_errors={}
  for key,value in prepared.items():
@@ -88,7 +90,7 @@ def run_judge_attempt(run_path,out,config,*,mode,scorer_config,semantic_goals=Fa
     if transport.count>=max_requests:raise DynamicError('judge_request_budget_blocked','Independent request ceiling exhausted; other pass results retained')
    except DynamicError as error:
     state.update(status='blocked',reason=error.code,error=error.record());write_json(out/(key+'-error.json'),error.record());save();continue
-   try:result=client.send_with_repair({**value,'behavior_run_id':run['run_id']},request_id='judge_'+uuid.uuid4().hex,pass_name=key,response_ids=ids,evidence_refs=refs,validator=consume)
+   try:result=client.send_with_repair({**value,'behavior_run_id':run['run_id']},request_id=(request_namespace+'.'+key if request_namespace else 'judge_'+uuid.uuid4().hex),pass_name=key,response_ids=ids,evidence_refs=refs,validator=consume,validation_context={'events':events,'goal_spec':goal,'q':run['q']})
    except DynamicError as error:
     blocked=error.code in ('repair_input_overflow','provider_capacity_blocked','campaign_cost_exhausted','campaign_segment_cost_exhausted','campaign_phase_cost_exhausted','provider_route_paused')
     state.update(status='blocked' if blocked else 'failed',reason=error.code,error=error.record());write_json(out/(key+'-error.json'),error.record());save();continue

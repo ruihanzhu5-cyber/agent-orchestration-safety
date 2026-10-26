@@ -81,6 +81,16 @@ class CampaignBudget:
             if old:
                 if old['fingerprint']!=fingerprint:raise DynamicError('campaign_request_identity_mismatch',request_id)
                 return dict(old)
+            if metadata.get('model_generation_group_id') is not None:
+                owner=metadata.get('execution_attempt_id')
+                if not owner:raise DynamicError('model_generation_identity_required','Fixed preparation must bind an execution attempt')
+                owners={json.loads(r['metadata']).get('execution_attempt_id') for r in db.execute('SELECT metadata,status FROM requests') if r['status']!='cancelled_before_send' and json.loads(r['metadata']).get('model_generation_group_id')==metadata['model_generation_group_id']}
+                if owners-{owner}:raise DynamicError('fixed_generation_already_started','This fixed history/prefix/branch already submitted in another attempt; reuse compatible artifacts or reconcile, never resample')
+            if metadata.get('validation_group_id') is not None:
+                limit=metadata.get('group_request_limit')
+                if type(limit) is not int or not 0<limit<=24:raise DynamicError('validation_request_policy_invalid','Formal acceptance group limit must be within 24')
+                used=sum(json.loads(r['metadata']).get('validation_group_id')==metadata['validation_group_id'] and r['status']!='cancelled_before_send' for r in db.execute('SELECT metadata,status FROM requests'))
+                if used>=limit:raise DynamicError('validation_request_budget_exhausted','Formal group request limit reached; unknown submissions count')
             charged="CASE WHEN status='settled' THEN settled WHEN status='cancelled_before_send' THEN 0 ELSE reserved END"
             total=db.execute('SELECT COALESCE(SUM('+charged+'),0) FROM requests').fetchone()[0]
             phase_total=db.execute('SELECT COALESCE(SUM('+charged+'),0) FROM requests WHERE phase=?',(phase,)).fetchone()[0]

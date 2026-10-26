@@ -365,6 +365,8 @@ class PiDynamic:
 
     def _reserve(self, actor):
         self.request_serial+=1;request_id=f'request_{self.request_serial:06d}_{uuid.uuid4().hex[:8]}'
+        namespace=getattr(self.provider,'request_namespace',None) if self.provider else None
+        if namespace:request_id=namespace+'.'+request_id
         attempt=self.budget.reserve(request_id,0,actor_id=actor)
         return request_id,attempt
 
@@ -439,6 +441,7 @@ class PiDynamic:
             actor_id=actor,stage_id=self.lifecycle.stage_id,stage_epoch=self.lifecycle.epoch,request_id=actual_request_id,
             invocation_id=invocation['invocation_id'] if invocation else None)
         if not success:raise DynamicError((result.get('error') or {}).get('code','pi_generation_failed'),(result.get('error') or {}).get('message') or (response.get('errorMessage','Provider failed') if response else 'No completion'))
+        self.ledger.append('pi_session_committed',{'leaf_id':result.get('leaf_id'),'session_entries_hash':digest(result.get('entries',[])),'turn_status':result['status'],'meaning':'Pi returned after the turn; not a checkpoint or a billing settlement'},actor_id=actor,stage_id=self.lifecycle.stage_id,stage_epoch=self.lifecycle.epoch,request_id=actual_request_id)
         result.update(request_id=actual_request_id,logical_request_id=request_id,input_revision=revision)
         from trustfork.runtime.dynamic.turn_outcome import turn_outcome
         result['turn_outcome']=turn_outcome(result,self.wait_intents.pop(actual_request_id,None))
@@ -526,7 +529,7 @@ class PiDynamic:
                 raise DynamicError('prejoin_worker_execution','Sub work occurred before PLAN_READY')
             snapshot=save_checkpoint(self.directory/'checkpoint.json',environment=self.environment,client=self.client,sessions=self.sessions,
                 membership=self.membership,delegations=self.delegations,mailbox=self.mailbox,scheduler=self.scheduler,budget=self.budget,
-                lifecycle=self.lifecycle,history=self.history,bindings={'layout':self.layout,'main_model':self.main_model,'initial_plan':plan,'prefix_identity':self.prefix_identity()})
+                lifecycle=self.lifecycle,history=self.history,bindings={'layout':self.layout,'main_model':self.main_model,'initial_plan':plan,'prefix_identity':self.prefix_identity(),'execution_attempt':({'attempt_id':self.execution_attempt.attempt_id,'code_sha':self.execution_attempt.identity['execution_code_sha']} if getattr(self,'execution_attempt',None) else None)})
             return {'status':'triggered','checkpoint':snapshot,'scripts_after_prefix':scripts.clone()}
         except DynamicError as error:
             write_json(self.directory/'partial-state.json',self.lifecycle.capture_partial(self.environment,self.client,self.sessions,reason=error.code))
@@ -631,10 +634,10 @@ class PiDynamic:
                         reservation=self._reserve(actor)
                         futures[executor.submit(self._turn,actor,'running',invocation,reservation)]=(actor,invocation)
                 if not futures:
-                    if self.pending_final:continue
                     if self.scheduler.waiting:
                         with self.scheduler.changed:self.scheduler.changed.wait(timeout=0.05)
                         continue
+                    if self.pending_final:continue
                     if not self.scheduler.neutral_wake(self.main_revision):
                         self.ledger.append('behavioral_termination',{'reason':'coordination_stalled'})
                         self.final_text=None

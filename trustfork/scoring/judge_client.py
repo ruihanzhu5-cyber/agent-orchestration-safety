@@ -20,6 +20,7 @@ def validate_judge_result(value,*,pass_name,response_ids,evidence_refs,scoring_p
         if not isinstance(row,dict) or row.get('status') not in ('complete','unknown','judge_error','not_applicable'):
             raise DynamicError('judge_anchor_schema',identity)
         refs=row.get('evidence_refs',[])
+        if not isinstance(refs,list) or any(not isinstance(ref,str) for ref in refs):raise DynamicError('judge_evidence_invalid',identity+'.evidence_refs must be an array of observed reference strings')
         if set(refs)-set(evidence_refs) or (row['status']=='complete' and not refs):
             raise DynamicError('judge_evidence_invalid',identity)
         if row['status']=='complete':
@@ -103,9 +104,12 @@ class JudgeClient:
         if report['fits'] is not True:raise DynamicError(report['reason'],'Preflight every pass before any transmission')
         return report
 
-    def send(self,prepared,*,request_id,pass_name,response_ids=(),evidence_refs=(),validator=None):
+    def send(self,prepared,*,request_id,pass_name,response_ids=(),evidence_refs=(),validator=None,validation_context=None):
         if prepared.get('not_applicable') or (pass_name=='response' and not response_ids):raise DynamicError('judge_pass_not_applicable','No formal deliveries; skip response pass')
         self.preflight(prepared)
+        if validation_context is not None and validation_context.get('events') is not None:
+            from trustfork.runtime.dynamic.events import events_digest
+            if events_digest(validation_context['events'])!=prepared['sanitizer']['source_events_hash']:raise DynamicError('judge_validation_source_mismatch','Wrong raw validation source; no request sent')
         alias=self.transport.config['judge_binding']
         binding=self.transport.config['logical_bindings'][alias]
         if digest(prepared['request'])!=prepared['request_hash'] or digest(prepared['wire_payload'])!=prepared['wire_payload_hash']:
@@ -129,7 +133,7 @@ class JudgeClient:
             value=json.loads(choice['message']['content'])
         except (ValueError,KeyError,IndexError,TypeError):raise DynamicError('judge_invalid_json','Raw reply retained, no fabricated scores') from None
         from .judge_contract import validate_complete_result
-        checked=validate_complete_result(value,pass_name=pass_name,response_ids=response_ids,evidence_refs=evidence_refs,scoring_profile=prepared.get('scoring_profile','legacy-eight-v1'),prepared=prepared)
+        checked=validate_complete_result(value,pass_name=pass_name,response_ids=response_ids,evidence_refs=evidence_refs,scoring_profile=prepared.get('scoring_profile','legacy-eight-v1'),prepared=prepared,**(validation_context or {}))
         if validator is not None:validator(checked)
         return {'request_hash':prepared['request_hash'],'wire_payload_hash':prepared['wire_payload_hash'],
             'result':checked,

@@ -180,3 +180,31 @@ def test_no_opportunity_is_distinct_known_absence(tmp_path,representation):
  t=ProviderTransport(c,mode='mock',journal=tmp_path/'j.jsonl',kind='judge',max_requests=1,http=lambda *args:reply(json.dumps(a)))
  r=JudgeClient(t).send_with_repair(p,request_id='absence',pass_name='trajectory',evidence_refs={e['branch_id']+'::'+e['event_id'] for e in f['events']})
  assert check_absent_fixture(f,r['result'])['passed'] and 'oracle' not in p['wire_payload']['messages'][1]['content']
+
+
+def test_raw_validation_context_is_bound_to_frozen_prepared_source(tmp_path):
+ from trustfork.scoring.judge_contract import validate_complete_result
+ from trustfork.scoring.judge_request import prepare_judge_pass
+ from test_provider_preparation import configuration
+ f=make_fixture(tmp_path,'direct_failed_attempt');a=oracle_annotations(f)
+ p=prepare_judge_pass(f['bundle'],'trajectory',binding=configuration()['logical_bindings']['gpt4o'],scorer_config={'trajectory_output_budget_tokens':100},counter=len)
+ altered=copy.deepcopy(f['events']);altered[0]['payload']['content']='changed source'
+ with pytest.raises(DynamicError,match='judge_validation_source_mismatch'):validate_complete_result(a,pass_name='trajectory',scoring_profile='dynamic-homogeneous-v2',prepared=p,events=altered)
+
+
+def test_wrong_raw_validation_context_is_rejected_before_any_send(tmp_path):
+ from trustfork.scoring.judge_request import prepare_judge_pass
+ from trustfork.scoring.judge_client import JudgeClient
+ from trustfork.runtime.dynamic.provider import ProviderTransport
+ from test_provider_preparation import configuration
+ f=make_fixture(tmp_path,'direct_failed_attempt');cfg=configuration()
+ p=prepare_judge_pass(f['bundle'],'trajectory',binding=cfg['logical_bindings']['gpt4o'],scorer_config={'trajectory_output_budget_tokens':100},counter=len)
+ t=ProviderTransport(cfg,mode='mock',journal=tmp_path/'log.jsonl',kind='judge',max_requests=1,http=lambda *a:pytest.fail('wrong context reached HTTP'))
+ with pytest.raises(DynamicError,match='judge_validation_source_mismatch'):JudgeClient(t).send_with_repair(p,request_id='wrong',pass_name='trajectory',validation_context={'events':[]})
+ assert t.count==0 and not t.journal.exists()
+
+@pytest.mark.parametrize('refs',[None,{'not':'a list'},[['not-a-string']]])
+def test_malformed_reference_types_use_structural_error_not_python_type_error(refs):
+ from test_first_api_judge import unknown_result
+ a=unknown_result();a['trajectory_judgements']['ias']['evidence_refs']=refs
+ with pytest.raises(DynamicError,match='judge_evidence_invalid'):validate_judge_result(a,pass_name='trajectory',response_ids=[],evidence_refs=set())

@@ -41,7 +41,7 @@ def frozen_identity(path):
             for item in value:visit(item)
     visit(run.get('prefix_export',{}));visit(run.get('frozen_export',{}))
     return {'run_hash':file_hash(path),'run_manifest_hash':digest(manifest),
-        'trajectory_hash':digest(events),'frozen_archives_hash':digest(archives),
+        'trajectory_hash':__import__('trustfork.runtime.dynamic.events',fromlist=['events_digest']).events_digest(events),'frozen_archives_hash':digest(archives),
         'model_bindings_hash':digest(manifest.get('resolved_api_bindings')),
         'origin_scorer_hash':manifest['scorer_hash']}
 
@@ -99,7 +99,7 @@ def rescore_contract(path,*,reason,annotation_policy='pending',compatibility=Non
         if original_annotations.get('scorer_manifest_hash')!=prior['manifest_hash'] or version['identity'].get('annotations_hash')!=digest(original_annotations):
             raise DynamicError('annotation_reuse_origin_mismatch','Parent score must bind these exact original annotations and their scorer')
         # Reuse is narrow: all Judge/annotation semantics must be identical.
-        critical=('verifier.py','dynamic_adapter.py','annotation_contracts.py','annotation.schema.json',
+        critical=('events.py','common.py','verifier.py','dynamic_adapter.py','annotation_contracts.py','annotation.schema.json',
             'judge_request.py','judge_client.py','judge_contract.py','trajectory_codec.py','contracts.schema.json','goal_observer.py','trajectory_observer.py',
             'metric_registry.py','metrics.v2.json','metrics.v2.schema.json','opportunity_rubric.v2.json','dynamic_metrics_v2.py','token_accounting.py')
         unchanged=all(prior['file_hashes'].get(k)==v for k,v in current_scorer['file_hashes'].items()

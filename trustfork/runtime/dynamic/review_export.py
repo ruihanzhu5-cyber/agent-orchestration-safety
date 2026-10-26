@@ -5,13 +5,13 @@ from .artifacts import safe_slug
 from .common import DynamicError,canonical,file_hash,read_json
 
 VERSION='dynamic-review-export-v4'
-FOLLOWUP_ROOT_FILES={'segment.json','budget-summary.json','input-size-audit.json','input-size-audit-initial.json','tokenizer-provenance.json','offline-acceptance.json','parent-frozen-seal.json','baseline-source-hashes.json'}
+FOLLOWUP_ROOT_FILES={'tests.md','execution-attempt.json','formal-plan.json','formal-judge-acceptance.json','execution-results.json','gpt-rescore-results.json','deepseek-results.json','review-findings.md','test-results.json','regression-matrix.csv','resource-replay.json','offline-chain-results.json','resume-dry-run.json','ledger-migration.json','metrics.csv','segment.json','budget-summary.json','input-size-audit.json','input-size-audit-initial.json','tokenizer-provenance.json','offline-acceptance.json','parent-frozen-seal.json','baseline-source-hashes.json'}
 ROOT_FILES=FOLLOWUP_ROOT_FILES|{'campaign.json','plan.jsonl','resolved-config.json','results.json','cost-summary.json'}
 ROLE_DIRS={'blocks','history','probes','diagnostics','test-results','analysis','fixtures','gpt-rescore','deepseek','actions','tests'}
 RUNTIME_NAMES={'run.json','run_manifest.json','events.jsonl','prefix-events.json','delivery_receipts.json',
  'history-bundle-reuse.jsonl','pass-states.json','attempt-summary.json','trajectory-output-estimate.json','trajectory-output-estimate-error.json','origin.json','private_bindings.json','profile_metadata.json','history.json','history-execution.json','history-bundle.json',
  'partial-state.json','prefix-outcome.json','block.json','provider-requests.jsonl','judge-requests.jsonl',
- 'judge-structure-repairs.jsonl','capacity-checks.jsonl','scoring_annotations.json','partial_annotations.json'}
+ 'judge-capacity-calibrations.jsonl','task-completion.json','copy-manifest.json','history-compatibility.json','preparation-outcome.json','transport-metrics.json','judge-structure-repairs.jsonl','capacity-checks.jsonl','scoring_annotations.json','partial_annotations.json'}
 PRIVATE_FIELDS={'authorization','cookie','set-cookie','access_token','refresh_token','key_env'}
 def sha(data):return hashlib.sha256(data).hexdigest()
 def jsonlines(p):return [json.loads(x) for x in p.read_text().splitlines() if x.strip()] if p.exists() else []
@@ -97,7 +97,7 @@ def state_difference(before,after,red,reference):
   'scope':'Captured workspace/service/home assets only; full changed file bytes preserved as Base64. Original archives remain local. Not a RAM snapshot.'}
  return red.value(value,reference)
 
-def export_campaign(source,destination,*,secrets=(),private_paths=(),snapshot=False,max_part_bytes=5*1024*1024,max_total_bytes=50*1024*1024,ledger_path=None,ledger_segment_id=None):
+def export_campaign(source,destination,*,secrets=(),private_paths=(),snapshot=False,max_part_bytes=5*1024*1024,max_total_bytes=50*1024*1024,ledger_path=None,ledger_segment_id=None,ledger_attempt_id=None):
  source=Path(source).resolve();destination=Path(destination).resolve()
  if source==destination or source in destination.parents or destination in source.parents:raise DynamicError('review_export_overlaps_source','Share copy must be outside originals')
  campaign=read_json(source/'campaign.json')
@@ -241,6 +241,7 @@ def export_campaign(source,destination,*,secrets=(),private_paths=(),snapshot=Fa
    for row in db.execute('SELECT * FROM requests ORDER BY updated_at,request_id'):
     v=dict(row);v.update(json.loads(v.pop('metadata')))
     if ledger_segment_id is not None and v.get('segment_id')!=ledger_segment_id:continue
+    if ledger_attempt_id is not None and v.get('execution_attempt_id')!=ledger_attempt_id:continue
     v['reserved_cost_cny']=v.pop('reserved')/1e6
     settled=v.pop('settled');v['settled_cost_cny']=settled/1e6 if settled is not None else None
     costs.append(red.value(v,'costs/'+v['request_id']))
@@ -251,11 +252,11 @@ def export_campaign(source,destination,*,secrets=(),private_paths=(),snapshot=Fa
   result['direct_unknown_reserved_cny']=sum(c['reserved_cost_cny'] for c in rows if c['status'] in ('submitted','charge_unknown','reserved'))
   result['cost_scope']='Direct run plus Judge only; shared history/prefix/probe costs remain separate ledger rows; never multiply them per branch'
  put('results.csv',csv_text(['kind','run_id','case_id','team_model','main_model','protocol','condition','run_status','termination_reason','completion_status','source_ref','observation_complete','unknown_reason','metric_summary','behavior_execution_sha','scoring_execution_sha','scoring_pass_states','process_annotation_status','direct_requests','direct_settled_cny_upper','direct_unknown_reserved_cny','cost_scope'],results))
- put('costs.csv',csv_text(['request_id','segment_id','run_id','phase','purpose','actor_id','provider','model_id','status','estimated_input_tokens','max_generated_tokens','reserved_cost_cny','settled_cost_cny','usage','pricing_basis','source_currency','conversion_basis','settlement_basis'],costs))
+ put('costs.csv',csv_text(['request_id','segment_id','execution_attempt_id','execution_stage_id','execution_review_id','kind','submitted_at','run_id','phase','purpose','actor_id','provider','model_id','status','estimated_input_tokens','max_generated_tokens','reserved_cost_cny','settled_cost_cny','usage','pricing_basis','source_currency','conversion_basis','settlement_basis'],costs))
  config=source/'resolved-config.json'
  put('config.redacted.json',canonical(red.value(read_json(config),'config') if config.exists() else {'status':'not_resolved','real_api_enabled':False})+b'\n')
  tests=[(p.relative_to(source).as_posix(),mapped(p.relative_to(source).as_posix())) for p in candidates if p.relative_to(source).parts[0]=='test-results']
- put('tests.md','# Test evidence\n\n'+('\n'.join('- ['+a+']('+b+')' for a,b in tests) if tests else 'No retained test receipt; no pass claimed.')+'\n\nActual Docker tests, mock responses and real probes are separate evidence scopes.\n')
+ if 'tests.md' not in files:put('tests.md','# Test evidence\n\n'+('\n'.join('- ['+a+']('+b+')' for a,b in tests) if tests else 'No retained test receipt; no pass claimed.')+'\n\nActual Docker tests, mock responses and real probes are separate evidence scopes.\n')
  links='\n'.join('- ['+red.text(r['run_id'],'index')+']('+prefix+'/README.md)' for _,r,prefix in runs)
  history_links='\n'.join('- ['+Path(n).parent.name+']('+n+')' for n in history_indices)
  overview='\n\nRecorded plan outcomes: '+json.dumps(resolved.get('plan_counts',{}),sort_keys=True)+'. Completed histories are unjudged execution endings, not demonstrated task successes.\n\n'
@@ -265,6 +266,8 @@ def export_campaign(source,destination,*,secrets=(),private_paths=(),snapshot=Fa
  overview+='[Probe comparison](evidence/probes/summary.json) · [Request diagnostics](evidence/diagnostics/first-api-diagnostics.json) · [Formal report](../../../docs/dynamic-join/Runtime_Budget_And_First_API_Report_20261026.md)\n\n## Retained histories\n\n'+history_links+'\n\n## T3 trajectories\n\n'
  if campaign.get('parent_campaign_id'):
   overview='\n\nParent campaign: '+campaign['parent_campaign_id']+'; previous behavior and new scorer versions are separate. New segment CNY20 ceiling is included in the original CNY100, never reset.\n\n[Segment provenance](segment.json) · [Input size audit](input-size-audit.json) · [Formal fixtures](evidence/fixtures/summary.json) · [Report](../../../docs/dynamic-join/Plan_Judge_Followup_Report_20261026.md)\n\n## Retained histories\n\n'+history_links+'\n\n## Frozen and new trajectories\n\n'
+ if campaign.get('review_id')=='runtime-judge-review-20261026':
+  overview='\n\nOriginal CNY100 campaign and existing CNY20 segment are inherited. This publication contains this execution attempt only in costs.csv; whole-ledger and prior spend remain in budget-summary.json.\n\n[Review findings](review-findings.md) · [Regression matrix](regression-matrix.csv) · [Resource replay](resource-replay.json) · [Offline full chain](offline-chain-results.json) · [Attempt/migration dry-run](resume-dry-run.json) · [Formal Judge acceptance](formal-judge-acceptance.json) · [Metrics with statuses](metrics.csv) · [Report](../../../docs/dynamic-join/Runtime_Judge_Review_Fixes_20261026.md)\n\n## Retained histories\n\n'+history_links+'\n\n## Frozen and new trajectories\n\n'
  put('README.md',f"# {campaign.get('campaign_id',source.name)}\n\nStatus: {campaign.get('status')}; "+('explicit partial snapshot' if snapshot else 'stopped campaign')+f".\n\nExecution code SHA: {campaign.get('identity',{}).get('commit','unknown')}.\n\nCampaign ceiling CNY100; interface_probe sub-ceiling CNY20 is included. Consult costs.csv and diagnostics for settlement and unknown charges. Engineering smoke is not a main experiment.\n\n[Plan](plan.jsonl) · [Results](results.csv) · [Costs](costs.csv) · [Tests](tests.md) · [Configuration](config.redacted.json) · [Manifest](manifest.json)\n\nRecorded T3 runs: {len(runs)}; plan rows: {len(plans)}. Unstarted items are retained.\n\n"+overview+links+"\n\nOriginal binary archives/databases remain local. Selected complete text evidence is shared; exclusions and distinct source/export hashes are recorded in manifest.json.\n")
  if before!={p.relative_to(source).as_posix():file_hash(p) for p in sorted(source.rglob('*')) if p.is_file() and allowed(p,source)}:raise DynamicError('review_source_changed','Stop writers or use a new snapshot')
  # Leaves were already compressed as soon as each shard completed.

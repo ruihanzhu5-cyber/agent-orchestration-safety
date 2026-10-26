@@ -14,6 +14,15 @@ from .common import DynamicError, canonical, digest
 from .schema import validate_contract
 
 
+def events_digest(rows):
+    """Canonical list hash without allocating the whole serialized event history."""
+    h=hashlib.sha256();h.update(b'[')
+    for i,row in enumerate(rows):
+        if i:h.update(b',')
+        h.update(canonical(row))
+    h.update(b']');return h.hexdigest()
+
+
 class EvidenceStore:
     def __init__(self, root: Path, branch_id: str):
         self.root, self.branch_id = root, branch_id

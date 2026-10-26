@@ -101,6 +101,10 @@ class Scheduler:
             if outcome is not None:
                 unfinished=outcome['state'] in ('continue','waiting')
                 if outcome['state']=='resource_ended':terminal_status='resource_ended'
+            if outcome is not None and outcome['state']=='waiting' and not self.membership.admitted(actor):
+                self.waiting.pop(actor,None);self.continuations.discard(actor)
+                self.wake_results[actor]={'reason':'member_released','version':self.versions[actor]}
+                return 'member_released'
             startup = self.startup.get(actor)
             if startup and startup['status'] == 'open' and not row['maintenance']:
                 if terminal_status or not unfinished:
@@ -173,12 +177,18 @@ class Scheduler:
             self.changed.notify_all()
 
     def coordination_snapshot(self):
-        with self.lock:return copy.deepcopy({'waiting':self.waiting,'versions':self.versions,'wake_results':self.wake_results})
+        with self.lock:
+            waiting=copy.deepcopy(self.waiting)
+            for row in waiting.values():row['remaining_seconds']=max(0,row['deadline_wall']-time.time())
+            return copy.deepcopy({'waiting':waiting,'versions':self.versions,'wake_results':self.wake_results})
 
-    def restore_coordination(self,value):
+    def restore_coordination(self,value,*,independent_fork=False):
         with self.lock:
             for key in ('waiting','versions','wake_results'):
                 if key in value:setattr(self,key,copy.deepcopy(value[key]))
+            for row in self.waiting.values():
+                remaining=row.pop('remaining_seconds',max(0,row['deadline_wall']-time.time()))
+                if independent_fork:row['deadline_wall']=time.time()+remaining
             self.poll_waiters()
 
     def terminate_startup(self, reason):

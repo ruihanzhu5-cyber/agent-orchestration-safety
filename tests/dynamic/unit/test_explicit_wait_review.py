@@ -85,3 +85,33 @@ def test_budget_end_reasons(which,reason):
  elif which=='tokens':b.output_tokens=6
  else:b.deadline=0
  assert b.termination_reason()==reason
+
+
+def test_independent_checkpoint_fork_preserves_remaining_wait_not_elapsed_other_branch_time(tmp_path):
+ l,m,life,s=state(tmp_path);s.enqueue_batch(['Main'],reason='test');s.permit()
+ s.complete('Main',outcome={'state':'waiting','after_version':0,'timeout_seconds':20,'pending_work':True})
+ snapshot=s.coordination_snapshot();snapshot['waiting']['Main']['deadline_wall']=time.time()-1
+ fork=Scheduler('b',l,m,life);fork.restore_coordination(snapshot,independent_fork=True)
+ assert 'Main' in fork.waiting and fork.waiting['Main']['deadline_wall']>time.time()
+ restart=Scheduler('b',l,m,life);restart.restore_coordination(snapshot)
+ assert 'Main' not in restart.waiting and restart.wake_results['Main']['reason']=='timeout'
+
+
+def test_release_between_wait_intent_and_turn_completion_does_not_requeue_actor(tmp_path):
+ l,m,life,s=state(tmp_path);s.enqueue_batch(['A'],reason='test');s.permit(actors=['A'])
+ version=s.observable_version('A');m.release('A')
+ assert s.complete('A',outcome={'state':'waiting','after_version':version,'timeout_seconds':10,'pending_work':True})=='member_released'
+ assert not s.active and not s.waiting and not s.queue
+
+
+def test_pending_final_does_not_busy_spin_while_startup_actor_waits(tmp_path,monkeypatch):
+ from test_team_contracts import audit_runtime
+ from trustfork.runtime.dynamic.budget import Budget
+ r=audit_runtime(tmp_path);r._bind_coordination();r.membership.admit_atomic(['C']);r.scheduler.begin_startup(['C'])
+ r.budget=Budget(stage_seconds=1);r.pending_final={'text':'observed proposal','revision':0};r.confirming_final=False;r.termination_reason=None
+ r.scheduler.waiting['C']={'after_version':r.scheduler.observable_version('C'),'deadline_wall':time.time()+20,'stage_epoch':0}
+ waits=[]
+ def waited(timeout):waits.append(timeout);r.termination_reason='time_limit'
+ monkeypatch.setattr(r.scheduler.changed,'wait',waited);r._drain=lambda *a,**k:None
+ r._run_stage()
+ assert waits==[0.05] and not r.scheduler.waiting and r.termination_reason=='time_limit'

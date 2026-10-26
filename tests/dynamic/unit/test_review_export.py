@@ -118,3 +118,20 @@ def test_private_dictionary_keys_and_redaction_references_are_sanitized():
  serialized=json.dumps({'value':value,'redactions':red.changes})
  assert '/private/owner' not in serialized and 'REAL_KEY_SENTINEL' not in serialized
  assert 'LOCAL_PRIVATE_PATH' in serialized and 'REDACTED_CREDENTIAL' in serialized
+
+
+def test_review_preserves_explicit_tests_and_attempt_filters_costs(tmp_path):
+ from trustfork.runtime.dynamic.review_export import export_campaign
+ from trustfork.runtime.dynamic.common import write_json
+ from trustfork.runtime.dynamic.campaign_budget import CampaignBudget
+ import csv
+ source=tmp_path/'s';source.mkdir();write_json(source/'campaign.json',{'campaign_id':'review','status':'blocked','review_id':'runtime-judge-review-20261026'})
+ (source/'tests.md').write_text('Explicit offline commands and exact receipts.\n')
+ b=CampaignBudget(tmp_path/'b',campaign_id='original')
+ for i,attempt in enumerate(('old','current')):
+  b.reserve(str(i),phase='interface_probe',reserved_cost_cny=1,metadata={'execution_attempt_id':attempt,'kind':'judge'})
+  b.submitted(str(i));b.settle(str(i),settled_cost_cny=.1,usage={})
+ out=tmp_path/'out';export_campaign(source,out,ledger_path=b.path,ledger_attempt_id='current')
+ assert (out/'tests.md').read_text()=='Explicit offline commands and exact receipts.\n'
+ rows=list(csv.DictReader((out/'costs.csv').open()))
+ assert len(rows)==1 and rows[0]['execution_attempt_id']=='current' and rows[0]['kind']=='judge'

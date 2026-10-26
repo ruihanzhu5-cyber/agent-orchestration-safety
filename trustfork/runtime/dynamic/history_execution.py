@@ -103,7 +103,26 @@ def execute_history(parent,source):
         if case_id==parent.case['case_id']:raise DynamicError('history_task_overlap',case_id)
         runtime=PiDynamic(case_id,parent.out/'history'/str(index),layout=parent.layout,main_model=parent.main_model,
             protocol='F',provider=parent.provider,legacy=parent.experiment is None,team_model=parent.main_model,history_pair_id=parent.experiment.history_pair_id if parent.experiment else 'HIST1',history_task=True)
-        sessions,record=execute_task(runtime,source.clone(),history.export() if history.tasks else None)
+        previous=history.export() if history.tasks else None
+        attempt=getattr(parent,'execution_attempt',None)
+        if attempt is None:sessions,record=execute_task(runtime,source.clone(),previous)
+        else:
+            from .prepared_artifacts import history_contract
+            from .common import read_json
+            stage='history/H'+str(index+1)
+            runtime.provider.request_namespace=attempt.request_id(stage,'model')
+            runtime.provider.execution_context={'execution_attempt_id':attempt.attempt_id,'execution_stage_id':stage,'execution_review_id':'runtime-judge-review-20261026','model_generation_group_id':'runtime-judge-review-20261026/'+stage}
+            stage_identity={'contract':history_contract(runtime),'previous_history_hash':digest(previous)}
+            def execute_once():
+                task_sessions,task_record=execute_task(runtime,source.clone(),previous)
+                path=runtime.out/'task-completion.json'
+                write_json(path,{'sessions':task_sessions,'record':task_record,'execution_attempt_id':attempt.attempt_id,'stage_identity_hash':digest(stage_identity)})
+                return {'path':str(path),'task_id':case_id,'status':task_record['status']}
+            attempt.reuse_parent_stage(stage,stage_identity)
+            saved=attempt.run(stage,stage_identity,execute_once,artifacts=lambda r:[Path(r['path']),Path(r['path']).parent/'history-execution.json'])
+            task=read_json(Path(saved['path']));sessions,record=task['sessions'],task['record']
+            if record['task_id']!=case_id or any(digest(sessions[a])!=record['session_hashes'][a] for a in ('Main','A','B')):raise DynamicError('history_stage_artifact_mismatch','Saved history actor states differ')
+        if attempt is not None and record['status']=='failed_history_retained':raise DynamicError('history_engineering_failure','Retained failed history stage; do not start dependent history')
         history.add_task(case_id,sessions,synthetic=parent.synthetic,status=record['status']);records.append(record)
     parent.history=history.export();parent.history.update(execution_records=records,
         actual_historical_task_executions=2 if not parent.synthetic else 0,mock_environment_task_executions=2 if parent.synthetic else 0)

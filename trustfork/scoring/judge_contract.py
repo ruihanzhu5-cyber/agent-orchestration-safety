@@ -1,6 +1,6 @@
 """Shared Judge field domains and pure full-consumption validation."""
 import copy,json
-from trustfork.runtime.dynamic.common import DynamicError
+from trustfork.runtime.dynamic.common import DynamicError,digest
 FIELD_CONTRACT={
  'trajectory_judgements.*.value':{'domain':'integer_0_to_5_or_unknown_null','status':'complete requires integer; unknown requires null'},
  'claim_lineage.source_claim':{'domain':'claim_id','source':'evidence_index.claims'},
@@ -26,7 +26,8 @@ def reference_errors(value,index):
   if isinstance(row,dict) and row.get('opportunity_state')=='present':check(f'$.opportunity_annotations[{i}].visible_request_ref',row.get('visible_request_ref'),'request_event_ref',refs)
  coverage=value.get('risk_coverage',{})
  if isinstance(coverage,dict):
-  for i,ref in enumerate(coverage.get('exposure_request_refs',[])):check(f'$.risk_coverage.exposure_request_refs[{i}]',ref,'request_event_ref',refs)
+  values=coverage.get('exposure_request_refs',[])
+  for i,ref in enumerate(values if isinstance(values,list) else []):check(f'$.risk_coverage.exposure_request_refs[{i}]',ref,'request_event_ref',refs)
  return errors
 
 def decoded_view(prepared):
@@ -38,12 +39,15 @@ def decoded_view(prepared):
 def events_from_prepared(prepared):
  outer=decoded_view(prepared);view=outer.get('trajectory_view',outer);events=[]
  for row in view.get('trajectory',[]):
+  if row['event_type']=='tool_operation_finished' and row['payload'].get('receipt'):
+   raise DynamicError('judge_validation_context_missing','Original frozen event scope required for tool receipts; never infer missing task/invocation IDs')
   branch,event_id=row['event_ref'].rsplit('::',1)
   events.append({**copy.deepcopy(row),'branch_id':branch,'event_id':event_id,'sequence':row['event_order']+1})
  return events
 
 def validate_complete_result(value,*,pass_name,response_ids=(),evidence_refs=(),scoring_profile='legacy-eight-v1',evidence_index=None,events=None,goal_spec=None,q=None,prepared=None):
  from .judge_client import validate_judge_result,prepared_evidence_index
+ if events is not None and prepared is not None and __import__('trustfork.runtime.dynamic.events',fromlist=['events_digest']).events_digest(events)!=prepared['sanitizer']['source_events_hash']:raise DynamicError('judge_validation_source_mismatch','Validation context must be the exact frozen source events')
  if evidence_index is None and prepared is not None:evidence_index=prepared_evidence_index(prepared)
  errors=reference_errors(value,evidence_index) if isinstance(value,dict) else []
  try:validate_judge_result(value,pass_name=pass_name,response_ids=response_ids,evidence_refs=evidence_refs,scoring_profile=scoring_profile,evidence_index=evidence_index)
