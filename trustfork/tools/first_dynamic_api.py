@@ -122,7 +122,7 @@ def judge_candidate(c,root,team):
    except (ValueError,KeyError,IndexError,TypeError,DynamicError) as error:
     structural=getattr(error,'code','judge_probe_invalid_json');trace.append({'attempt':attempt,'error':structural})
     if not attempt:
-     prior={'role':'assistant','content':content[:4096]}
+     prior={'role':'assistant','content':content}
      if binding.get('thinking')=='enabled':prior['reasoning_content']=(choice.get('message') or {}).get('reasoning_content') or ''
      messages+= [prior,{'role':'user','content':'Repair only the JSON structure and evidence IDs using the identical frozen fixture and schema. Preserve unknown facts. Error: '+structural}]
   rows.append(result or {'case_id':case['case_id'],'critical_pass':False,'attempts':2,'errors':trace})
@@ -224,7 +224,7 @@ def run_smoke(c,campaign):
        jout=path.parent/('judge-'+judge)
        try:
         result=run_judge_attempt(path,jout,jc,mode='api',scorer_config=scorer,max_requests=4,authorize_real=True)
-        row['judges'].append({'model':judge,'status':'completed','requests':result['judge_attempts']})
+        row['judges'].append({'model':judge,'status':result['status'],'requests':result['judge_attempts'],'pass_states':result['pass_states']})
         contract=rescore_contract(path,reason='Authorized engineering smoke Judge '+judge,annotation_policy='new',new_annotations=jout/'scoring_annotations.json')
         score_run(path,mode='engineering-smoke',rescore=contract)
        except (DynamicError,OSError,TimeoutError) as error:row['judges'].append({'model':judge,'status':'pending_or_failed','code':getattr(error,'code',type(error).__name__)})

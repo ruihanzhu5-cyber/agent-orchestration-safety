@@ -77,6 +77,58 @@ def audit_view(view,*,label,diagnostic_output_reserve=4096):
         'cognitive_equivalence':'requires future real discovery comparison; not established offline'}
 
 
+def audit_frozen_prepared(prepared,binding):
+    """Compare identical decoded evidence, original v1 and optional prefix v2; no sender."""
+    from collections import Counter
+    from trustfork.scoring.trajectory_codec import encode_trajectory_v2,PREFIX_VERSION,PREFIX_INSTRUCTIONS,INSTRUCTIONS
+    from trustfork.runtime.dynamic.token_accounting import engineering_counting_policy,count_request
+    import copy
+    original=prepared['wire_payload'];old=json.loads(original['messages'][1]['content'])
+    decoded=decode_trajectory(old) if old.get('representation_version') else old
+    view=decoded.get('trajectory_view',decoded);events=view.get('trajectory',[])
+    kinds=Counter();subtypes=Counter();partial_equal=0;updates=0;prefix_pairs=0;previous={}
+    for e in events:
+        kinds[e['event_type']]+=len(canonical(e))
+        if e['event_type']!='pi_event':continue
+        inner=e['payload'].get('event',{});subtypes[inner.get('type','unknown')]+=len(canonical(e))
+        if inner.get('type')!='message_update':continue
+        updates+=1;partial=inner.get('assistantMessageEvent',{}).get('partial')
+        partial_equal+=int(partial is not None and partial==inner.get('message'))
+        # Prefix identity refers to the same actor, request and content block.
+        for index,block in enumerate(inner.get('message',{}).get('content',[])):
+            if not isinstance(block,dict):continue
+            for field in ('text','thinking','partialArgs'):
+                text=block.get(field)
+                if not isinstance(text,str):continue
+                key=(e.get('actor_id'),e.get('request_id'),index,field)
+                before=previous.get(key)
+                if before and text.startswith(before) and text!=before:prefix_pairs+=1
+                previous[key]=text
+    policy=engineering_counting_policy(binding);measure={}
+    base_system=original['messages'][0]['content']
+    for instruction in (PREFIX_INSTRUCTIONS,INSTRUCTIONS):
+        suffix='\n\n'+instruction
+        if base_system.endswith(suffix):
+            base_system=base_system[:-len(suffix)];break
+    for name,body in [('legacy-full',decoded),('trajectory-lossless-v1',encode_trajectory(decoded)),(PREFIX_VERSION,encode_trajectory_v2(decoded))]:
+        wire=copy.deepcopy(original);wire['messages'][1]['content']=canonical(body).decode()
+        wire['messages'][0]['content']=base_system
+        if name in ('trajectory-lossless-v1',PREFIX_VERSION):wire['messages'][0]['content']+='\n\n'+(PREFIX_INSTRUCTIONS if name==PREFIX_VERSION else INSTRUCTIONS)
+        a=count_request(wire,policy);byte_binding=copy.deepcopy(binding);byte_binding.pop('engineering_counting',None)
+        ba=count_request(wire,engineering_counting_policy(byte_binding))
+        n=a['estimated_total_input_tokens']
+        measure[name]={'view_utf8_bytes':len(canonical(body)),'decoded_wire_message_utf8_bytes':sum(len(m['content'].encode()) for m in wire['messages']),
+          'byte_estimate':ba['input_tokens'],'token_estimate':a['input_tokens'],'tokenizer':a['tokenizer'],'service_prompt_tokens':None,
+          'framing_tokens':a['framing_tokens'],'safety_margin_tokens':max(2048,(n+9)//10),'wire_payload_hash':digest(wire),'roundtrip_exact':True}
+    return {'source_view_hash':digest(decoded),'sanitized_view_hash':digest(view),'source_prepared_request_hash':prepared['request_hash'],
+       'measurements':measure,'event_type_utf8_bytes':dict(kinds),'pi_subtype_utf8_bytes':dict(subtypes),
+       'event_count':len(events),'message_update_count':updates,'partial_equals_message':partial_equal,'growing_string_prefix_pairs':prefix_pairs,
+       'index_counts':{k:len(v) for k,v in view.get('evidence_index',{}).items() if isinstance(v,list)},
+       'independent_compartments_utf8_bytes':{'trajectory':len(canonical(events)),'evidence_index':len(canonical(view.get('evidence_index',{}))),
+        **{k:len(canonical(v)) for k,v in decoded.items() if k!='trajectory_view'}},
+       'nonadditive_diagnostics':True,'service_usage_unknown_for_unsent_requests':True,'no_source_mutation':True}
+
+
 def main():
     p=argparse.ArgumentParser(description=__doc__);p.add_argument('--input',type=Path,required=True);p.add_argument('--out',type=Path,required=True)
     p.add_argument('--include-long-fixture',action='store_true');a=p.parse_args();rows=[]

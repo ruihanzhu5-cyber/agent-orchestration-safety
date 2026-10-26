@@ -27,7 +27,7 @@ def scorer_manifest():
         'trustfork/runtime/dynamic/operation_receipts.py','trustfork/scoring/visibility_index.py',
         'trustfork/scoring/annotation_contracts.py','trustfork/config/dynamic/annotation.schema.json',
         'trustfork/config/dynamic/contracts.schema.json']
-    names+=['trustfork/scoring/trajectory_codec.py','trustfork/scoring/judge_request.py',
+    names+=['trustfork/scoring/trajectory_codec.py','trustfork/scoring/judge_request.py','trustfork/config/dynamic/tokenizers.v1.json',
         'trustfork/scoring/risk_opportunity.py','trustfork/tools/audit_model_calls.py',
         'trustfork/runtime/dynamic/model_capabilities.py','trustfork/config/dynamic/scorer.example.json',
         'trustfork/config/dynamic/model_bindings.schema.json','trustfork/runtime/dynamic/schema.py',
@@ -36,7 +36,7 @@ def scorer_manifest():
         'trustfork/scoring/metric_registry.py','trustfork/scoring/dynamic_metrics_v2.py','trustfork/scoring/aggregate_dynamic_v2.py','trustfork/runtime/dynamic/token_accounting.py']
     files={name:file_hash(repo_root()/name) for name in names}
     return {'version':'dynamic-scoring-analysis-v4','file_hashes':files,'manifest_hash':digest(files),
-        'judge_binding_ref':'gpt4o','precise_judge_binding':None,'network_sender_present':True,'network_sender_default_enabled':False}
+        'judge_binding_ref':None,'precise_judge_binding':None,'network_sender_present':True,'network_sender_default_enabled':False}
 
 
 def load_events(directory,run):
@@ -204,6 +204,17 @@ def _score_run(path,*,mode='formal',output_override=None,rescore=None,frozen_ide
         if file_hash(annotations_path)!=rescore['new_annotation_hash']:
             raise DynamicError('new_annotation_hash_mismatch','New annotation input changed')
     annotations=_validate_judgements(read_json(annotations_path),refs,deliverables) if annotations_path.exists() else {}
+    # A source-only scorer has no selected route. Populate execution labels only
+    # from the exact successful prepared passes, including explicit frozen rescoring.
+    actual_judges={}
+    for item in annotations.get('judge_passes',{}).values():
+        prepared=item['prepared']
+        identity={k:prepared.get(k) for k in ('judge_binding_ref','judge_model_id','route_fingerprint')}
+        actual_judges[digest(identity)]=identity
+    if len(actual_judges)>1:raise DynamicError('judge_binding_mismatch','Passes have different actual Judge routes')
+    if actual_judges:
+        precise=next(iter(actual_judges.values()))
+        score_manifest.update(judge_binding_ref=precise['judge_binding_ref'],precise_judge_binding=precise)
     if mode=='formal' and annotations.get('synthetic'):raise DynamicError('synthetic_judge_rejected','Synthetic judgments cannot enter formal scores')
     if rescore and rescore['annotation_policy']=='pending':annotations={}
     if annotations and annotations['scorer_manifest_hash']!=score_manifest['manifest_hash'] and (not rescore or rescore['annotation_policy']=='new'):

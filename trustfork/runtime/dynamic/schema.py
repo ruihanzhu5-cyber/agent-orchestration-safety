@@ -65,10 +65,11 @@ def validate_bindings(config: dict, *, formal: bool, required_aliases=None, role
     required = {"provider", "base_url", "model_id", "key_env", "context_window", "max_output_tokens", "supported_parameters"}
     unresolved = []
     for alias, binding in config["logical_bindings"].items():
-        strict_keys(binding, required, {'capability','api','compat','output_token_parameter','thinking','reasoning_effort'})
+        strict_keys(binding, required, {'capability','api','compat','output_token_parameter','thinking','reasoning_effort','engineering_counting'})
         unresolved += [f"{alias}.{key}" for key in required if binding[key] is None]
         for key in ('api','compat','output_token_parameter'):
             if binding.get(key) is None:unresolved.append(alias+'.'+key)
+        if binding.get('engineering_counting') not in (None,'deepseek-v41-text-v1'):raise DynamicError('request_counting_policy_unknown',alias)
         if binding.get('thinking') not in (None,'enabled','disabled'):raise DynamicError('invalid_thinking_mode',alias)
         if binding.get('reasoning_effort') not in (None,'high'):raise DynamicError('invalid_thinking_effort',alias)
         if alias=='gpt4o' and binding.get('thinking')=='enabled':raise DynamicError('invalid_thinking_mode','GPT4o cannot use DeepSeek thinking')

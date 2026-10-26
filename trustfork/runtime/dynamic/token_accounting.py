@@ -1,6 +1,6 @@
 """Network-free decoded-request estimates. No HTTP escaping or route inference."""
 from .common import canonical,digest,DynamicError
-VERSION='decoded-request-count-v1'
+VERSION='decoded-request-count-v2'
 def route_counting_policy(binding,*,counter=None):
  from .model_capabilities import binding_capability
  cap=binding_capability(binding);tokenizer=cap.get('tokenizer');route=digest({k:binding.get(k) for k in ('provider','base_url','model_id')})
@@ -23,7 +23,12 @@ def count_request(wire_payload,route_counting_policy):
   import json
   body=json.loads(body['body'])
  counts={'text':0,'reasoning':0,'tool_calls':0,'tool_results':0,'tools_schema':0,'response_format':0,'role_and_call_associations':0}
- def count(value):return counter(value if isinstance(value,str) else canonical(value).decode())
+ decoded_bytes=0
+ def count(value):
+  nonlocal decoded_bytes
+  text=value if isinstance(value,str) else canonical(value).decode()
+  decoded_bytes+=len(text.encode('utf-8'))
+  return counter(text)
  def content(value):
   if value is None:return 0
   if isinstance(value,str):return count(value)
@@ -49,10 +54,10 @@ def count_request(wire_payload,route_counting_policy):
  if body.get('tools'):counts['tools_schema']=count(body['tools'])
  if body.get('response_format'):counts['response_format']=count(body['response_format'])
  tokens=sum(counts.values());framing=p.get('framing_tokens')
- return {'version':VERSION,'input_tokens':tokens,'components':counts,'framing_tokens':framing,
+ return {'version':VERSION,'decoded_input_utf8_bytes':decoded_bytes,'service_prompt_tokens':None,'input_tokens':tokens,'components':counts,'framing_tokens':framing,
   'estimated_total_input_tokens':tokens+framing if framing is not None else None,
   'route_fingerprint':p.get('route_fingerprint'),'tokenizer':p.get('tokenizer'),'policy_source':p.get('source'),'policy_evidence_hash':p.get('evidence_hash'),
-  'policy_status':p.get('status','unknown'),'wire_serialization_is_input':False,'method':'UTF-8 byte estimate plus fixed engineering framing; additional margin applied at sender; not server token count' if p.get('status')=='estimated' else 'decoded text/tool/schema BPE estimate plus explicit role/call associations and separately evidenced route framing; not observed usage'}
+  'policy_status':p.get('status','unknown'),'wire_serialization_is_input':False,'method':'UTF-8 byte estimate plus fixed engineering framing; additional margin applied at sender; not server token count' if p.get('tokenizer',{}).get('id')=='utf8-byte-upper-estimate' else 'decoded text/tool/schema BPE estimate plus explicit role/call associations and separately evidenced route framing; not observed usage'}
 
 def engineering_counting_policy(binding):
  """Explicit byte estimate for declared-capacity engineering only, never verified."""
@@ -60,6 +65,40 @@ def engineering_counting_policy(binding):
  cap=binding_capability(binding)
  if cap['status'] not in ('declared','verified'):raise DynamicError('provider_capacity_unknown','Sourced declaration required')
  route=cap['route_fingerprint']
+ selected=binding.get('engineering_counting')
+ if selected is not None:
+  if selected!='deepseek-v41-text-v1':raise DynamicError('request_counting_policy_unknown',selected)
+  return deepseek_text_policy(binding,cap)
  return {'version':VERSION,'counter':lambda s:len(s.encode('utf-8')),
   'tokenizer':{'id':'utf8-byte-upper-estimate','version':'v1','count_method':'conservative-estimate','applicable_route':route},
   'framing_tokens':64,'route_fingerprint':route,'source':cap['source'],'evidence_hash':cap['evidence_hash'],'status':'estimated'}
+
+def deepseek_text_policy(binding,cap):
+ """Pinned official tokenizer; route-specific engineering estimate, never exact API usage."""
+ import os,importlib.metadata,hashlib
+ from pathlib import Path
+ from functools import lru_cache
+ from .common import read_json,config_dir,repo_root
+ spec=read_json(config_dir()/'tokenizers.v1.json')['deepseek-v41-text-v1']
+ if binding.get('provider')!=spec['provider'] or binding.get('base_url','').rstrip('/')!=spec['base_url'] or binding.get('model_id') not in spec['model_ids']:
+  raise DynamicError('counting_route_mismatch','Tokenizer is not registered for this exact provider route')
+ version=importlib.metadata.version(spec['library'])
+ if version!=spec['library_version']:raise DynamicError('tokenizer_version_mismatch','Pinned tokenizers library differs')
+ path=Path(os.environ.get('TRUSTFORK_DEEPSEEK_TOKENIZER',str(repo_root()/spec['cache_relative'])))
+ counter=_deepseek_counter(str(path.resolve()),spec['sha256'])
+ return {'version':VERSION,'counter':counter,'tokenizer':{'id':'deepseek-v41-text-v1','version':version,'sha256':spec['sha256'],
+    'count_method':'official-tokenizer-decoded-text-estimate','applicable_route':cap['route_fingerprint']},
+    'framing_tokens':spec['framing_tokens'],'route_fingerprint':cap['route_fingerprint'],
+    'source':spec['source'],'evidence_hash':digest(spec),'status':'estimated'}
+
+from functools import lru_cache
+@lru_cache(maxsize=2)
+def _deepseek_counter(path,expected_hash):
+ import hashlib
+ from pathlib import Path
+ from tokenizers import Tokenizer
+ p=Path(path)
+ if not p.is_file():raise DynamicError('offline_tokenizer_unavailable','Pinned DeepSeek tokenizer must be prepared locally')
+ if hashlib.sha256(p.read_bytes()).hexdigest()!=expected_hash:raise DynamicError('tokenizer_hash_mismatch','Pinned tokenizer data differs')
+ tokenizer=Tokenizer.from_file(str(p))
+ return lambda text:len(tokenizer.encode(text,add_special_tokens=False).ids)

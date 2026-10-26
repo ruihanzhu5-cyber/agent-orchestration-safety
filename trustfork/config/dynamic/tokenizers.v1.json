@@ -1,0 +1,23 @@
+{
+  "version": "engineering-tokenizers-v1",
+  "deepseek-v41-text-v1": {
+    "source": "https://raw.githubusercontent.com/deepseek-ai/deepseek-recipe/935817c66f5d6e64838f419692545f06787e485f/static/tokenizers/v41/tokenizer.json",
+    "source_revision": "935817c66f5d6e64838f419692545f06787e485f",
+    "sha256": "81f64d1248a68ce3663e07ab3ee48b851e5df0e32d27cb98e4c9a268151e8d99",
+    "bytes": 6367247,
+    "library": "tokenizers",
+    "library_version": "0.23.3",
+    "retrieved_at": "2026-10-26",
+    "applicability": "Official V4.1 text tokenizer estimate; API framing/conversion and physical served snapshot remain unverified",
+    "provider": "deepseek",
+    "base_url": "https://api.deepseek.com",
+    "model_ids": [
+      "deepseek-v4-flash",
+      "deepseek-flash"
+    ],
+    "cache_relative": "build/dynamic/tokenizers/deepseek-v41/tokenizer.json",
+    "framing_tokens": 64,
+    "margin": "max(2048,ceil(0.10*estimated_input))",
+    "status": "estimated"
+  }
+}

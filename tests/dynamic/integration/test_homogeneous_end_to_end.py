@@ -63,7 +63,8 @@ def test_two_homogeneous_teams_history_t3_judge_and_rescore(tmp_path,team,case,m
  summary=score_run(path,mode='test-fixtures');assert 'IAS' not in summary['scores'] and 'CAR' not in summary['scores']
  replies=judge_replies(run,events);scorer={'scoring_profile':'dynamic-homogeneous-v2','temperature':0,'response_output_budget_tokens':256,'trajectory_output_budget_tokens':512,'trajectory_representation':'trajectory-lossless-v1'}
  failed=copy.deepcopy(replies);failed['trajectory']['body']=json.dumps({'choices':[{'finish_reason':'length','message':{'content':'{}'}}]})
- with pytest.raises(DynamicError,match='judge_incomplete_output'):run_judge_attempt(path,tmp_path/'judge-failed',config,mode='mock',scorer_config=scorer,mock_replies=failed)
+ failed_result=run_judge_attempt(path,tmp_path/'judge-failed',config,mode='mock',scorer_config=scorer,mock_replies=failed)
+ assert failed_result['pass_states']['response']['status']=='completed' and failed_result['pass_states']['trajectory']['status']=='failed'
  assert (tmp_path/'judge-failed/response-result.json').exists() and (tmp_path/'judge-failed/trajectory-error.json').exists()
  run_judge_attempt(path,tmp_path/'judge-retry',config,mode='mock',scorer_config=scorer,mock_replies={'trajectory':replies['trajectory']},passes=('trajectory',),prior_attempt=tmp_path/'judge-failed')
  journal=[json.loads(x) for x in (tmp_path/'judge-retry/judge-requests.jsonl').read_text().splitlines()]
@@ -78,17 +79,18 @@ def test_two_homogeneous_teams_history_t3_judge_and_rescore(tmp_path,team,case,m
   previous=read_json(path.parent/'scoring/trajectory_input.json');target=copy.deepcopy(previous['data']);target['view']='synthetic-derived-view-v3';target['fixture_annotation_scope']='explicit migration only'
   target['_sanitizer']['sanitized_view_hash']=digest({k:v for k,v in target.items() if k!='_sanitizer'})
   run_judge_attempt(path,tmp_path/'judge-migration',config,mode='mock',scorer_config=scorer,mock_replies=replies,trajectory_view_override=target)
-  migration={'old_view_version':previous['data']['view'],'new_view_version':target['view'],'old_view_hash':previous['content_hash'],'new_view_hash':digest(target),'builder_version':'judge-bundle-v4','reason':'Synthetic derived-view extension; raw evidence unchanged','field_mapping':{'trajectory':'unchanged','fixture_annotation_scope':'synthetic new derived field'},'raw_evidence_hash':digest(frozen_identity(path))}
+  migration={'old_view_version':previous['data']['view'],'new_view_version':target['view'],'old_view_hash':previous['content_hash'],'new_view_hash':digest(target),'builder_version':__import__('trustfork.scoring.judge_request',fromlist=['BUNDLE_VERSION']).BUNDLE_VERSION,'reason':'Synthetic derived-view extension; raw evidence unchanged','field_mapping':{'trajectory':'unchanged','fixture_annotation_scope':'synthetic new derived field'},'raw_evidence_hash':digest(frozen_identity(path))}
   monkeypatch.setattr(pipeline,'trajectory_judge_view',lambda *a,**k:copy.deepcopy(target))
   migrated=rescore_contract(path,reason='Explicit synthetic view migration',annotation_policy='new',new_annotations=tmp_path/'judge-migration/scoring_annotations.json',view_migration=migration)
   score_run(path,mode='test-fixtures',rescore=migrated)
   assert read_json(path.parent/'scoring/trajectory_input.json')['content_hash']==digest(target)
  assert all(file_hash(path.parent/p)==h for p,h in raw.items())
  blocked={**scorer,'trajectory_output_budget_tokens':None}
- with pytest.raises(DynamicError,match='capacity_unknown'):run_judge_attempt(path,tmp_path/'judge-preflight-blocked',config,mode='mock',scorer_config=blocked,mock_replies=replies)
- assert not (tmp_path/'judge-preflight-blocked/judge-requests.jsonl').exists()
- with pytest.raises(DynamicError,match='judge_request_budget_blocked'):run_judge_attempt(path,tmp_path/'judge-ceiling-blocked',config,mode='mock',scorer_config=scorer,mock_replies=replies,max_requests=1)
- assert not (tmp_path/'judge-ceiling-blocked/judge-requests.jsonl').exists()
+ partial=run_judge_attempt(path,tmp_path/'judge-preflight-blocked',config,mode='mock',scorer_config=blocked,mock_replies=replies)
+ assert partial['pass_states']['trajectory']['status']=='blocked' and partial['pass_states']['response']['status']=='completed'
+ assert (tmp_path/'judge-preflight-blocked/response-result.json').exists()
+ limited=run_judge_attempt(path,tmp_path/'judge-ceiling-blocked',config,mode='mock',scorer_config=scorer,mock_replies=replies,max_requests=1)
+ assert limited['judge_attempts']==1 and limited['pass_states']['response']['status']=='completed' and limited['pass_states']['trajectory']['status']=='blocked'
 
 def test_early_prefix_shared_s_f_repeat_and_late_derivation(tmp_path):
  source=PiDynamic('p001',tmp_path/'source',team_model='gpt4o');scripts=ScriptSource(branch_scripts('p001',protocol='L',peer=True))

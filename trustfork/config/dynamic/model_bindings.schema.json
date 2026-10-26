@@ -205,6 +205,12 @@
                 "high",
                 null
               ]
+            },
+            "engineering_counting": {
+              "enum": [
+                null,
+                "deepseek-v41-text-v1"
+              ]
             }
           }
         },
@@ -381,6 +387,12 @@
               "enum": [
                 "high",
                 null
+              ]
+            },
+            "engineering_counting": {
+              "enum": [
+                null,
+                "deepseek-v41-text-v1"
               ]
             }
           }

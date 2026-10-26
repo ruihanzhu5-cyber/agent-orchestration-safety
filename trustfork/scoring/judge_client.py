@@ -71,7 +71,7 @@ def prepared_evidence_index(prepared):
     if prepared.get('pass_name')!='trajectory' or prepared.get('scoring_profile')!='dynamic-homogeneous-v2':return None
     from .trajectory_codec import decode_trajectory
     view=json.loads(prepared['wire_payload']['messages'][1]['content'])
-    if prepared['representation']=='trajectory-lossless-v1':view=decode_trajectory(view)
+    if prepared['representation'] in ('trajectory-lossless-v1','trajectory-lossless-v2'):view=decode_trajectory(view)
     return view['trajectory_view']['evidence_index']
 
 
@@ -145,7 +145,7 @@ class JudgeClient:
         except DynamicError as error:
             if error.code not in structural:raise
             first_error=error.record()
-        # Keep prior invalid score bounded; the original frozen task evidence remains untouched.
+        # Keep the complete invalid answer and its own reasoning; frozen evidence is unchanged.
         content='';reasoning=''
         for line in self.transport.journal.read_text().splitlines():
             row=json.loads(line)
@@ -156,7 +156,7 @@ class JudgeClient:
                 except (ValueError,KeyError,IndexError,TypeError):content=''
         fixed=deepcopy(prepared)
         binding=self.transport.config['logical_bindings'][self.transport.config['judge_binding']]
-        previous_message={'role':'assistant','content':content[:4096]}
+        previous_message={'role':'assistant','content':content}
         if binding.get('thinking')=='enabled':previous_message['reasoning_content']=reasoning
         fixed['request']['messages'] += [previous_message,
             {'role':'user','content':'Repair the previous scoring JSON structure and evidence references using exactly the same frozen evidence and supplied schema. Do not infer missing observations. Return only complete JSON. Validation error: '+first_error['code']}]
@@ -169,5 +169,10 @@ class JudgeClient:
         fixed['behavior_run_id']=prepared.get('behavior_run_id','frozen-judge-pass')
         append_jsonl(self.transport.journal.with_name('judge-structure-repairs.jsonl'),
             {'first_request_id':request_id,'repair_request_id':request_id+'.repair1','first_error':first_error,'prepared':fixed,
-             'frozen_representation_hash':prepared['representation_hash'],'previous_invalid_score_char_limit':4096})
+             'frozen_representation_hash':prepared['representation_hash'],'previous_invalid_score_char_limit':None,'previous_invalid_score_characters':len(content)})
+        try:self.preflight(fixed)
+        except DynamicError as error:
+            if error.code in ('judge_input_overflow','capacity_blocked','capacity_unknown'):
+                raise DynamicError('repair_input_overflow','Complete previous answer and frozen evidence do not fit; no truncated repair') from error
+            raise
         return {**self.send(fixed,request_id=request_id+'.repair1',**kwargs),'structure_attempts':2,'first_error':first_error,'original_request_hash':prepared['request_hash']}
