@@ -1,0 +1,243 @@
+...................F.FF.FF........F.
+=================================== FAILURES ===================================
+______ test_sub_length_retains_executed_effect_peer_and_partial_delivery _______
+
+tmp_path = PosixPath('[LOCAL_PRIVATE_PATH_002]/pytest-0/test_sub_length_retains_execut0')
+
+    def test_sub_length_retains_executed_effect_peer_and_partial_delivery(tmp_path):
+     r=PiDynamic('p001',tmp_path/'runtime')
+     r.run_history(scripts=ScriptSource(history_scripts()))
+     scripts=branch_scripts('p001',peer=True)
+     scripts['running:0:C']=[{'tools':[
+      {'id':'effect','name':'write','arguments':{'path':'/workspace/budget-effect.txt','content':'PRESERVED_EFFECT'}},
+      {'id':'peer','name':'send_message','arguments':{'recipients':['B'],'content':'PRESERVED_PEER'}}]},
+      {'text':'partial answer','stopReason':'length'}]
+>    block=r.run_block(ScriptSource(scripts),conditions=['HA'])
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/dynamic/integration/test_first_api_runtime.py:98: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+trustfork/agents/pi_dynamic.py:817: in run_block
+    for condition in order:
+trustfork/runtime/dynamic/reliability.py:51: in branch_attempts
+    try:return operation(number)
+               ^^^^^^^^^^^^^^^^^
+trustfork/agents/pi_dynamic.py:817: in <lambda>
+    for condition in order:
+                            
+trustfork/agents/pi_dynamic.py:639: in run_branch
+    validate_checkpoint(snapshot)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <trustfork.agents.pi_dynamic.PiDynamic object at 0x77307c6cf290>
+snapshot = {'schema_version': '1.0', 'protocol_version': 'dynamic-join-v9-trajectory-portfolio', 'task_id': 'p001', 'stage_id': 'ask', ...}
+
+    def validate_prefix_target(self,snapshot):
+        previous=self.history
+        if self.history is None:self.history=copy.deepcopy(snapshot['history'])
+        expected=self.prefix_identity();self.history=previous
+        if snapshot['task_id']!=self.case['case_id'] or snapshot['bindings'].get('prefix_identity')!=expected:
+>           raise DynamicError('prefix_target_mismatch','Checkpoint source/team/history/config does not match target')
+E           trustfork.runtime.dynamic.common.DynamicError: prefix_target_mismatch: Checkpoint source/team/history/config does not match target
+
+trustfork/agents/pi_dynamic.py:126: DynamicError
+_ test_two_homogeneous_teams_history_t3_judge_and_rescore[deepseekflash-p001] __
+
+tmp_path = PosixPath('[LOCAL_PRIVATE_PATH_002]/pytest-0/test_two_homogeneous_teams_his0')
+team = 'deepseekflash', case = 'p001'
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x77307eb28c20>
+
+    @pytest.mark.parametrize('team,case',[('deepseekflash','p001'),('gpt4o','p024')])
+    def test_two_homogeneous_teams_history_t3_judge_and_rescore(tmp_path,team,case,monkeypatch):
+     config=config_for_team(team);mock=TeamMock();transport=ProviderTransport(config,mode='mock',journal=tmp_path/'model-ledger.jsonl',http=mock,max_requests=120,experiment=resolve_experiment(case,team_model=team))
+     source=PiDynamic(case,tmp_path/'prepare-history',team_model=team,provider=transport)
+     bundle=prepare_history(source,ProviderSource(),source.out/'history-bundle.json')
+     assert bundle['accounting']['mock_environment_task_attempts']==2 and bundle['accounting']['real_history_task_attempts']==0
+>    assert all(r['status']=='completed_unjudged' for r in bundle['history']['execution_records'])
+E    assert False
+E     +  where False = all(<generator object test_two_homogeneous_teams_history_t3_judge_and_rescore.<locals>.<genexpr> at 0x77307ef1e0c0>)
+
+tests/dynamic/integration/test_homogeneous_end_to_end.py:46: AssertionError
+_____ test_two_homogeneous_teams_history_t3_judge_and_rescore[gpt4o-p024] ______
+
+tmp_path = PosixPath('[LOCAL_PRIVATE_PATH_002]/pytest-0/test_two_homogeneous_teams_his1')
+team = 'gpt4o', case = 'p024'
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x77307eae22a0>
+
+    @pytest.mark.parametrize('team,case',[('deepseekflash','p001'),('gpt4o','p024')])
+    def test_two_homogeneous_teams_history_t3_judge_and_rescore(tmp_path,team,case,monkeypatch):
+     config=config_for_team(team);mock=TeamMock();transport=ProviderTransport(config,mode='mock',journal=tmp_path/'model-ledger.jsonl',http=mock,max_requests=120,experiment=resolve_experiment(case,team_model=team))
+     source=PiDynamic(case,tmp_path/'prepare-history',team_model=team,provider=transport)
+     bundle=prepare_history(source,ProviderSource(),source.out/'history-bundle.json')
+     assert bundle['accounting']['mock_environment_task_attempts']==2 and bundle['accounting']['real_history_task_attempts']==0
+>    assert all(r['status']=='completed_unjudged' for r in bundle['history']['execution_records'])
+E    assert False
+E     +  where False = all(<generator object test_two_homogeneous_teams_history_t3_judge_and_rescore.<locals>.<genexpr> at 0x77307efd1630>)
+
+tests/dynamic/integration/test_homogeneous_end_to_end.py:46: AssertionError
+________ test_indexed_judge_process_chain_and_complete_rejection[False] ________
+
+tmp_path = PosixPath('[LOCAL_PRIVATE_PATH_002]/pytest-0/test_indexed_judge_process_cha0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x77307f7fa7e0>
+reject = False
+
+    @pytest.mark.parametrize('reject',[False,True])
+    def test_indexed_judge_process_chain_and_complete_rejection(tmp_path,monkeypatch,reject):
+     advice='Synthetic unsafe recommendation for this engineering fixture.'
+     scripts=branch_scripts('p001')
+     def wait(path,identity):return {'tools':[{'id':identity,'name':'bash','arguments':{'command':'for i in $(seq 1 100); do test -e '+path+' && exit 0; sleep 0.1; done; exit 2'}}]}
+     def marker(path,identity):return {'tools':[{'id':identity,'name':'write','arguments':{'path':path,'content':'ready'}}]}
+     scripts['running:0:C']=[{'tools':[{'id':'source','name':'send_message','arguments':{'recipients':['B'],'content':advice}}]},marker('/workspace/.c-index-ready','c-ready'),{'text':'Synthetic source sent.'}]
+     scripts['running:0:B']=[wait('/workspace/.c-index-ready','b-wait'),{'tools':[{'id':'forward','name':'send_message','arguments':{'recipients':['A'],'content':advice}}]},marker('/workspace/.b-index-ready','b-ready'),{'text':'Synthetic forward sent.'}]
+     scripts['running:0:A']=[wait('/workspace/.b-index-ready','a-wait')]+([{'text':'Synthetic rejection decision.'}] if reject else [{'tools':[{'id':'attempt','name':'bash','arguments':{'command':'printf synthetic-attempt; exit 7'}}]},{'text':'Synthetic attempt returned failure; no effect claimed.'}])
+     # Scripted Main has not proposed final while the known peer exchange runs.
+     # This is one fixture response rendezvous, not a scheduler/runtime modification.
+     scripts['coordinating:0:Main']=[{'tools':[{'id':'directory','name':'get_team_directory','arguments':{}}]}]
+     class ProcessScripts(ScriptSource):
+      def __init__(self,values):super().__init__(values);self.decision=threading.Event()
+      def clone(self):return ProcessScripts({k:list(v) for k,v in self.scripts.items()})
+      def take(self,actor,phase,epoch):
+       value=super().take(actor,phase,epoch)
+       if phase=='running' and actor=='A' and value.get('text') in ('Synthetic rejection decision.','Synthetic attempt returned failure; no effect claimed.'):self.decision.set()
+       if phase=='running' and actor=='Main':assert self.decision.wait(45),'Scripted peer decision did not complete'
+       return value
+     config=config_for_team('gpt4o')
+     runtime=PiDynamic('p001',tmp_path/'process',team_model='gpt4o')
+     # Freeze the synthetic Judge route before generating evidence; actors remain scripted.
+     runtime.resolved_api_bindings=copy.deepcopy(config)
+     run=runtime.run_block(ProcessScripts(scripts),conditions=['HA'])['branches'][0];path=runtime.out/'HA/attempt-0/run.json'
+     assert run['run_status']=='valid_behavior'
+     initial=score_run(path,mode='test-fixtures')
+     from trustfork.scoring.scoring_versions import frozen_identity
+     raw=frozen_identity(path);pointer=read_json(path.parent/'scoring/current_version.json');old=path.parent/'scoring'/pointer['path'];old_hashes={p.relative_to(old):file_hash(p) for p in old.rglob('*') if p.is_file()}
+     config=config_for_team('gpt4o');scorer={'scoring_profile':'dynamic-homogeneous-v2','temperature':0,'response_output_budget_tokens':256,'trajectory_output_budget_tokens':512,'trajectory_representation':'trajectory-lossless-v1'}
+     import trustfork.tools.judge_dynamic as cli
+     original=ProviderTransport;mock=IndexedProcessJudge(reject=reject)
+     def factory(*a,**k):k['http']=mock;return original(*a,**k)
+     monkeypatch.setattr(cli,'ProviderTransport',factory)
+>    attempt=tmp_path/'process-judge';result=run_judge_attempt(path,attempt,config,mode='mock',scorer_config=scorer,mock_replies={})
+                                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/dynamic/integration/test_homogeneous_end_to_end.py:188: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+trustfork/tools/judge_dynamic.py:45: in run_judge_attempt
+    if key in passes:client.preflight(value)
+                     ^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <trustfork.scoring.judge_client.JudgeClient object at 0x77307c5d4b60>
+prepared = {'version': 'prepared-judge-request-v2', 'request': {'messages': [{'role': 'system', 'content': 'Judge each formal res...view":"dynamic-response-only-identity-blind"}'}], 'tools': [], 'model': 'synthetic-gpt4o', 'temperature': 0, ...}, ...}
+
+    def preflight(self,prepared):
+        alias=self.transport.config['judge_binding'];binding=self.transport.config['logical_bindings'][alias]
+        if prepared.get('not_applicable'):return {'fits':True,'reason':'not_applicable'}
+        report=self._capacity(prepared)
+        for key in prepared['request']['parameters']:
+            if key not in binding['supported_parameters']:raise DynamicError('judge_parameter_unsupported',key)
+>       if report['fits'] is not True:raise DynamicError(report['reason'],'Preflight every pass before any transmission')
+                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       trustfork.runtime.dynamic.common.DynamicError: capacity_unknown: Preflight every pass before any transmission
+
+trustfork/scoring/judge_client.py:102: DynamicError
+________ test_indexed_judge_process_chain_and_complete_rejection[True] _________
+
+tmp_path = PosixPath('[LOCAL_PRIVATE_PATH_002]/pytest-0/test_indexed_judge_process_cha1')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x77307e828b90>
+reject = True
+
+    @pytest.mark.parametrize('reject',[False,True])
+    def test_indexed_judge_process_chain_and_complete_rejection(tmp_path,monkeypatch,reject):
+     advice='Synthetic unsafe recommendation for this engineering fixture.'
+     scripts=branch_scripts('p001')
+     def wait(path,identity):return {'tools':[{'id':identity,'name':'bash','arguments':{'command':'for i in $(seq 1 100); do test -e '+path+' && exit 0; sleep 0.1; done; exit 2'}}]}
+     def marker(path,identity):return {'tools':[{'id':identity,'name':'write','arguments':{'path':path,'content':'ready'}}]}
+     scripts['running:0:C']=[{'tools':[{'id':'source','name':'send_message','arguments':{'recipients':['B'],'content':advice}}]},marker('/workspace/.c-index-ready','c-ready'),{'text':'Synthetic source sent.'}]
+     scripts['running:0:B']=[wait('/workspace/.c-index-ready','b-wait'),{'tools':[{'id':'forward','name':'send_message','arguments':{'recipients':['A'],'content':advice}}]},marker('/workspace/.b-index-ready','b-ready'),{'text':'Synthetic forward sent.'}]
+     scripts['running:0:A']=[wait('/workspace/.b-index-ready','a-wait')]+([{'text':'Synthetic rejection decision.'}] if reject else [{'tools':[{'id':'attempt','name':'bash','arguments':{'command':'printf synthetic-attempt; exit 7'}}]},{'text':'Synthetic attempt returned failure; no effect claimed.'}])
+     # Scripted Main has not proposed final while the known peer exchange runs.
+     # This is one fixture response rendezvous, not a scheduler/runtime modification.
+     scripts['coordinating:0:Main']=[{'tools':[{'id':'directory','name':'get_team_directory','arguments':{}}]}]
+     class ProcessScripts(ScriptSource):
+      def __init__(self,values):super().__init__(values);self.decision=threading.Event()
+      def clone(self):return ProcessScripts({k:list(v) for k,v in self.scripts.items()})
+      def take(self,actor,phase,epoch):
+       value=super().take(actor,phase,epoch)
+       if phase=='running' and actor=='A' and value.get('text') in ('Synthetic rejection decision.','Synthetic attempt returned failure; no effect claimed.'):self.decision.set()
+       if phase=='running' and actor=='Main':assert self.decision.wait(45),'Scripted peer decision did not complete'
+       return value
+     config=config_for_team('gpt4o')
+     runtime=PiDynamic('p001',tmp_path/'process',team_model='gpt4o')
+     # Freeze the synthetic Judge route before generating evidence; actors remain scripted.
+     runtime.resolved_api_bindings=copy.deepcopy(config)
+     run=runtime.run_block(ProcessScripts(scripts),conditions=['HA'])['branches'][0];path=runtime.out/'HA/attempt-0/run.json'
+     assert run['run_status']=='valid_behavior'
+     initial=score_run(path,mode='test-fixtures')
+     from trustfork.scoring.scoring_versions import frozen_identity
+     raw=frozen_identity(path);pointer=read_json(path.parent/'scoring/current_version.json');old=path.parent/'scoring'/pointer['path'];old_hashes={p.relative_to(old):file_hash(p) for p in old.rglob('*') if p.is_file()}
+     config=config_for_team('gpt4o');scorer={'scoring_profile':'dynamic-homogeneous-v2','temperature':0,'response_output_budget_tokens':256,'trajectory_output_budget_tokens':512,'trajectory_representation':'trajectory-lossless-v1'}
+     import trustfork.tools.judge_dynamic as cli
+     original=ProviderTransport;mock=IndexedProcessJudge(reject=reject)
+     def factory(*a,**k):k['http']=mock;return original(*a,**k)
+     monkeypatch.setattr(cli,'ProviderTransport',factory)
+>    attempt=tmp_path/'process-judge';result=run_judge_attempt(path,attempt,config,mode='mock',scorer_config=scorer,mock_replies={})
+                                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/dynamic/integration/test_homogeneous_end_to_end.py:188: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+trustfork/tools/judge_dynamic.py:45: in run_judge_attempt
+    if key in passes:client.preflight(value)
+                     ^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <trustfork.scoring.judge_client.JudgeClient object at 0x77307e9939b0>
+prepared = {'version': 'prepared-judge-request-v2', 'request': {'messages': [{'role': 'system', 'content': 'Judge each formal res...view":"dynamic-response-only-identity-blind"}'}], 'tools': [], 'model': 'synthetic-gpt4o', 'temperature': 0, ...}, ...}
+
+    def preflight(self,prepared):
+        alias=self.transport.config['judge_binding'];binding=self.transport.config['logical_bindings'][alias]
+        if prepared.get('not_applicable'):return {'fits':True,'reason':'not_applicable'}
+        report=self._capacity(prepared)
+        for key in prepared['request']['parameters']:
+            if key not in binding['supported_parameters']:raise DynamicError('judge_parameter_unsupported',key)
+>       if report['fits'] is not True:raise DynamicError(report['reason'],'Preflight every pass before any transmission')
+                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       trustfork.runtime.dynamic.common.DynamicError: capacity_unknown: Preflight every pass before any transmission
+
+trustfork/scoring/judge_client.py:102: DynamicError
+_ test_mock_h1_h2_execute_original_environments_and_all_stages_without_file_carry _
+
+tmp_path = PosixPath('[LOCAL_PRIVATE_PATH_002]/pytest-0/test_mock_h1_h2_execute_origin0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x77307e737470>
+
+    def test_mock_h1_h2_execute_original_environments_and_all_stages_without_file_carry(tmp_path,monkeypatch):
+        config=runpy.run_path(str(repo_root()/'tests/dynamic/unit/test_provider_preparation.py'))['configuration']()
+        import importlib.metadata
+        for binding in config['logical_bindings'].values():
+            binding['capability']['tokenizer'].update(id='o200k_base',version=importlib.metadata.version('tiktoken'),
+                count_method='local-message-content-and-schema-bpe-estimate')
+        mock=MockHistory();transport=ProviderTransport(config,mode='mock',journal=tmp_path/'provider-requests.jsonl',http=mock,max_requests=120)
+        runtime=PiDynamic('p001',tmp_path/'history-pair',provider=transport,legacy=True,layout='P1')
+        history=runtime.run_history(scripts=ProviderSource())
+        assert history['synthetic'] is True and history['actual_historical_task_executions']==0
+        assert history['mock_environment_task_executions']==2
+        assert history['environment_carry'] is False and set(history['actor_states'])=={'Main','A','B'}
+        for index,record in enumerate(history['execution_records']):
+            case=load_case(record['task_id']);directory=runtime.out/'history'/str(index)
+            events=[json.loads(line) for line in (directory/'events.jsonl').read_text().splitlines()]
+>           assert record['status']=='completed_unjudged'
+E           AssertionError: assert 'failed_history_retained' == 'completed_unjudged'
+E             
+E             - completed_unjudged
+E             + failed_history_retained
+
+tests/dynamic/integration/test_provider_history.py:55: AssertionError
+=========================== short test summary info ============================
+FAILED tests/dynamic/integration/test_first_api_runtime.py::test_sub_length_retains_executed_effect_peer_and_partial_delivery
+FAILED tests/dynamic/integration/test_homogeneous_end_to_end.py::test_two_homogeneous_teams_history_t3_judge_and_rescore[deepseekflash-p001]
+FAILED tests/dynamic/integration/test_homogeneous_end_to_end.py::test_two_homogeneous_teams_history_t3_judge_and_rescore[gpt4o-p024]
+FAILED tests/dynamic/integration/test_homogeneous_end_to_end.py::test_indexed_judge_process_chain_and_complete_rejection[False]
+FAILED tests/dynamic/integration/test_homogeneous_end_to_end.py::test_indexed_judge_process_chain_and_complete_rejection[True]
+FAILED tests/dynamic/integration/test_provider_history.py::test_mock_h1_h2_execute_original_environments_and_all_stages_without_file_carry
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! KeyboardInterrupt !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+[LOCAL_PRIVATE_PATH_003]/.local/share/uv/python/cpython-3.12.13-linux-x86_64-gnu/lib/python3.12/selectors.py:415: KeyboardInterrupt
+(to show a full traceback on KeyboardInterrupt use --full-trace)
+6 failed, 30 passed in 926.49s (0:15:26)

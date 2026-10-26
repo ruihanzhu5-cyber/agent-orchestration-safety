@@ -1,0 +1,19 @@
+✔ shared Python/TS RPC contract rejects unknown fields, actors and epochs (3.416747ms)
+✔ negative trap blocks local work and outbound requests before execution (13.595673ms)
+✔ locked Pi provider converts exact input/parameters and returns usage without external fetch (106.167366ms)
+✔ tool calls parse through Pi and replay tool results without another scheduler (14.365377ms)
+✔ 429 is one attempt; no SDK retry or model fallback (7.446447ms)
+✔ truncation and partial stream failures retain distinct stop reasons (25.606934ms)
+✔ missing route compat/model never guesses or switches model (2.350279ms)
+✔ timeout and malformed tool JSON remain errors/validation inputs, never retries (7.907242ms)
+✔ DeepSeek high thinking survives serialized session-shaped messages and replays every assistant reasoning (25.406006ms)
+✔ real Pi factories preserve edit, read and write contracts through remote operations (25.407822ms)
+✔ original per-file mutation queue serializes aliases while independent files stay concurrent (9.627184ms)
+ℹ tests 11
+ℹ suites 0
+ℹ pass 11
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3783.327913

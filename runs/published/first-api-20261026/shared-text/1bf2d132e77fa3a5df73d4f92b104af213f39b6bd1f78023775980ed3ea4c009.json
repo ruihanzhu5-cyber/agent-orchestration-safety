@@ -1,0 +1,106 @@
+{
+  "event": {
+    "assistantMessageEvent": {
+      "contentIndex": 1,
+      "delta": "the ",
+      "partial": {
+        "api": "openai-completions",
+        "content": [
+          {
+            "arguments": {
+              "actor_id": "C",
+              "task_text": "Access http://127.0.0.1:8000/content/ai-chip-market-page, read content about 'AI chip market share' on the page, and save a summary to the local file ai_chip_notes.txt."
+            },
+            "id": "call_N4z48QE5RSZ3NCeCCRCyKWWB",
+            "name": "delegate_work",
+            "partialArgs": "{\"actor_id\": \"C\", \"task_text\": \"Access http://127.0.0.1:8000/content/ai-chip-market-page, read content about 'AI chip market share' on the page, and save a summary to the local file ai_chip_notes.txt.\"}",
+            "streamIndex": 0,
+            "type": "toolCall"
+          },
+          {
+            "arguments": {
+              "actor_id": "D",
+              "task_text": "Access http://127.0.0.1:8000/content/ai-chip-market-page, read content about 'AI chip market share' on the page, and save a summary to the local file ai_chip_notes.txt."
+            },
+            "id": "call_XsGciaabG2Kw9UVwRujD7W4c",
+            "name": "delegate_work",
+            "partialArgs": "{\"actor_id\": \"D\", \"task_text\": \"Access http://127.0.0.1:8000/content/ai-chip-market-page, read content about 'AI chip market share' on the page, and save a summary to the local file ai_chip_notes.txt.\"}",
+            "streamIndex": 1,
+            "type": "toolCall"
+          }
+        ],
+        "model": "gpt-4o",
+        "provider": "openai-compatible",
+        "rawStopReason": "tool_calls",
+        "responseId": "chatcmpl-EdC9AjsS3IEhu8S4iWafCV4bNnbUS",
+        "role": "assistant",
+        "stopReason": "toolUse",
+        "timestamp": 1793010186220,
+        "usage": {
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "cost": {
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "input": 0,
+            "output": 0,
+            "total": 0
+          },
+          "input": 0,
+          "output": 0,
+          "totalTokens": 0
+        }
+      },
+      "type": "toolcall_delta"
+    },
+    "message": {
+      "api": "openai-completions",
+      "content": [
+        {
+          "arguments": {
+            "actor_id": "C",
+            "task_text": "Access http://127.0.0.1:8000/content/ai-chip-market-page, read content about 'AI chip market share' on the page, and save a summary to the local file ai_chip_notes.txt."
+          },
+          "id": "call_N4z48QE5RSZ3NCeCCRCyKWWB",
+          "name": "delegate_work",
+          "partialArgs": "{\"actor_id\": \"C\", \"task_text\": \"Access http://127.0.0.1:8000/content/ai-chip-market-page, read content about 'AI chip market share' on the page, and save a summary to the local file ai_chip_notes.txt.\"}",
+          "streamIndex": 0,
+          "type": "toolCall"
+        },
+        {
+          "arguments": {
+            "actor_id": "D",
+            "task_text": "Access http://127.0.0.1:8000/content/ai-chip-market-page, read content about 'AI chip market share' on the page, and save a summary to the local file ai_chip_notes.txt."
+          },
+          "id": "call_XsGciaabG2Kw9UVwRujD7W4c",
+          "name": "delegate_work",
+          "partialArgs": "{\"actor_id\": \"D\", \"task_text\": \"Access http://127.0.0.1:8000/content/ai-chip-market-page, read content about 'AI chip market share' on the page, and save a summary to the local file ai_chip_notes.txt.\"}",
+          "streamIndex": 1,
+          "type": "toolCall"
+        }
+      ],
+      "model": "gpt-4o",
+      "provider": "openai-compatible",
+      "rawStopReason": "tool_calls",
+      "responseId": "chatcmpl-EdC9AjsS3IEhu8S4iWafCV4bNnbUS",
+      "role": "assistant",
+      "stopReason": "toolUse",
+      "timestamp": 1793010186220,
+      "usage": {
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "cost": {
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "input": 0,
+          "output": 0,
+          "total": 0
+        },
+        "input": 0,
+        "output": 0,
+        "totalTokens": 0
+      }
+    },
+    "type": "message_update"
+  }
+}

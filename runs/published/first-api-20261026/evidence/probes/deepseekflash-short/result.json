@@ -1,0 +1,1 @@
+{"content_nonempty":true,"finish_reason":"stop","http_status":200,"reasoning_present":false,"status":"passed","usage":{"completion_tokens":2,"completion_tokens_details":{"reasoning_tokens":0},"prompt_cache_hit_tokens":0,"prompt_cache_miss_tokens":35,"prompt_tokens":35,"prompt_tokens_details":{"cached_tokens":0},"total_tokens":37}}

@@ -1,0 +1,5 @@
+{"cwd":"/workspace","id":"01a177b9-402c-75e5-8b06-69bda0f823e7","timestamp":"2026-10-26T10:19:51.724Z","type":"session","version":3}
+{"id":"2bd78c57","modelId":"deepseek-v4-flash","parentId":null,"provider":"deepseek","timestamp":"2026-10-26T10:19:51.730Z","type":"model_change"}
+{"id":"8c9dfa51","parentId":"2bd78c57","thinkingLevel":"high","timestamp":"2026-10-26T10:19:51.730Z","type":"thinking_level_change"}
+{"id":"5724ae94","modelId":"deepseek-v4-flash","parentId":"8c9dfa51","provider":"deepseek","timestamp":"2026-10-26T10:20:28.921Z","type":"model_change"}
+{"id":"1062e28c","parentId":"5724ae94","thinkingLevel":"high","timestamp":"2026-10-26T10:20:28.922Z","type":"thinking_level_change"}

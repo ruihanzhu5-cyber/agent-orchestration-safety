@@ -1,0 +1,42 @@
+........................................................................ [ 27%]
+........................................................................ [ 55%]
+.............................F.......................................... [ 83%]
+..........................................                               [100%]
+=================================== FAILURES ===================================
+____________ test_plan_outcomes_and_history_indexes_are_review_only ____________
+
+tmp_path = PosixPath('[LOCAL_PRIVATE_PATH_002]/pytest-0/test_plan_outcomes_and_history0')
+
+    def test_plan_outcomes_and_history_indexes_are_review_only(tmp_path):
+     root=setup(tmp_path)
+     original=(root/'plan.jsonl').read_bytes()
+     atomic_json(root/'results.json',{'plan_results':[{'plan_id':'p','status':'not_started','unknown_reason':'prefix_invalid'}]})
+     (root/'plan.jsonl').write_text(json.dumps({'plan_id':'p','kind':'t3','status':'planned','case_id':'p001','team_model':'deepseekflash','protocol':'S','condition':'HP'})+'\n')
+     declared=(root/'plan.jsonl').read_bytes()
+     d=root/'history/gpt4o/history/0';d.mkdir(parents=True)
+     atomic_json(d/'history-execution.json',{'history_id':'h1','task_id':'p002','status':'failed_history_retained','initial_state':None,'frozen_state':None})
+     (d/'events.jsonl').write_text(json.dumps({'branch_id':'h','event_id':'e1','sequence':1,'event_type':'history_execution_failed','payload':{'code':'fixture'}})+'\n')
+>    out=tmp_path/'out';export_campaign(root,out)
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/dynamic/unit/test_review_export.py:100: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+trustfork/runtime/dynamic/review_export.py:186: in export_campaign
+    team=rel.parts[1] if len(rel.parts)>1 and rel.parts[1] in ('gpt4o','deepseekflash') else None
+                                                                                                  
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+rel = PosixPath('history/gpt4o/history/0/history-execution.json')
+
+    def mapped(rel):
+     rel=Path(rel).as_posix()
+     path=source/rel
+     for p,run,prefix in runs:
+>     if path.parent==p.parent or p.parent in path.parents:return prefix+'/'+path.relative_to(p.parent).as_posix()
+            ^^^^^^^^^^^^^^^
+E     TypeError: can only concatenate str (not "PosixPath") to str
+
+trustfork/runtime/dynamic/review_export.py:133: TypeError
+=========================== short test summary info ============================
+FAILED tests/dynamic/unit/test_review_export.py::test_plan_outcomes_and_history_indexes_are_review_only
+1 failed, 257 passed in 45.22s

@@ -1,0 +1,23 @@
+.F
+=================================== FAILURES ===================================
+_ test_two_homogeneous_teams_history_t3_judge_and_rescore[deepseekflash-p001] __
+
+tmp_path = PosixPath('[LOCAL_PRIVATE_PATH_002]/pytest-6/test_two_homogeneous_teams_his0')
+team = 'deepseekflash', case = 'p001'
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7403046145c0>
+
+    @pytest.mark.parametrize('team,case',[('deepseekflash','p001'),('gpt4o','p024')])
+    def test_two_homogeneous_teams_history_t3_judge_and_rescore(tmp_path,team,case,monkeypatch):
+     config=config_for_team(team);mock=TeamMock();transport=ProviderTransport(config,mode='mock',journal=tmp_path/'model-ledger.jsonl',http=mock,max_requests=120,experiment=resolve_experiment(case,team_model=team))
+     source=PiDynamic(case,tmp_path/'prepare-history',team_model=team,provider=transport)
+     bundle=prepare_history(source,ProviderSource(),source.out/'history-bundle.json')
+     assert bundle['accounting']['mock_environment_task_attempts']==2 and bundle['accounting']['real_history_task_attempts']==0
+>    assert all(r['status']=='completed_unjudged' for r in bundle['history']['execution_records'])
+E    assert False
+E     +  where False = all(<generator object test_two_homogeneous_teams_history_t3_judge_and_rescore.<locals>.<genexpr> at 0x7403047b5ff0>)
+
+tests/dynamic/integration/test_homogeneous_end_to_end.py:46: AssertionError
+=========================== short test summary info ============================
+FAILED tests/dynamic/integration/test_homogeneous_end_to_end.py::test_two_homogeneous_teams_history_t3_judge_and_rescore[deepseekflash-p001]
+!!!!!!!!!!!!!!!!!!!!!!!!!! stopping after 1 failures !!!!!!!!!!!!!!!!!!!!!!!!!!!
+1 failed, 1 passed in 69.31s (0:01:09)

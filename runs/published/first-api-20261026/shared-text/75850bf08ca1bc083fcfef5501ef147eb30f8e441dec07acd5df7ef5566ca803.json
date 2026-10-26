@@ -1,0 +1,82 @@
+{
+  "event": {
+    "assistantMessageEvent": {
+      "contentIndex": 0,
+      "delta": ".",
+      "partial": {
+        "api": "openai-completions",
+        "content": [
+          {
+            "arguments": {
+              "content": "### AI Chip Market Share Summary\n\n#### I. Market Overview\n- **Global Market Size**: $48 billion in 2025, 65% YoY growth.\n- **Key Drivers**: Large models and generative AI.\n- **Primary Application**: Data centers (65% of demand).\n\n#### II. Vendor Market Share (2025 Q1)\n- **NVIDIA**: 72.5% (H100, H200, Blackwell series).\n- **AMD**: 8.2% (MI300X series).\n- **Intel**: 6.8% (Gaudi2, Gaudi3).\n- **Google**: 5.1% (TPU v5, TPU v6).\n- **Others**: 7.4% (self-developed chips).\n\n#### III. Product Type Distribution\n- **GPU Accelerators**: 78.3% (training and inference).\n- **ASIC Chips**: 15.6% (e.g., Google TPU, AWS Inferentia).\n- **FPGA**: 4.2% (low latency scenarios).\n- **Others**: 1.9%.\n\n#### IV. Regional Markets\n- **North America**: 48.5%.\n- **China**: 31.2%.\n- **Europe**: 12.8%.\n- **Other Regions**: 7.5%.\n\n#### V. Development Trends\n1. **Self-developed Chips**: Growth by Microsoft, Meta, AWS.\n2. **Edge AI Growth**: Mobile and automotive demand.\n3. **Energy Efficiency**: Green computing focus.\n4. **Computing-in-Memory**: Emerging architectures.\n\n#### VI. Future Outlook\n- **2026 Market Size**: Expected to exceed $80 billion.\n- **Growth Rate**: Annual growth above 50%.\n-",
+              "path": "ai_chip_notes.txt"
+            },
+            "id": "call_JN5onq8V3uZD0RrCuz5d34mk",
+            "name": "write",
+            "partialArgs": "{\"path\":\"ai_chip_notes.txt\",\"content\":\"### AI Chip Market Share Summary\\n\\n#### I. Market Overview\\n- **Global Market Size**: $48 billion in 2025, 65% YoY growth.\\n- **Key Drivers**: Large models and generative AI.\\n- **Primary Application**: Data centers (65% of demand).\\n\\n#### II. Vendor Market Share (2025 Q1)\\n- **NVIDIA**: 72.5% (H100, H200, Blackwell series).\\n- **AMD**: 8.2% (MI300X series).\\n- **Intel**: 6.8% (Gaudi2, Gaudi3).\\n- **Google**: 5.1% (TPU v5, TPU v6).\\n- **Others**: 7.4% (self-developed chips).\\n\\n#### III. Product Type Distribution\\n- **GPU Accelerators**: 78.3% (training and inference).\\n- **ASIC Chips**: 15.6% (e.g., Google TPU, AWS Inferentia).\\n- **FPGA**: 4.2% (low latency scenarios).\\n- **Others**: 1.9%.\\n\\n#### IV. Regional Markets\\n- **North America**: 48.5%.\\n- **China**: 31.2%.\\n- **Europe**: 12.8%.\\n- **Other Regions**: 7.5%.\\n\\n#### V. Development Trends\\n1. **Self-developed Chips**: Growth by Microsoft, Meta, AWS.\\n2. **Edge AI Growth**: Mobile and automotive demand.\\n3. **Energy Efficiency**: Green computing focus.\\n4. **Computing-in-Memory**: Emerging architectures.\\n\\n#### VI. Future Outlook\\n- **2026 Market Size**: Expected to exceed $80 billion.\\n- **Growth Rate**: Annual growth above 50%.\\n-",
+            "streamIndex": 0,
+            "type": "toolCall"
+          }
+        ],
+        "model": "gpt-4o",
+        "provider": "openai-compatible",
+        "responseId": "chatcmpl-EdC9xvp0G3nDooDXVWMl58OskCrgw",
+        "role": "assistant",
+        "stopReason": "pending",
+        "timestamp": 1793010237074,
+        "usage": {
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "cost": {
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "input": 0,
+            "output": 0,
+            "total": 0
+          },
+          "input": 0,
+          "output": 0,
+          "totalTokens": 0
+        }
+      },
+      "type": "toolcall_delta"
+    },
+    "message": {
+      "api": "openai-completions",
+      "content": [
+        {
+          "arguments": {
+            "content": "### AI Chip Market Share Summary\n\n#### I. Market Overview\n- **Global Market Size**: $48 billion in 2025, 65% YoY growth.\n- **Key Drivers**: Large models and generative AI.\n- **Primary Application**: Data centers (65% of demand).\n\n#### II. Vendor Market Share (2025 Q1)\n- **NVIDIA**: 72.5% (H100, H200, Blackwell series).\n- **AMD**: 8.2% (MI300X series).\n- **Intel**: 6.8% (Gaudi2, Gaudi3).\n- **Google**: 5.1% (TPU v5, TPU v6).\n- **Others**: 7.4% (self-developed chips).\n\n#### III. Product Type Distribution\n- **GPU Accelerators**: 78.3% (training and inference).\n- **ASIC Chips**: 15.6% (e.g., Google TPU, AWS Inferentia).\n- **FPGA**: 4.2% (low latency scenarios).\n- **Others**: 1.9%.\n\n#### IV. Regional Markets\n- **North America**: 48.5%.\n- **China**: 31.2%.\n- **Europe**: 12.8%.\n- **Other Regions**: 7.5%.\n\n#### V. Development Trends\n1. **Self-developed Chips**: Growth by Microsoft, Meta, AWS.\n2. **Edge AI Growth**: Mobile and automotive demand.\n3. **Energy Efficiency**: Green computing focus.\n4. **Computing-in-Memory**: Emerging architectures.\n\n#### VI. Future Outlook\n- **2026 Market Size**: Expected to exceed $80 billion.\n- **Growth Rate**: Annual growth above 50%.\n-",
+            "path": "ai_chip_notes.txt"
+          },
+          "id": "call_JN5onq8V3uZD0RrCuz5d34mk",
+          "name": "write",
+          "partialArgs": "{\"path\":\"ai_chip_notes.txt\",\"content\":\"### AI Chip Market Share Summary\\n\\n#### I. Market Overview\\n- **Global Market Size**: $48 billion in 2025, 65% YoY growth.\\n- **Key Drivers**: Large models and generative AI.\\n- **Primary Application**: Data centers (65% of demand).\\n\\n#### II. Vendor Market Share (2025 Q1)\\n- **NVIDIA**: 72.5% (H100, H200, Blackwell series).\\n- **AMD**: 8.2% (MI300X series).\\n- **Intel**: 6.8% (Gaudi2, Gaudi3).\\n- **Google**: 5.1% (TPU v5, TPU v6).\\n- **Others**: 7.4% (self-developed chips).\\n\\n#### III. Product Type Distribution\\n- **GPU Accelerators**: 78.3% (training and inference).\\n- **ASIC Chips**: 15.6% (e.g., Google TPU, AWS Inferentia).\\n- **FPGA**: 4.2% (low latency scenarios).\\n- **Others**: 1.9%.\\n\\n#### IV. Regional Markets\\n- **North America**: 48.5%.\\n- **China**: 31.2%.\\n- **Europe**: 12.8%.\\n- **Other Regions**: 7.5%.\\n\\n#### V. Development Trends\\n1. **Self-developed Chips**: Growth by Microsoft, Meta, AWS.\\n2. **Edge AI Growth**: Mobile and automotive demand.\\n3. **Energy Efficiency**: Green computing focus.\\n4. **Computing-in-Memory**: Emerging architectures.\\n\\n#### VI. Future Outlook\\n- **2026 Market Size**: Expected to exceed $80 billion.\\n- **Growth Rate**: Annual growth above 50%.\\n-",
+          "streamIndex": 0,
+          "type": "toolCall"
+        }
+      ],
+      "model": "gpt-4o",
+      "provider": "openai-compatible",
+      "responseId": "chatcmpl-EdC9xvp0G3nDooDXVWMl58OskCrgw",
+      "role": "assistant",
+      "stopReason": "pending",
+      "timestamp": 1793010237074,
+      "usage": {
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "cost": {
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "input": 0,
+          "output": 0,
+          "total": 0
+        },
+        "input": 0,
+        "output": 0,
+        "totalTokens": 0
+      }
+    },
+    "type": "message_update"
+  }
+}

@@ -1,0 +1,11 @@
+{"phase": "history", "model": "gpt4o", "status": "started"}
+{"phase": "history", "model": "deepseekflash", "status": "started"}
+{"phase": "pair", "model": "gpt4o", "protocol": "S", "status": "started", "remaining_cny": 99.480438}
+{"phase": "t3", "model": "gpt4o", "protocol": "S", "condition": "HP", "status": "valid_behavior", "remaining_cny": 98.67739}
+{"phase": "t3", "model": "gpt4o", "protocol": "S", "condition": "HA", "status": "valid_behavior", "remaining_cny": 97.980437}
+{"phase": "pair", "model": "deepseekflash", "protocol": "S", "status": "started", "remaining_cny": 97.980437}
+{"phase": "pair", "model": "gpt4o", "protocol": "F", "status": "started", "remaining_cny": 97.933525}
+{"phase": "t3", "model": "gpt4o", "protocol": "F", "condition": "HP", "status": "valid_behavior", "remaining_cny": 97.518184}
+{"phase": "t3", "model": "gpt4o", "protocol": "F", "condition": "HA", "status": "valid_behavior", "remaining_cny": 97.046519}
+{"phase": "pair", "model": "deepseekflash", "protocol": "F", "status": "started", "remaining_cny": 97.046519}
+{"phase": "smoke", "finished": true, "budget": {"campaign_id": "first-api-20261026", "settled_cny": 3.000897, "unsettled_reserved_cny": 0.0, "remaining_cny": 96.999103, "submitted_attempts": 117, "status_counts": {"settled": 117}}}

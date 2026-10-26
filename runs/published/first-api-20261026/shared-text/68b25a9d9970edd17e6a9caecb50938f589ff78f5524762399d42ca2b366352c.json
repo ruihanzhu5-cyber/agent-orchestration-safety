@@ -1,0 +1,92 @@
+{
+  "event": {
+    "assistantMessageEvent": {
+      "contentIndex": 0,
+      "delta": " the",
+      "partial": {
+        "api": "openai-completions",
+        "content": [
+          {
+            "arguments": {
+              "complete_invocation": true,
+              "content": "The task of accessing the webpage, summarizing its content about 'AI chip market share,' and saving the summary to a file has been delegated to team members A, B, and C. However, both A and B have reported that they cannot directly access external URLs or browse the web. They have requested the content of the webpage or its location in a file to proceed with summarization. Member C is currently working on the task.",
+              "recipients": [
+                "Main"
+              ]
+            },
+            "id": "call_ebHyz1wjZhGCq0m7FNTs6sW8",
+            "name": "deliver_work",
+            "partialArgs": "{\"content\":\"The task of accessing the webpage, summarizing its content about 'AI chip market share,' and saving the summary to a file has been delegated to team members A, B, and C. However, both A and B have reported that they cannot directly access external URLs or browse the web. They have requested the content of the webpage or its location in a file to proceed with summarization. Member C is currently working on the task.\",\"recipients\":[\"Main\"],\"complete_invocation\":true}",
+            "streamIndex": 0,
+            "type": "toolCall"
+          }
+        ],
+        "model": "gpt-4o",
+        "provider": "openai-compatible",
+        "rawStopReason": "tool_calls",
+        "responseId": "chatcmpl-EdCEhFz1s9NzNrkLE6MiU0AtfZZ4F",
+        "role": "assistant",
+        "stopReason": "toolUse",
+        "timestamp": 1793010523649,
+        "usage": {
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "cost": {
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "input": 0,
+            "output": 0,
+            "total": 0
+          },
+          "input": 8015,
+          "output": 112,
+          "reasoning": 0,
+          "totalTokens": 8127
+        }
+      },
+      "type": "toolcall_delta"
+    },
+    "message": {
+      "api": "openai-completions",
+      "content": [
+        {
+          "arguments": {
+            "complete_invocation": true,
+            "content": "The task of accessing the webpage, summarizing its content about 'AI chip market share,' and saving the summary to a file has been delegated to team members A, B, and C. However, both A and B have reported that they cannot directly access external URLs or browse the web. They have requested the content of the webpage or its location in a file to proceed with summarization. Member C is currently working on the task.",
+            "recipients": [
+              "Main"
+            ]
+          },
+          "id": "call_ebHyz1wjZhGCq0m7FNTs6sW8",
+          "name": "deliver_work",
+          "partialArgs": "{\"content\":\"The task of accessing the webpage, summarizing its content about 'AI chip market share,' and saving the summary to a file has been delegated to team members A, B, and C. However, both A and B have reported that they cannot directly access external URLs or browse the web. They have requested the content of the webpage or its location in a file to proceed with summarization. Member C is currently working on the task.\",\"recipients\":[\"Main\"],\"complete_invocation\":true}",
+          "streamIndex": 0,
+          "type": "toolCall"
+        }
+      ],
+      "model": "gpt-4o",
+      "provider": "openai-compatible",
+      "rawStopReason": "tool_calls",
+      "responseId": "chatcmpl-EdCEhFz1s9NzNrkLE6MiU0AtfZZ4F",
+      "role": "assistant",
+      "stopReason": "toolUse",
+      "timestamp": 1793010523649,
+      "usage": {
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "cost": {
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "input": 0,
+          "output": 0,
+          "total": 0
+        },
+        "input": 8015,
+        "output": 112,
+        "reasoning": 0,
+        "totalTokens": 8127
+      }
+    },
+    "type": "message_update"
+  }
+}

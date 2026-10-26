@@ -1,0 +1,82 @@
+{
+  "event": {
+    "assistantMessageEvent": {
+      "contentIndex": 0,
+      "delta": "n",
+      "partial": {
+        "api": "openai-completions",
+        "content": [
+          {
+            "arguments": {
+              "content": "AI Chip Market Share Analysis Report 2025\n\nMarket Overview:\n- Global AI chip market size reached $48 billion in 2025, a year-over-year increase of 65%.\n- Data centers are the largest application scenario, accounting for approximately 65%.\n\nVendor Market Share (2025 Q1):\n- NVIDIA: 72.5% (H100, H200, Blackwell series)\n- AMD: 8.2% (MI300X series)\n- Intel: 6.8% (Gaudi2, Gaudi3)\n- Google: 5.1% (TPU v5, TPU v6)\n- Others: 7.4% (Vendor self-developed chips)\n\nProduct Type Distribution:\n- GPU Accelerators: 78.3% (Main for training and inference)\n- ASIC Chips: 15.6% (Google TPU, AWS Inferentia)\n- FPGA: 4.2% (Low latency scenarios)\n- Others: 1.9%\n\nRegional Markets:\n- North America: 48.5%\n- China: 31.2%\n- Europe: 12.8%\n- Other Regions: 7.5%\n\nDevelopment Trends",
+              "path": "ai_chip_notes.txt"
+            },
+            "id": "call_4DmGoLsBvDpd9QOswTyn1Bco",
+            "name": "write",
+            "partialArgs": "{\"path\":\"ai_chip_notes.txt\",\"content\":\"AI Chip Market Share Analysis Report 2025\\n\\nMarket Overview:\\n- Global AI chip market size reached $48 billion in 2025, a year-over-year increase of 65%.\\n- Data centers are the largest application scenario, accounting for approximately 65%.\\n\\nVendor Market Share (2025 Q1):\\n- NVIDIA: 72.5% (H100, H200, Blackwell series)\\n- AMD: 8.2% (MI300X series)\\n- Intel: 6.8% (Gaudi2, Gaudi3)\\n- Google: 5.1% (TPU v5, TPU v6)\\n- Others: 7.4% (Vendor self-developed chips)\\n\\nProduct Type Distribution:\\n- GPU Accelerators: 78.3% (Main for training and inference)\\n- ASIC Chips: 15.6% (Google TPU, AWS Inferentia)\\n- FPGA: 4.2% (Low latency scenarios)\\n- Others: 1.9%\\n\\nRegional Markets:\\n- North America: 48.5%\\n- China: 31.2%\\n- Europe: 12.8%\\n- Other Regions: 7.5%\\n\\nDevelopment Trends",
+            "streamIndex": 0,
+            "type": "toolCall"
+          }
+        ],
+        "model": "gpt-4o",
+        "provider": "openai-compatible",
+        "responseId": "chatcmpl-EdCBDM9g7q7fOdIQp7fQ44dQedvj6",
+        "role": "assistant",
+        "stopReason": "pending",
+        "timestamp": 1793010313590,
+        "usage": {
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "cost": {
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "input": 0,
+            "output": 0,
+            "total": 0
+          },
+          "input": 0,
+          "output": 0,
+          "totalTokens": 0
+        }
+      },
+      "type": "toolcall_delta"
+    },
+    "message": {
+      "api": "openai-completions",
+      "content": [
+        {
+          "arguments": {
+            "content": "AI Chip Market Share Analysis Report 2025\n\nMarket Overview:\n- Global AI chip market size reached $48 billion in 2025, a year-over-year increase of 65%.\n- Data centers are the largest application scenario, accounting for approximately 65%.\n\nVendor Market Share (2025 Q1):\n- NVIDIA: 72.5% (H100, H200, Blackwell series)\n- AMD: 8.2% (MI300X series)\n- Intel: 6.8% (Gaudi2, Gaudi3)\n- Google: 5.1% (TPU v5, TPU v6)\n- Others: 7.4% (Vendor self-developed chips)\n\nProduct Type Distribution:\n- GPU Accelerators: 78.3% (Main for training and inference)\n- ASIC Chips: 15.6% (Google TPU, AWS Inferentia)\n- FPGA: 4.2% (Low latency scenarios)\n- Others: 1.9%\n\nRegional Markets:\n- North America: 48.5%\n- China: 31.2%\n- Europe: 12.8%\n- Other Regions: 7.5%\n\nDevelopment Trends",
+            "path": "ai_chip_notes.txt"
+          },
+          "id": "call_4DmGoLsBvDpd9QOswTyn1Bco",
+          "name": "write",
+          "partialArgs": "{\"path\":\"ai_chip_notes.txt\",\"content\":\"AI Chip Market Share Analysis Report 2025\\n\\nMarket Overview:\\n- Global AI chip market size reached $48 billion in 2025, a year-over-year increase of 65%.\\n- Data centers are the largest application scenario, accounting for approximately 65%.\\n\\nVendor Market Share (2025 Q1):\\n- NVIDIA: 72.5% (H100, H200, Blackwell series)\\n- AMD: 8.2% (MI300X series)\\n- Intel: 6.8% (Gaudi2, Gaudi3)\\n- Google: 5.1% (TPU v5, TPU v6)\\n- Others: 7.4% (Vendor self-developed chips)\\n\\nProduct Type Distribution:\\n- GPU Accelerators: 78.3% (Main for training and inference)\\n- ASIC Chips: 15.6% (Google TPU, AWS Inferentia)\\n- FPGA: 4.2% (Low latency scenarios)\\n- Others: 1.9%\\n\\nRegional Markets:\\n- North America: 48.5%\\n- China: 31.2%\\n- Europe: 12.8%\\n- Other Regions: 7.5%\\n\\nDevelopment Trends",
+          "streamIndex": 0,
+          "type": "toolCall"
+        }
+      ],
+      "model": "gpt-4o",
+      "provider": "openai-compatible",
+      "responseId": "chatcmpl-EdCBDM9g7q7fOdIQp7fQ44dQedvj6",
+      "role": "assistant",
+      "stopReason": "pending",
+      "timestamp": 1793010313590,
+      "usage": {
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "cost": {
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "input": 0,
+          "output": 0,
+          "total": 0
+        },
+        "input": 0,
+        "output": 0,
+        "totalTokens": 0
+      }
+    },
+    "type": "message_update"
+  }
+}

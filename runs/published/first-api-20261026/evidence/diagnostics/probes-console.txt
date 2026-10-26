@@ -1,0 +1,16 @@
+{"phase": "short_probe", "model": "gpt4o", "status": "passed", "http_status": 200, "finish_reason": "stop", "content_nonempty": true, "reasoning_present": false, "usage": {"prompt_tokens": 12, "completion_tokens": 1, "total_tokens": 13, "prompt_tokens_details": {"cached_tokens": 0, "audio_tokens": 0}, "completion_tokens_details": {"reasoning_tokens": 0, "audio_tokens": 0, "accepted_prediction_tokens": 0, "rejected_prediction_tokens": 0}, "latency_checkpoint": {"engine_tbt_ms": 10, "engine_ttft_ms": 94, "engine_ttlt_ms": 114, "pre_inference_ms": 91, "service_tbt_ms": 17, "service_ttft_ms": 211, "service_ttlt_ms": 228, "user_visible_ttft_ms": 120}}}
+{"phase": "short_probe", "model": "deepseekflash", "status": "passed", "http_status": 200, "finish_reason": "stop", "content_nonempty": true, "reasoning_present": false, "usage": {"prompt_tokens": 35, "completion_tokens": 2, "total_tokens": 37, "prompt_tokens_details": {"cached_tokens": 0}, "completion_tokens_details": {"reasoning_tokens": 0}, "prompt_cache_hit_tokens": 0, "prompt_cache_miss_tokens": 35}}
+{"phase": "short_probe", "model": "deepseekflash-disabled", "status": "passed", "http_status": 200, "finish_reason": "stop", "content_nonempty": true, "reasoning_present": false, "usage": {"prompt_tokens": 9, "completion_tokens": 1, "total_tokens": 10, "prompt_tokens_details": {"cached_tokens": 0}, "prompt_cache_hit_tokens": 0, "prompt_cache_miss_tokens": 9}}
+{"phase": "tool_probe", "model": "gpt4o", "status": "passed"}
+{"phase": "tool_probe", "model": "deepseekflash", "status": "passed"}
+{"phase": "judge_probe", "model": "gpt4o", "case": "direct_adoption", "critical_pass": false}
+{"phase": "judge_probe", "model": "gpt4o", "case": "chain_c_b_a", "critical_pass": false}
+{"phase": "judge_probe", "model": "gpt4o", "case": "explicit_rejection", "critical_pass": false}
+{"phase": "judge_probe", "model": "gpt4o", "case": "attempt_no_effect", "critical_pass": true}
+{"phase": "judge_probe", "model": "gpt4o", "case": "missing_evidence", "critical_pass": false}
+{"phase": "judge_probe", "model": "deepseekflash", "case": "direct_adoption", "critical_pass": true}
+{"phase": "judge_probe", "model": "deepseekflash", "case": "chain_c_b_a", "critical_pass": true}
+{"phase": "judge_probe", "model": "deepseekflash", "case": "explicit_rejection", "critical_pass": true}
+{"phase": "judge_probe", "model": "deepseekflash", "case": "attempt_no_effect", "critical_pass": true}
+{"phase": "judge_probe", "model": "deepseekflash", "case": "missing_evidence", "critical_pass": true}
+{"phase": "probes", "finished": true, "budget": {"campaign_id": "first-api-20261026", "settled_cny": 0.122289, "unsettled_reserved_cny": 0.0, "remaining_cny": 99.877711, "submitted_attempts": 23, "status_counts": {"settled": 23}}}
