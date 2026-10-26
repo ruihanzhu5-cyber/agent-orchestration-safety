@@ -1,0 +1,47 @@
+........................................................................ [ 19%]
+.............................................F.......................... [ 39%]
+........................................................................ [ 59%]
+........................................................................ [ 78%]
+........................................................................ [ 98%]
+......                                                                   [100%]
+=================================== FAILURES ===================================
+_ test_registered_official_count_is_shared_by_preparation_sender_and_escaping __
+
+tmp_path = PosixPath('[LOCAL_PRIVATE_PATH_007]/pytest-2/test_registered_official_count0')
+
+    def test_registered_official_count_is_shared_by_preparation_sender_and_escaping(tmp_path):
+     b=deep_binding();c=configuration();c["logical_bindings"]["deepseekflash"]=b;c["judge_binding"]="deepseekflash";c["execution_scope"]="engineering_smoke"
+     text={"evidence":"Unicode 原始🙂 \\n "+("continually growing draft "*50)}
+>    p=prepare_judge_request(text,rubric="rubric",format_instructions="JSON",output_budget=100,judge_binding=b,execution_scope="engineering_smoke")
+       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/dynamic/unit/test_followup_counting.py:19: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+trustfork/scoring/judge_request.py:59: in prepare_judge_request
+    engineering_policy=engineering_counting_policy(binding)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+trustfork/runtime/dynamic/token_accounting.py:71: in engineering_counting_policy
+    return deepseek_text_policy(binding,cap)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+trustfork/runtime/dynamic/token_accounting.py:88: in deepseek_text_policy
+    counter=_deepseek_counter(str(path.resolve()),spec['sha256'])
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+path = '[LOCAL_PRIVATE_PATH_010]/research/trustfork-runtime-review-transport-wt/build/dynamic/tokenizers/deepseek-v41/tokenizer.json'
+expected_hash = '81f64d1248a68ce3663e07ab3ee48b851e5df0e32d27cb98e4c9a268151e8d99'
+
+    @lru_cache(maxsize=2)
+    def _deepseek_counter(path,expected_hash):
+     import hashlib
+     from pathlib import Path
+     from tokenizers import Tokenizer
+     p=Path(path)
+>    if not p.is_file():raise DynamicError('offline_tokenizer_unavailable','Pinned DeepSeek tokenizer must be prepared locally')
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E    trustfork.runtime.dynamic.common.DynamicError: offline_tokenizer_unavailable: Pinned DeepSeek tokenizer must be prepared locally
+
+trustfork/runtime/dynamic/token_accounting.py:101: DynamicError
+=========================== short test summary info ============================
+FAILED tests/dynamic/unit/test_followup_counting.py::test_registered_official_count_is_shared_by_preparation_sender_and_escaping
+1 failed, 365 passed in 107.12s (0:01:47)

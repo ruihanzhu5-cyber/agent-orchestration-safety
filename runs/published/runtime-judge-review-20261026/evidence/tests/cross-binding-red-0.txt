@@ -1,0 +1,44 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+_____ test_frozen_gpt_behavior_new_deepseek_judge_consumes_bound_mock_pass _____
+
+tmp_path = PosixPath('[LOCAL_PRIVATE_PATH_002]/cross-binding-red/test_frozen_gpt_behavior_new_d0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x76b077800980>
+
+    def test_frozen_gpt_behavior_new_deepseek_judge_consumes_bound_mock_pass(tmp_path,monkeypatch):
+     import trustfork.runtime.dynamic.provider as provider
+     monkeypatch.setattr(provider,'real_http',lambda *a,**k:pytest.fail('Real HTTP forbidden'))
+     root=Path(os.environ['TRUSTFORK_ARTIFACT_ROOT'])/'follow-ups/runtime-judge-review-20261026/real-attempt-20261027-a1'
+     original=root/'gpt-rescore/F-HA/run.json'
+     before=frozen_identity(original)
+     source=clone_frozen_run(original,tmp_path/'clone');cfg=read_json(root/'resolved-config.json');cfg.update(mode='mock',real_api_enabled=False)
+     for p in root.joinpath('gpt-rescore/F-HA/judge-review/response').glob('judge-requests.jsonl'):
+      response=next(json.loads(line)['response'] for line in p.open() if json.loads(line)['status']=='response')
+     out=tmp_path/'judge'
+>    judged=run_judge_attempt(source,out,cfg,mode='mock',scorer_config=scorer(),passes=('response',),mock_http=lambda *a:response,max_requests=1)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/dynamic/integration/test_cross_judge_binding_review.py:23: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+trustfork/tools/judge_dynamic.py:41: in run_judge_attempt
+    transport=ProviderTransport(config,mode=mode,journal=out/'judge-requests.jsonl',authorize_real=authorize_real,http=(mock_http if mock_http is not None else (lambda *unused:mock_replies[current[0]])) if mode=='mock' else None,max_requests=max_requests,kind='judge')
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+trustfork/runtime/dynamic/provider.py:67: in __init__
+    validate_bindings(config,formal=False,required_aliases=self.active_aliases)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+config = {'campaign_budget': {'account_price_upper_bound_confirmed': True, 'campaign_id': 'first-api-20261026', 'conversion_bas......}}, 'requests_per_minute': 30, ...}}, 'execution_scope': 'engineering_smoke', 'judge_binding': 'deepseekflash', ...}
+formal = False, required_aliases = {'deepseekflash'}, role_scope = None
+
+    def validate_bindings(config: dict, *, formal: bool, required_aliases=None, role_scope=None) -> dict:
+        strict_keys(config, {"protocol_version", "mode", "real_api_enabled", "logical_bindings", "judge_binding"}, {"note","execution_limits","runtime_budgets","execution_scope","campaign_budget"})
+        if config["protocol_version"] != PROTOCOL_VERSION:
+            raise DynamicError("wrong_protocol", config["protocol_version"])
+        if config["mode"] not in {"offline", "scripted-test", "api"}:
+>           raise DynamicError("invalid_mode", str(config["mode"]))
+E           trustfork.runtime.dynamic.common.DynamicError: invalid_mode: mock
+
+trustfork/runtime/dynamic/schema.py:59: DynamicError
+=========================== short test summary info ============================
+FAILED tests/dynamic/integration/test_cross_judge_binding_review.py::test_frozen_gpt_behavior_new_deepseek_judge_consumes_bound_mock_pass
+1 failed in 21.70s

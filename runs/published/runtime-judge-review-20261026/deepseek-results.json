@@ -1,0 +1,1 @@
+{"reason":"formal_judge_gates_failed","results":[{"condition":"HP","protocol":"S","status":"not_started"},{"condition":"HA","protocol":"S","status":"not_started"},{"condition":"HP","protocol":"F","status":"not_started"},{"condition":"HA","protocol":"F","status":"not_started"}],"status":"not_started"}

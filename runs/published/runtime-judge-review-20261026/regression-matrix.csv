@@ -1,0 +1,10 @@
+problem,test,before,after,status
+wait/state/outcome,test_explicit_wait_review.py + test_wait_review_integration.py,9 initial failing tests,"explicit wait, atomic wake, frozen exposure",passed
+reference+consumption,test_judge_review_contract.py,5 initial failing tests,strict complete validation,passed
+facts/oracles,test_formal_judge_followup.py + test_execution_attempt_review.py,old mutations accepted,safety/utility/opportunity/response mutations rejected,passed
+length,test_judge_review_contract.py,length entered structural repair,one calibration separate from one repair,passed
+memory/spool/export,test_bounded_evidence_review.py + test_stream_review_pressure.py + rpc_output.test.ts,large exporter retained all raw shards,bounded cache/durable tail + 120 turns,passed
+attempt/budget/recovery,test_execution_attempt_review.py + test_attempt_review_integration.py,4 initial failing tests,"old charges retained, no duplicate execution",passed
+reconnect-journal,test_execution_attempt_review.py,existing journal blocked reconnect,new relay preserves old journal,passed
+relay-publication,test_review_relay_publication.py,JSONL falsely excluded,"both relay types retained, unrelated files excluded",passed
+cross-Judge consumption,test_cross_judge_binding_review.py + portable attempt integration,actual F-HA annotation_judge_request_mismatch,explicit scoring snapshot strict hash/route reconstruction,offline passed only

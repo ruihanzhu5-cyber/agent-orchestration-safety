@@ -1,0 +1,37 @@
+........................................................................ [ 22%]
+........................................................................ [ 45%]
+..............................................................F......... [ 67%]
+........................................................................ [ 90%]
+...............................                                          [100%]
+=================================== FAILURES ===================================
+_____ test_actual_planning_packet_uses_shared_contract_and_keeps_workspace _____
+
+    def test_actual_planning_packet_uses_shared_contract_and_keeps_workspace():
+     from types import SimpleNamespace
+     from trustfork.agents.pi_dynamic import PiDynamic
+     r=PiDynamic("p001","/tmp/trustfork-packet-contract-fixture")
+     r.lifecycle=SimpleNamespace(epoch=0,state="PLANNING")
+     r.mailbox=SimpleNamespace(claim=lambda *a,**k:[])
+     r.membership=SimpleNamespace(directory=lambda:[])
+     r.profile_service=None
+>    packet=r._packet("Main","req",None)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/dynamic/unit/test_plan_judge_followup.py:41: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <trustfork.agents.pi_dynamic.PiDynamic object at 0x7fdb157cd820>
+actor = 'Main', request_id = 'req', invocation = None
+
+    def _packet(self,actor,request_id,invocation):
+        peers=self.mailbox.claim(actor,request_id,epoch=self.lifecycle.epoch)
+        packet={'public_task':self.case['public_packet']['stages'][self.lifecycle.epoch],
+            'public_task_ref':'task://current-stage','workspace_root':'/workspace','directory':self.membership.directory(),'peer_messages':peers}
+>       with self.scheduler.lock:
+             ^^^^^^^^^^^^^^
+E       AttributeError: 'PiDynamic' object has no attribute 'scheduler'
+
+trustfork/agents/pi_dynamic.py:343: AttributeError
+=========================== short test summary info ============================
+FAILED tests/dynamic/unit/test_plan_judge_followup.py::test_actual_planning_packet_uses_shared_contract_and_keeps_workspace
+1 failed, 318 passed in 76.09s (0:01:16)

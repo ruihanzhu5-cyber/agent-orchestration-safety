@@ -1,0 +1,48 @@
+........FF.......                                                        [100%]
+=================================== FAILURES ===================================
+_ test_response_facts_use_actual_assignments_and_exclude_queue[response_success] _
+
+tmp_path = PosixPath('[LOCAL_PRIVATE_PATH_007]/pytest-0/test_response_facts_use_actual0')
+kind = 'response_success'
+
+    @pytest.mark.parametrize('kind',['response_success','response_refusal','queued_only'])
+    def test_response_facts_use_actual_assignments_and_exclude_queue(tmp_path,kind):
+     from trustfork.scoring.formal_judge_fixtures import make_response_fixture,check_response_fixture
+     from trustfork.scoring.judge_request import prepare_judge_pass
+     from trustfork.scoring.judge_client import JudgeClient
+     from trustfork.runtime.dynamic.provider import ProviderTransport
+     from test_provider_preparation import configuration
+     from test_first_api_judge import reply
+     f=make_response_fixture(tmp_path,kind);cfg=configuration()
+     expected=f['oracle']['responses'];a={'response_judgements':{k:{**v,'status':'complete','evidence_refs':['response://'+k]} for k,v in expected.items()}}
+     assert check_response_fixture(f,a)['passed']
+>    for k in expected:assert f['bundle']['views']['response']['responses'][0]['assignment']['instruction']=='Return exactly READY.'
+                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E    TypeError: 'NoneType' object is not subscriptable
+
+tests/dynamic/unit/test_judge_review_contract.py:73: TypeError
+_ test_response_facts_use_actual_assignments_and_exclude_queue[response_refusal] _
+
+tmp_path = PosixPath('[LOCAL_PRIVATE_PATH_007]/pytest-0/test_response_facts_use_actual1')
+kind = 'response_refusal'
+
+    @pytest.mark.parametrize('kind',['response_success','response_refusal','queued_only'])
+    def test_response_facts_use_actual_assignments_and_exclude_queue(tmp_path,kind):
+     from trustfork.scoring.formal_judge_fixtures import make_response_fixture,check_response_fixture
+     from trustfork.scoring.judge_request import prepare_judge_pass
+     from trustfork.scoring.judge_client import JudgeClient
+     from trustfork.runtime.dynamic.provider import ProviderTransport
+     from test_provider_preparation import configuration
+     from test_first_api_judge import reply
+     f=make_response_fixture(tmp_path,kind);cfg=configuration()
+     expected=f['oracle']['responses'];a={'response_judgements':{k:{**v,'status':'complete','evidence_refs':['response://'+k]} for k,v in expected.items()}}
+     assert check_response_fixture(f,a)['passed']
+>    for k in expected:assert f['bundle']['views']['response']['responses'][0]['assignment']['instruction']=='Return exactly READY.'
+                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E    TypeError: 'NoneType' object is not subscriptable
+
+tests/dynamic/unit/test_judge_review_contract.py:73: TypeError
+=========================== short test summary info ============================
+FAILED tests/dynamic/unit/test_judge_review_contract.py::test_response_facts_use_actual_assignments_and_exclude_queue[response_success]
+FAILED tests/dynamic/unit/test_judge_review_contract.py::test_response_facts_use_actual_assignments_and_exclude_queue[response_refusal]
+2 failed, 15 passed in 8.05s

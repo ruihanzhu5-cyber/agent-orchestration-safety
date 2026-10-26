@@ -1,0 +1,50 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+_ test_compatible_history_budget_and_real_checkpoint_resume_through_final_mock_metrics _
+
+tmp_path = PosixPath('[LOCAL_PRIVATE_PATH_002]/attempt-integration-1/test_compatible_history_budget0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f8b54021370>
+
+    def test_compatible_history_budget_and_real_checkpoint_resume_through_final_mock_metrics(tmp_path,monkeypatch):
+     import trustfork.runtime.dynamic.provider as module
+     monkeypatch.setattr(module,'real_http',lambda *a,**k:(_ for _ in ()).throw(AssertionError('real network forbidden')))
+     sys.path.insert(0,str(repo_root()/'tests/dynamic/unit'))
+     configured=runpy.run_path(str(repo_root()/'tests/dynamic/unit/test_campaign_budget.py'))['configured_campaign']
+     budget=CampaignBudget(tmp_path/'budget.sqlite3',campaign_id='first-api-20261026',segment_id='plan-judge-followup-20261026',segment_cny=20,segment_identity={'identity_hash':'old-test'})
+     budget.reserve('old-paid',phase='engineering_smoke',reserved_cost_cny=8,metadata={});budget.submitted('old-paid');budget.settle('old-paid',settled_cost_cny=7,usage={})
+     migrate_attempts(budget.path,apply=True,backup=tmp_path/'backup.sqlite3')
+     attempt=ExecutionAttempt(budget,tmp_path/'new-attempt',attempt_id='review-offline',parent_attempt='old-test',identity={'execution_code_sha':'synthetic-current-code'})
+     cfg=configured(budget.path);cfg['judge_binding']='deepseekflash';cfg['campaign_budget'].update(segment_id=budget.segment_id,segment_cny=20,segment_identity={'identity_hash':'old-test'},must_exist=True)
+     for binding in cfg['logical_bindings'].values():binding['capability']['tokenizer'].update(id='o200k_base',version=importlib.metadata.version('tiktoken'),count_method='local-message-content-and-schema-bpe-estimate')
+     for limits in cfg['execution_limits'].values():limits.update(requests_per_minute=10000,tokens_per_minute=100000000)
+     mock=MockHistory();t=ProviderTransport(cfg,mode='mock',journal=attempt.path/'requests.jsonl',http=mock,max_requests=100)
+>    parent=PiDynamic('p001',attempt.path/'history',team_model='deepseekflash',provider=t);parent.execution_attempt=attempt
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/dynamic/integration/test_attempt_review_integration.py:29: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+trustfork/agents/pi_dynamic.py:61: in __init__
+    self.case=load_case(case_id)
+              ^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+case_id = 'p001'
+root = PosixPath('[LOCAL_PRIVATE_PATH_003]')
+
+    def load_case(case_id: str, root: Path | None = None) -> dict:
+        root = root or repo_root()
+        catalog = read_json(root / "trustfork/config/dynamic/cases.json")
+        if case_id not in catalog:
+            raise DynamicError("unknown_case", case_id)
+        case = copy.deepcopy(catalog[case_id])
+        task = root / case["source_task_path"]
+        if file_hash(task / "tests/task_metadata.json") != case["metadata_sha256"]:
+            raise DynamicError("source_metadata_changed", case_id)
+        if digest(inventory(task / "environment")) != case["deployed_asset_hash"]:
+>           raise DynamicError("source_environment_changed", case_id)
+E           trustfork.runtime.dynamic.common.DynamicError: source_environment_changed: p001
+
+trustfork/runtime/dynamic/case_loader.py:195: DynamicError
+=========================== short test summary info ============================
+FAILED tests/dynamic/integration/test_attempt_review_integration.py::test_compatible_history_budget_and_real_checkpoint_resume_through_final_mock_metrics
+1 failed in 8.40s

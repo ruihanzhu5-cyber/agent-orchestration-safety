@@ -1,0 +1,93 @@
+........FF.....F........                                                 [100%]
+=================================== FAILURES ===================================
+_ test_response_facts_use_actual_assignments_and_exclude_queue[response_success] _
+
+tmp_path = PosixPath('[LOCAL_PRIVATE_PATH_007]/pytest-0/test_response_facts_use_actual0')
+kind = 'response_success'
+
+    @pytest.mark.parametrize('kind',['response_success','response_refusal','queued_only'])
+    def test_response_facts_use_actual_assignments_and_exclude_queue(tmp_path,kind):
+     from trustfork.scoring.formal_judge_fixtures import make_response_fixture,check_response_fixture
+     from trustfork.scoring.judge_request import prepare_judge_pass
+     from trustfork.scoring.judge_client import JudgeClient
+     from trustfork.runtime.dynamic.provider import ProviderTransport
+     from test_provider_preparation import configuration
+     from test_first_api_judge import reply
+     f=make_response_fixture(tmp_path,kind);cfg=configuration()
+     expected=f['oracle']['responses'];a={'response_judgements':{k:{**v,'status':'complete','evidence_refs':['response://'+k]} for k,v in expected.items()}}
+     assert check_response_fixture(f,a)['passed']
+>    for k in expected:assert f['bundle']['views']['response']['responses'][0]['assignment']['instruction']=='Return exactly READY.'
+                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E    TypeError: 'NoneType' object is not subscriptable
+
+tests/dynamic/unit/test_judge_review_contract.py:73: TypeError
+_ test_response_facts_use_actual_assignments_and_exclude_queue[response_refusal] _
+
+tmp_path = PosixPath('[LOCAL_PRIVATE_PATH_007]/pytest-0/test_response_facts_use_actual1')
+kind = 'response_refusal'
+
+    @pytest.mark.parametrize('kind',['response_success','response_refusal','queued_only'])
+    def test_response_facts_use_actual_assignments_and_exclude_queue(tmp_path,kind):
+     from trustfork.scoring.formal_judge_fixtures import make_response_fixture,check_response_fixture
+     from trustfork.scoring.judge_request import prepare_judge_pass
+     from trustfork.scoring.judge_client import JudgeClient
+     from trustfork.runtime.dynamic.provider import ProviderTransport
+     from test_provider_preparation import configuration
+     from test_first_api_judge import reply
+     f=make_response_fixture(tmp_path,kind);cfg=configuration()
+     expected=f['oracle']['responses'];a={'response_judgements':{k:{**v,'status':'complete','evidence_refs':['response://'+k]} for k,v in expected.items()}}
+     assert check_response_fixture(f,a)['passed']
+>    for k in expected:assert f['bundle']['views']['response']['responses'][0]['assignment']['instruction']=='Return exactly READY.'
+                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E    TypeError: 'NoneType' object is not subscriptable
+
+tests/dynamic/unit/test_judge_review_contract.py:73: TypeError
+____________ test_consumption_failure_is_repaired_before_completion ____________
+
+tmp_path = PosixPath('[LOCAL_PRIVATE_PATH_007]/pytest-0/test_consumption_failure_is_re0')
+
+    def test_consumption_failure_is_repaired_before_completion(tmp_path):
+     from collections import deque
+     from trustfork.scoring.judge_client import JudgeClient
+     from trustfork.scoring.judge_request import prepare_judge_pass
+     from trustfork.runtime.dynamic.provider import ProviderTransport
+     from test_provider_preparation import configuration
+     from test_first_api_judge import reply
+     f=make_fixture(tmp_path,'direct_failed_attempt');good=oracle_annotations(f);bad=copy.deepcopy(good)
+     bad['action_annotations'][0]['effect_status']='observed'
+     cfg=configuration();cfg['logical_bindings']['gpt4o']['max_output_tokens']=16384;cfg['logical_bindings']['gpt4o']['capability']['max_output_tokens']=16384
+     sent=[];answers=deque([reply(json.dumps(bad)),reply(json.dumps(good))])
+     def http(u,b,*a):sent.append(json.loads(b));return answers.popleft()
+     t=ProviderTransport(cfg,mode='mock',journal=tmp_path/'j.jsonl',kind='judge',max_requests=2,http=http)
+     p=prepare_judge_pass(f['bundle'],'trajectory',binding=cfg['logical_bindings']['gpt4o'],scorer_config={'trajectory_output_budget_tokens':16384})
+>    result=JudgeClient(t).send_with_repair(p,request_id='consume',pass_name='trajectory',evidence_refs={e['branch_id']+'::'+e['event_id'] for e in f['events']})
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/dynamic/unit/test_judge_review_contract.py:155: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+trustfork/scoring/judge_client.py:148: in send_with_repair
+    try:return {**self.send(prepared,request_id=request_id,**kwargs),'structure_attempts':1}
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+trustfork/scoring/judge_client.py:108: in send
+    self.preflight(prepared)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <trustfork.scoring.judge_client.JudgeClient object at 0x78fe32d85ee0>
+prepared = {'version': 'prepared-judge-request-v2', 'request': {'messages': [{'role': 'system', 'content': 'Score whole-team term...:17,"source_bytes":16475,"submitted_requests":0}}'}], 'tools': [], 'model': 'exact-fixture', 'max_tokens': 16384}, ...}
+
+    def preflight(self,prepared):
+        alias=self.transport.config['judge_binding'];binding=self.transport.config['logical_bindings'][alias]
+        if prepared.get('not_applicable'):return {'fits':True,'reason':'not_applicable'}
+        report=self._capacity(prepared)
+        for key in prepared['request']['parameters']:
+            if key not in binding['supported_parameters']:raise DynamicError('judge_parameter_unsupported',key)
+>       if report['fits'] is not True:raise DynamicError(report['reason'],'Preflight every pass before any transmission')
+                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       trustfork.runtime.dynamic.common.DynamicError: capacity_unknown: Preflight every pass before any transmission
+
+trustfork/scoring/judge_client.py:103: DynamicError
+=========================== short test summary info ============================
+FAILED tests/dynamic/unit/test_judge_review_contract.py::test_response_facts_use_actual_assignments_and_exclude_queue[response_success]
+FAILED tests/dynamic/unit/test_judge_review_contract.py::test_response_facts_use_actual_assignments_and_exclude_queue[response_refusal]
+FAILED tests/dynamic/unit/test_judge_review_contract.py::test_consumption_failure_is_repaired_before_completion
+3 failed, 21 passed in 9.72s

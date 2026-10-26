@@ -1,0 +1,61 @@
+FFFF                                                                     [100%]
+=================================== FAILURES ===================================
+___ test_migration_dry_run_preserves_original_facts_and_new_attempt_inherits ___
+
+tmp_path = PosixPath('[LOCAL_PRIVATE_PATH_007]/pytest-0/test_migration_dry_run_preserv0')
+
+    def test_migration_dry_run_preserves_original_facts_and_new_attempt_inherits(tmp_path):
+>    from trustfork.runtime.dynamic.execution_attempt import migrate_attempts,ExecutionAttempt
+E    ModuleNotFoundError: No module named 'trustfork.runtime.dynamic.execution_attempt'
+
+tests/dynamic/unit/test_execution_attempt_review.py:15: ModuleNotFoundError
+__ test_interrupted_stage_unknown_charge_not_replayed_and_artifact_reconcile ___
+
+tmp_path = PosixPath('[LOCAL_PRIVATE_PATH_007]/pytest-0/test_interrupted_stage_unknown0')
+
+    def test_interrupted_stage_unknown_charge_not_replayed_and_artifact_reconcile(tmp_path):
+>    from trustfork.runtime.dynamic.execution_attempt import migrate_attempts,ExecutionAttempt
+E    ModuleNotFoundError: No module named 'trustfork.runtime.dynamic.execution_attempt'
+
+tests/dynamic/unit/test_execution_attempt_review.py:37: ModuleNotFoundError
+_________ test_completed_artifact_mutation_and_protocol_mismatch_fail __________
+
+tmp_path = PosixPath('[LOCAL_PRIVATE_PATH_007]/pytest-0/test_completed_artifact_mutati0')
+
+    def test_completed_artifact_mutation_and_protocol_mismatch_fail(tmp_path):
+>    from trustfork.runtime.dynamic.execution_attempt import migrate_attempts,ExecutionAttempt
+E    ModuleNotFoundError: No module named 'trustfork.runtime.dynamic.execution_attempt'
+
+tests/dynamic/unit/test_execution_attempt_review.py:60: ModuleNotFoundError
+______ test_atomic_clone_failure_never_publishes_half_copy_and_can_retry _______
+
+tmp_path = PosixPath('[LOCAL_PRIVATE_PATH_007]/pytest-0/test_atomic_clone_failure_neve0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7b292507fd70>
+
+    def test_atomic_clone_failure_never_publishes_half_copy_and_can_retry(tmp_path,monkeypatch):
+     from trustfork.runtime.dynamic.followup import clone_frozen_run
+     import trustfork.runtime.dynamic.followup as m
+     source=tmp_path/'source';source.mkdir()
+     write_json(source/'run.json',{'run_id':'original','run_manifest_path':'manifest.json','events_path':'events.jsonl','prefix_events_path':'prefix-events.json'})
+     for name in ('manifest.json','events.jsonl','prefix-events.json','private_bindings.json','profile_metadata.json','delivery_receipts.json'):write_json(source/name,{'synthetic':name})
+     write_json(source/'scoring/current_version.json',{'version':'original'})
+     monkeypatch.setattr(m,'frozen_identity',lambda p:{'run_hash':file_hash(Path(p))})
+     original=m.shutil.copyfile;calls=[]
+     def fail(a,b,*args,**kwargs):
+      calls.append(1)
+      if len(calls)==3:raise OSError('injected interrupted copy')
+      return original(a,b,*args,**kwargs)
+     monkeypatch.setattr(m.shutil,'copyfile',fail)
+     with pytest.raises(OSError):clone_frozen_run(source/'run.json',tmp_path/'dest')
+>    assert not (tmp_path/'dest').exists()
+E    AssertionError: assert not True
+E     +  where True = exists()
+E     +    where exists = (PosixPath('[LOCAL_PRIVATE_PATH_007]/pytest-0/test_atomic_clone_failure_neve0') / 'dest').exists
+
+tests/dynamic/unit/test_execution_attempt_review.py:85: AssertionError
+=========================== short test summary info ============================
+FAILED tests/dynamic/unit/test_execution_attempt_review.py::test_migration_dry_run_preserves_original_facts_and_new_attempt_inherits
+FAILED tests/dynamic/unit/test_execution_attempt_review.py::test_interrupted_stage_unknown_charge_not_replayed_and_artifact_reconcile
+FAILED tests/dynamic/unit/test_execution_attempt_review.py::test_completed_artifact_mutation_and_protocol_mismatch_fail
+FAILED tests/dynamic/unit/test_execution_attempt_review.py::test_atomic_clone_failure_never_publishes_half_copy_and_can_retry
+4 failed in 4.08s

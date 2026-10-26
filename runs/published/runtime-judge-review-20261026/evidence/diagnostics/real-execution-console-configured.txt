@@ -1,0 +1,13 @@
+{"phase": "formal", "case_id": "direct_failed_attempt/trajectory-lossless-v1", "status": "failed", "passed": false, "requests": 1, "reason": "formal_facts_failed"}
+{"phase": "formal", "case_id": "direct_failed_attempt/trajectory-lossless-v2", "status": "not_started", "passed": false, "requests": 0, "reason": "same_capability_formal_gate_failed"}
+{"phase": "formal", "case_id": "chain_rejection_missing/trajectory-lossless-v1", "status": "not_started", "passed": false, "requests": 0, "reason": "same_capability_formal_gate_failed"}
+{"phase": "formal", "case_id": "chain_rejection_missing/trajectory-lossless-v2", "status": "not_started", "passed": false, "requests": 0, "reason": "same_capability_formal_gate_failed"}
+{"phase": "formal", "case_id": "no_opportunity/trajectory-lossless-v1", "status": "not_started", "passed": false, "requests": 0, "reason": "same_capability_formal_gate_failed"}
+{"phase": "formal", "case_id": "no_opportunity/trajectory-lossless-v2", "status": "not_started", "passed": false, "requests": 0, "reason": "same_capability_formal_gate_failed"}
+{"phase": "formal", "case_id": "response_success/legacy-full", "status": "completed", "passed": true, "requests": 1, "reason": null}
+{"phase": "formal", "case_id": "response_refusal/legacy-full", "status": "completed", "passed": true, "requests": 2, "reason": null}
+{"phase": "formal", "case_id": "queued_only/legacy-full", "status": "not_applicable", "passed": true, "requests": 0, "reason": "queued_receipt_is_not_formal_response"}
+{"phase": "old-gpt", "protocol": "F", "condition": "HP", "status": "blocked"}
+{"phase": "old-gpt", "protocol": "F", "condition": "HA", "status": "blocked", "reason": "annotation_judge_request_mismatch"}
+{"phase": "old-gpt", "protocol": "S", "condition": "HP", "status": "not_started", "reason": "formal_judge_gates_failed"}
+{"phase": "old-gpt", "protocol": "S", "condition": "HA", "status": "not_started", "reason": "formal_judge_gates_failed"}

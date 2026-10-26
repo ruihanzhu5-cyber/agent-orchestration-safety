@@ -1,0 +1,34 @@
+"""Read-only paid-source replay through mock; never resends a model/Judge request."""
+import json,os
+from pathlib import Path
+import pytest
+from trustfork.runtime.dynamic.common import read_json,write_json,file_hash,repo_root,DynamicError
+from trustfork.runtime.dynamic.followup import clone_frozen_run
+from trustfork.tools.judge_dynamic import run_judge_attempt
+from trustfork.tools.runtime_judge_review import scorer
+from trustfork.scoring.scoring_versions import frozen_identity,rescore_contract
+from trustfork.scoring.dynamic_pipeline import score_run
+
+
+def test_frozen_gpt_behavior_new_deepseek_judge_consumes_bound_mock_pass(tmp_path,monkeypatch):
+ import trustfork.runtime.dynamic.provider as provider
+ monkeypatch.setattr(provider,'real_http',lambda *a,**k:pytest.fail('Real HTTP forbidden'))
+ root=Path(os.environ['TRUSTFORK_ARTIFACT_ROOT'])/'follow-ups/runtime-judge-review-20261026/real-attempt-20261027-a1'
+ original=root/'gpt-rescore/F-HA/run.json'
+ before=frozen_identity(original)
+ source=clone_frozen_run(original,tmp_path/'clone');cfg=read_json(root/'resolved-config.json');cfg.update(mode='scripted-test',real_api_enabled=False);cfg.pop('campaign_budget',None)
+ for p in root.joinpath('gpt-rescore/F-HA/judge-review/response').glob('judge-requests.jsonl'):
+  response=next(json.loads(line)['response'] for line in p.open() if json.loads(line)['status']=='response')
+ out=tmp_path/'judge'
+ judged=run_judge_attempt(source,out,cfg,mode='mock',scorer_config=scorer(),passes=('response',),mock_http=lambda *a:response,max_requests=1)
+ assert judged['pass_states']['response']['status']=='completed'
+ # Saved metadata must identify the actual scoring route; old behavior manifest stays GPT.
+ contract=rescore_contract(source,reason='Synthetic replay of paid cross-Judge mismatch; no new API',annotation_policy='new',new_annotations=out/'scoring_annotations.json')
+ summary=score_run(source,mode='engineering-smoke',rescore=contract)
+ assert summary['scores']['RTF']['status']=='complete'
+ assert frozen_identity(original)==before
+ # A changed explicit scoring binding must not silently fall back to old manifest.
+ a=read_json(out/'scoring_annotations.json');a['judge_passes']['response']['resolved_judge_binding']['model_id']='tampered-route'
+ write_json(tmp_path/'tampered.json',a)
+ with pytest.raises(DynamicError,match='annotation_judge_binding_invalid'):
+  score_run(source,mode='engineering-smoke',rescore=rescore_contract(source,reason='Tampered scoring route negative',annotation_policy='new',new_annotations=tmp_path/'tampered.json'))

@@ -1,0 +1,119 @@
+FFFFFFFFF                                                                [100%]
+=================================== FAILURES ===================================
+_________ test_wait_releases_permit_deduplicates_wake_and_closes_race __________
+
+tmp_path = PosixPath('[LOCAL_PRIVATE_PATH_007]/pytest-0/test_wait_releases_permit_dedu0')
+
+    def test_wait_releases_permit_deduplicates_wake_and_closes_race(tmp_path):
+     l,m,life,s=state(tmp_path)
+     s.enqueue_batch(["Main","A","B"],reason="test")
+     assert s.permit(actors=["Main"])
+>    v=s.observable_version("Main")
+       ^^^^^^^^^^^^^^^^^^^^
+E    AttributeError: 'Scheduler' object has no attribute 'observable_version'
+
+tests/dynamic/unit/test_explicit_wait_review.py:19: AttributeError
+___________________ test_wait_terminal_and_timeout[timeout] ____________________
+
+tmp_path = PosixPath('[LOCAL_PRIVATE_PATH_007]/pytest-0/test_wait_terminal_and_timeout0')
+reason = 'timeout'
+
+    @pytest.mark.parametrize("reason",["timeout","cancelled","stage_deadline","resource_ended","member_released"])
+    def test_wait_terminal_and_timeout(tmp_path,reason):
+     l,m,life,s=state(tmp_path);s.enqueue_batch(["Main"],reason="test");s.permit()
+>    s.complete("Main",outcome={"state":"waiting","after_version":0,"timeout_seconds":0.01,"pending_work":True})
+E    TypeError: Scheduler.complete() got an unexpected keyword argument 'outcome'
+
+tests/dynamic/unit/test_explicit_wait_review.py:40: TypeError
+__________________ test_wait_terminal_and_timeout[cancelled] ___________________
+
+tmp_path = PosixPath('[LOCAL_PRIVATE_PATH_007]/pytest-0/test_wait_terminal_and_timeout1')
+reason = 'cancelled'
+
+    @pytest.mark.parametrize("reason",["timeout","cancelled","stage_deadline","resource_ended","member_released"])
+    def test_wait_terminal_and_timeout(tmp_path,reason):
+     l,m,life,s=state(tmp_path);s.enqueue_batch(["Main"],reason="test");s.permit()
+>    s.complete("Main",outcome={"state":"waiting","after_version":0,"timeout_seconds":0.01,"pending_work":True})
+E    TypeError: Scheduler.complete() got an unexpected keyword argument 'outcome'
+
+tests/dynamic/unit/test_explicit_wait_review.py:40: TypeError
+________________ test_wait_terminal_and_timeout[stage_deadline] ________________
+
+tmp_path = PosixPath('[LOCAL_PRIVATE_PATH_007]/pytest-0/test_wait_terminal_and_timeout2')
+reason = 'stage_deadline'
+
+    @pytest.mark.parametrize("reason",["timeout","cancelled","stage_deadline","resource_ended","member_released"])
+    def test_wait_terminal_and_timeout(tmp_path,reason):
+     l,m,life,s=state(tmp_path);s.enqueue_batch(["Main"],reason="test");s.permit()
+>    s.complete("Main",outcome={"state":"waiting","after_version":0,"timeout_seconds":0.01,"pending_work":True})
+E    TypeError: Scheduler.complete() got an unexpected keyword argument 'outcome'
+
+tests/dynamic/unit/test_explicit_wait_review.py:40: TypeError
+________________ test_wait_terminal_and_timeout[resource_ended] ________________
+
+tmp_path = PosixPath('[LOCAL_PRIVATE_PATH_007]/pytest-0/test_wait_terminal_and_timeout3')
+reason = 'resource_ended'
+
+    @pytest.mark.parametrize("reason",["timeout","cancelled","stage_deadline","resource_ended","member_released"])
+    def test_wait_terminal_and_timeout(tmp_path,reason):
+     l,m,life,s=state(tmp_path);s.enqueue_batch(["Main"],reason="test");s.permit()
+>    s.complete("Main",outcome={"state":"waiting","after_version":0,"timeout_seconds":0.01,"pending_work":True})
+E    TypeError: Scheduler.complete() got an unexpected keyword argument 'outcome'
+
+tests/dynamic/unit/test_explicit_wait_review.py:40: TypeError
+_______________ test_wait_terminal_and_timeout[member_released] ________________
+
+tmp_path = PosixPath('[LOCAL_PRIVATE_PATH_007]/pytest-0/test_wait_terminal_and_timeout4')
+reason = 'member_released'
+
+    @pytest.mark.parametrize("reason",["timeout","cancelled","stage_deadline","resource_ended","member_released"])
+    def test_wait_terminal_and_timeout(tmp_path,reason):
+     l,m,life,s=state(tmp_path);s.enqueue_batch(["Main"],reason="test");s.permit()
+>    s.complete("Main",outcome={"state":"waiting","after_version":0,"timeout_seconds":0.01,"pending_work":True})
+E    TypeError: Scheduler.complete() got an unexpected keyword argument 'outcome'
+
+tests/dynamic/unit/test_explicit_wait_review.py:40: TypeError
+_____________________ test_no_pending_work_and_bad_version _____________________
+
+tmp_path = PosixPath('[LOCAL_PRIVATE_PATH_007]/pytest-0/test_no_pending_work_and_bad_v0')
+
+    def test_no_pending_work_and_bad_version(tmp_path):
+     l,m,life,s=state(tmp_path);s.enqueue_batch(["Main"],reason="test");s.permit()
+>    assert s.complete("Main",outcome={"state":"waiting","after_version":0,"timeout_seconds":1,"pending_work":False})=="no_pending_work"
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E    TypeError: Scheduler.complete() got an unexpected keyword argument 'outcome'
+
+tests/dynamic/unit/test_explicit_wait_review.py:49: TypeError
+_____________ test_public_work_status_does_not_leak_task_or_goals ______________
+
+tmp_path = PosixPath('[LOCAL_PRIVATE_PATH_007]/pytest-0/test_public_work_status_does_n0')
+
+    def test_public_work_status_does_not_leak_task_or_goals(tmp_path):
+     l,m,life,s=state(tmp_path);d=Delegations(l,m)
+     row=d.prepare("A","private task wording",stage_id="s")
+>    result=d.work_status("Main",epoch=0)
+            ^^^^^^^^^^^^^
+E    AttributeError: 'Delegations' object has no attribute 'work_status'
+
+tests/dynamic/unit/test_explicit_wait_review.py:57: AttributeError
+_________________________ test_wait_snapshot_roundtrip _________________________
+
+tmp_path = PosixPath('[LOCAL_PRIVATE_PATH_007]/pytest-0/test_wait_snapshot_roundtrip0')
+
+    def test_wait_snapshot_roundtrip(tmp_path):
+     l,m,life,s=state(tmp_path);s.enqueue_batch(["Main"],reason="test");s.permit()
+>    s.complete("Main",outcome={"state":"waiting","after_version":0,"timeout_seconds":20,"pending_work":True})
+E    TypeError: Scheduler.complete() got an unexpected keyword argument 'outcome'
+
+tests/dynamic/unit/test_explicit_wait_review.py:65: TypeError
+=========================== short test summary info ============================
+FAILED tests/dynamic/unit/test_explicit_wait_review.py::test_wait_releases_permit_deduplicates_wake_and_closes_race
+FAILED tests/dynamic/unit/test_explicit_wait_review.py::test_wait_terminal_and_timeout[timeout]
+FAILED tests/dynamic/unit/test_explicit_wait_review.py::test_wait_terminal_and_timeout[cancelled]
+FAILED tests/dynamic/unit/test_explicit_wait_review.py::test_wait_terminal_and_timeout[stage_deadline]
+FAILED tests/dynamic/unit/test_explicit_wait_review.py::test_wait_terminal_and_timeout[resource_ended]
+FAILED tests/dynamic/unit/test_explicit_wait_review.py::test_wait_terminal_and_timeout[member_released]
+FAILED tests/dynamic/unit/test_explicit_wait_review.py::test_no_pending_work_and_bad_version
+FAILED tests/dynamic/unit/test_explicit_wait_review.py::test_public_work_status_does_not_leak_task_or_goals
+FAILED tests/dynamic/unit/test_explicit_wait_review.py::test_wait_snapshot_roundtrip
+9 failed in 5.06s

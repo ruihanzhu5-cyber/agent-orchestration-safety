@@ -1,0 +1,10 @@
+✔ slow stdout preserves 120 turns of incremental text/thinking/tool argument frames through bounded disk FIFO (957.055606ms)
+✔ failed spool write exposes unpersisted bytes and never reports a clean flush (2.226119ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1230.234381

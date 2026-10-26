@@ -1,0 +1,43 @@
+FF                                                                       [100%]
+=================================== FAILURES ===================================
+____________ test_disk_ledger_restore_iter_query_and_bounded_cache _____________
+
+tmp_path = PosixPath('[LOCAL_PRIVATE_PATH_007]/pytest-0/test_disk_ledger_restore_iter_0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x78941d1f7c50>
+
+    def test_disk_ledger_restore_iter_query_and_bounded_cache(tmp_path,monkeypatch):
+     p=tmp_path/'events.jsonl';l=EventLedger(p,'b','p001');expected=[]
+     for i in range(120):
+      row=l.append('pi_event',{'text':'完整🙂'*2048,'turn':i},actor_id='A',request_id=str(i))
+      expected.append(digest(row));row['payload']['text']='caller mutation'
+>    assert not isinstance(l.rows,list)
+E    AssertionError: assert not True
+E     +  where True = isinstance([{'schema_version': '1.0', 'event_id': 'event_00000001', 'sequence': 1, 'monotonic_ns': 475631948313, ...}, {'schema_v..., ...}, {'schema_version': '1.0', 'event_id': 'event_00000006', 'sequence': 6, 'monotonic_ns': 475769041818, ...}, ...], list)
+E     +    where [{'schema_version': '1.0', 'event_id': 'event_00000001', 'sequence': 1, 'monotonic_ns': 475631948313, ...}, {'schema_v..., ...}, {'schema_version': '1.0', 'event_id': 'event_00000006', 'sequence': 6, 'monotonic_ns': 475769041818, ...}, ...] = <trustfork.runtime.dynamic.events.EventLedger object at 0x78941d1f6d20>.rows
+
+tests/dynamic/unit/test_bounded_evidence_review.py:11: AssertionError
+__________ test_export_large_compressible_jsonl_is_bounded_and_atomic __________
+
+tmp_path = PosixPath('[LOCAL_PRIVATE_PATH_007]/pytest-0/test_export_large_compressible0')
+
+    def test_export_large_compressible_jsonl_is_bounded_and_atomic(tmp_path):
+     from trustfork.runtime.dynamic.review_export import export_campaign
+     source=tmp_path/'source';source.mkdir();write_json(source/'campaign.json',{'status':'stopped','campaign_id':'bounded-offline','identity':{'commit':'synthetic'}})
+     path=source/'tests/large.jsonl';path.parent.mkdir()
+     with path.open('wb') as f:
+      for i in range(160):f.write(canonical({'sequence':i,'payload':'abc🙂'*32768})+b'\n')
+     before=hashlib.sha256(path.read_bytes()).hexdigest()
+     tracemalloc.start()
+     result=export_campaign(source,tmp_path/'public',max_part_bytes=512*1024,max_total_bytes=2*1024*1024)
+     _,peak=tracemalloc.get_traced_memory();tracemalloc.stop()
+     # Input >35MiB; threshold allows 20 shard buffers plus interpreter/redactor overhead,
+     # deliberately far below cumulative uncompressed output. No absolute RSS assertion.
+>    assert peak<20*512*1024+8*1024*1024,peak
+E    AssertionError: 136232266
+E    assert 136232266 < (((20 * 512) * 1024) + ((8 * 1024) * 1024))
+
+tests/dynamic/unit/test_bounded_evidence_review.py:38: AssertionError
+=========================== short test summary info ============================
+FAILED tests/dynamic/unit/test_bounded_evidence_review.py::test_disk_ledger_restore_iter_query_and_bounded_cache
+FAILED tests/dynamic/unit/test_bounded_evidence_review.py::test_export_large_compressible_jsonl_is_bounded_and_atomic
+2 failed in 8.19s

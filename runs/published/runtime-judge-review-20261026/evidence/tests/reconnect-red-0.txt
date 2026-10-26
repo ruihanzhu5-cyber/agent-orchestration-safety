@@ -1,0 +1,69 @@
+FF                                                                       [100%]
+=================================== FAILURES ===================================
+________ test_reconnecting_same_attempt_preserves_old_transport_journal ________
+
+tmp_path = PosixPath('[LOCAL_PRIVATE_PATH_007]/pytest-0/test_reconnecting_same_attempt0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x770df1303920>
+
+    def test_reconnecting_same_attempt_preserves_old_transport_journal(tmp_path,monkeypatch):
+     runner,b=runner_mock(tmp_path,monkeypatch);runner.http_factory=lambda stage:(lambda *a:pytest.fail('no request expected'))
+     out=runner.path/'deepseek/history';first=runner.transport('history',out,kind='model',limit=240)
+     write_json(first.journal,{'status':'synthetic_previous_connection','requests_complete_in_stage_records':True})
+     original_hash=file_hash(first.journal)
+>    second=runner.transport('history',out,kind='model',limit=240)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/dynamic/unit/test_execution_attempt_review.py:210: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+trustfork/tools/runtime_judge_review.py:40: in transport
+    t=ProviderTransport(cfg,mode=self.mode,journal=Path(out)/('provider-requests.jsonl' if kind=='model' else 'judge-requests.jsonl'),authorize_real=self.mode=='api',max_requests=limit,kind=kind,experiment=experiment,http=self.http_factory(stage) if self.http_factory else None)
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <trustfork.runtime.dynamic.provider.ProviderTransport object at 0x770df119c890>
+config = {'protocol_version': 'dynamic-join-v9-trajectory-portfolio', 'mode': 'offline', 'real_api_enabled': False, 'logical_bi...etic', 'base_url': 'https://mock.invalid/v1', 'model_id': 'exact-fixture', 'key_env': 'UNUSED_FIXTURE_KEY', ...}}, ...}
+mode = 'mock'
+journal = PosixPath('[LOCAL_PRIVATE_PATH_007]/pytest-0/test_reconnecting_same_attempt0/out/deepseek/history/provider-requests.jsonl')
+authorize_real = False
+http = <function test_reconnecting_same_attempt_preserves_old_transport_journal.<locals>.<lambda>.<locals>.<lambda> at 0x770df0f7e5c0>
+max_requests = 240, kind = 'model'
+experiment = ExperimentConfig(experiment_version='dynamic-join-homogeneous-v1', team_model='deepseekflash', history_pair_id='HIST1'...'request_limit': 120, 'token_limit': 192000, 'per_request': 16384, 'stage_seconds': 1200, 'http_timeout_seconds': 180})
+
+    def __init__(self,config,*,mode,journal,authorize_real=False,http=None,max_requests=None,kind='model',experiment=None):
+        if mode not in ('mock','api'):raise DynamicError('invalid_provider_mode',mode)
+        if mode=='mock' and http is None:raise DynamicError('mock_transport_required','Mock must be injected, never external')
+        if mode=='api' and (http is not None or not authorize_real or config.get('mode')!='api' or config.get('real_api_enabled') is not True):
+            raise DynamicError('real_api_disabled','Explicit API mode, local flag and run authorization required')
+        if type(max_requests) is not int or max_requests<1:raise DynamicError('request_budget_required','Explicit request ceiling required')
+        self.active_aliases={config['judge_binding']} if kind=='judge' else set(experiment.model_refs.values()) if experiment is not None else set(config['logical_bindings'])
+        from .schema import validate_bindings
+        validate_bindings(config,formal=False,required_aliases=self.active_aliases)
+        self.config,self.mode,self.journal=config,mode,Path(journal)
+>       if self.journal.exists():raise DynamicError('provider_journal_exists','Select a new attempt; campaign budget is never reset')
+                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       trustfork.runtime.dynamic.common.DynamicError: provider_journal_exists: Select a new attempt; campaign budget is never reset
+
+trustfork/runtime/dynamic/provider.py:69: DynamicError
+_________ test_failed_fsync_reports_received_but_not_durable_rpc_bytes _________
+
+tmp_path = PosixPath('[LOCAL_PRIVATE_PATH_007]/pytest-0/test_failed_fsync_reports_rece0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x770df1106de0>
+
+    def test_failed_fsync_reports_received_but_not_durable_rpc_bytes(tmp_path,monkeypatch):
+     import os,pytest
+     from trustfork.runtime.dynamic.rpc_spool import RpcSpool
+     spool=RpcSpool(tmp_path/'frames')
+     def failed(fd):raise OSError('injected durable-write failure')
+     monkeypatch.setattr(os,'fsync',failed)
+     with pytest.raises(OSError,match='durable-write failure'):spool.append(b'{"kind":"event"}\n')
+     stats=spool.stats()
+     assert stats['accepted_bytes']>0 and stats['persisted_bytes']==0
+>    assert stats['unpersisted_tail_bytes']==stats['accepted_bytes']
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E    KeyError: 'unpersisted_tail_bytes'
+
+tests/dynamic/unit/test_bounded_evidence_review.py:85: KeyError
+=========================== short test summary info ============================
+FAILED tests/dynamic/unit/test_execution_attempt_review.py::test_reconnecting_same_attempt_preserves_old_transport_journal
+FAILED tests/dynamic/unit/test_bounded_evidence_review.py::test_failed_fsync_reports_received_but_not_durable_rpc_bytes
+2 failed in 2.82s

@@ -1,0 +1,43 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+_______ test_120_pi_turns_incremental_reasoning_text_and_tool_arguments ________
+
+tmp_path = PosixPath('[LOCAL_PRIVATE_PATH_002]/pressure-pi-2/test_120_pi_turns_incremental_0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x75e63d240d70>
+
+    def test_120_pi_turns_incremental_reasoning_text_and_tool_arguments(tmp_path,monkeypatch):
+     import trustfork.runtime.dynamic.provider as module
+     monkeypatch.setattr(module,'real_http',lambda *a,**k:(_ for _ in ()).throw(AssertionError('real network forbidden')))
+     cfg=runpy.run_path(str(repo_root()/'tests/dynamic/unit/test_provider_preparation.py'))['configuration']()
+     cfg['execution_scope']='engineering_smoke'
+     for alias,b in cfg['logical_bindings'].items():
+      b['capability']['tokenizer'].update(id='o200k_base',version=importlib.metadata.version('tiktoken'),count_method='local-message-content-and-schema-bpe-estimate')
+      b['capability']['status']='declared';b.update(thinking='enabled' if alias=='deepseekflash' else 'disabled',reasoning_effort='high' if alias=='deepseekflash' else None)
+      b['supported_parameters']+=['thinking','reasoning_effort']
+     def http(url,body,key,timeout):
+      frames=[]
+      def delta(value):frames.append({'choices':[{'index':0,'delta':value,'finish_reason':None}]})
+      for i in range(8):delta({'reasoning_content':'Synthetic thought '+str(i)+'; '})
+      for i in range(8):delta({'content':'Synthetic text '+str(i)+'; '})
+      delta({'tool_calls':[{'index':0,'id':'call-directory','type':'function','function':{'name':'get_team_directory','arguments':''}}]})
+      for part in ['{','}']:delta({'tool_calls':[{'index':0,'function':{'arguments':part}}]})
+      frames.append({'choices':[{'index':0,'delta':{},'finish_reason':'tool_calls'}],'usage':{'prompt_tokens':100,'completion_tokens':100,'total_tokens':200}})
+      return {'status':200,'headers':{'content-type':'text/event-stream'},'body':''.join('data: '+json.dumps(f)+'\n\n' for f in frames)+'data: [DONE]\n\n'}
+     transport=ProviderTransport(cfg,mode='mock',journal=tmp_path/'requests.jsonl',http=http,max_requests=120)
+     ledger=EventLedger(tmp_path/'events.jsonl','stream-120','p001')
+     client=PiClient(tmp_path/'control',None,ledger=ledger,provider=transport,model_refs={'Main':'deepseekflash'},coordination=lambda *a:{'version':0,'members':[]})
+     observations=[]
+     try:
+      session,_=client.create_session('Main',branch_id='stream-120',task_id='p001',system_prompt='Synthetic Main')
+      for i in range(120):
+       result=client.call(session,'execute_turn',{'messages':[{'role':'user','content':'Synthetic turn '+str(i),'timestamp':i+1}],'max_output_tokens':512},request_id='stream-'+str(i),timeout=60)
+>      assert result['status']=='success'
+E      AssertionError: assert 'infra_error' == 'success'
+E        
+E        - success
+E        + infra_error
+
+tests/dynamic/integration/test_stream_review_pressure.py:34: AssertionError
+=========================== short test summary info ============================
+FAILED tests/dynamic/integration/test_stream_review_pressure.py::test_120_pi_turns_incremental_reasoning_text_and_tool_arguments
+1 failed in 13.04s

@@ -1,0 +1,29 @@
+........................................................................ [ 21%]
+.....F.................................................................. [ 42%]
+........................................................................ [ 63%]
+........................................................................ [ 84%]
+....................................................                     [100%]
+=================================== FAILURES ===================================
+____ test_judge_has_at_most_two_attempts_and_no_reasoning_as_score[length] _____
+
+tmp_path = PosixPath('[LOCAL_PRIVATE_PATH_007]/pytest-1/test_judge_has_at_most_two_att0')
+reason = 'length'
+
+    @pytest.mark.parametrize('reason',['length','empty_reasoning_only','invented_evidence'])
+    def test_judge_has_at_most_two_attempts_and_no_reasoning_as_score(tmp_path,reason):
+     c=configuration();p=prepared(c)
+     if reason=='length':r=reply('{}','length')
+     elif reason=='empty_reasoning_only':r=reply('',reasoning=json.dumps(unknown_result()))
+     else:
+      bad=unknown_result();bad['trajectory_judgements']['ias']={'value':0,'status':'complete','evidence_refs':['invented']}
+      r=reply(json.dumps(bad))
+     t=ProviderTransport(c,mode='mock',journal=tmp_path/'judge.jsonl',http=lambda *a:r,max_requests=5,kind='judge')
+     with pytest.raises(DynamicError):JudgeClient(t).send_with_repair(p,request_id='j',pass_name='trajectory',evidence_refs=[])
+>    assert t.count==2
+E    assert 1 == 2
+E     +  where 1 = <trustfork.runtime.dynamic.provider.ProviderTransport object at 0x70afc30dba70>.count
+
+tests/dynamic/unit/test_first_api_judge.py:38: AssertionError
+=========================== short test summary info ============================
+FAILED tests/dynamic/unit/test_first_api_judge.py::test_judge_has_at_most_two_attempts_and_no_reasoning_as_score[length]
+1 failed, 339 passed in 95.24s (0:01:35)

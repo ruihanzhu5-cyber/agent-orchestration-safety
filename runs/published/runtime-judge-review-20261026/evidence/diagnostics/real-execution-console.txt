@@ -1,0 +1,13 @@
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "[LOCAL_PRIVATE_PATH_003]/trustfork/tools/runtime_judge_review.py", line 312, in <module>
+    if __name__=='__main__':main()
+                            ^^^^^^
+  File "[LOCAL_PRIVATE_PATH_003]/trustfork/tools/runtime_judge_review.py", line 294, in main
+    c=read_json(a.bindings);c.update(mode='api',real_api_enabled=True,execution_scope='engineering_smoke');c=attach_budget(c,a.parent)
+                                                                                                             ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "[LOCAL_PRIVATE_PATH_003]/trustfork/tools/runtime_judge_review.py", line 26, in attach_budget
+    cfg['campaign_budget'].update(path=str(path),campaign_id='first-api-20261026',must_exist=True,segment_id=SEGMENT_ID,segment_cny=20,segment_identity=json.loads(row[1]))
+    ~~~^^^^^^^^^^^^^^^^^^^
+KeyError: 'campaign_budget'

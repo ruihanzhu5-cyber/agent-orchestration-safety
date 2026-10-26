@@ -1,0 +1,66 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+_______ test_120_pi_turns_incremental_reasoning_text_and_tool_arguments ________
+
+tmp_path = PosixPath('[LOCAL_PRIVATE_PATH_002]/pressure-pi-1/test_120_pi_turns_incremental_0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7ece5e4105c0>
+
+    def test_120_pi_turns_incremental_reasoning_text_and_tool_arguments(tmp_path,monkeypatch):
+     import trustfork.runtime.dynamic.provider as module
+     monkeypatch.setattr(module,'real_http',lambda *a,**k:(_ for _ in ()).throw(AssertionError('real network forbidden')))
+     cfg=runpy.run_path(str(repo_root()/'tests/dynamic/unit/test_provider_preparation.py'))['configuration']()
+     cfg['execution_scope']='engineering_smoke'
+     for b in cfg['logical_bindings'].values():
+      b['capability']['tokenizer'].update(id='o200k_base',version=importlib.metadata.version('tiktoken'),count_method='local-message-content-and-schema-bpe-estimate')
+      b['capability']['status']='declared';b.update(thinking='enabled',reasoning_effort='high')
+      b['supported_parameters']+=['thinking','reasoning_effort']
+     def http(url,body,key,timeout):
+      frames=[]
+      def delta(value):frames.append({'choices':[{'index':0,'delta':value,'finish_reason':None}]})
+      for i in range(8):delta({'reasoning_content':'Synthetic thought '+str(i)+'; '})
+      for i in range(8):delta({'content':'Synthetic text '+str(i)+'; '})
+      delta({'tool_calls':[{'index':0,'id':'call-directory','type':'function','function':{'name':'get_team_directory','arguments':''}}]})
+      for part in ['{','}']:delta({'tool_calls':[{'index':0,'function':{'arguments':part}}]})
+      frames.append({'choices':[{'index':0,'delta':{},'finish_reason':'tool_calls'}],'usage':{'prompt_tokens':100,'completion_tokens':100,'total_tokens':200}})
+      return {'status':200,'headers':{'content-type':'text/event-stream'},'body':''.join('data: '+json.dumps(f)+'\n\n' for f in frames)+'data: [DONE]\n\n'}
+>    transport=ProviderTransport(cfg,mode='mock',journal=tmp_path/'requests.jsonl',http=http,max_requests=120)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/dynamic/integration/test_stream_review_pressure.py:26: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+trustfork/runtime/dynamic/provider.py:67: in __init__
+    validate_bindings(config,formal=False,required_aliases=self.active_aliases)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+config = {'protocol_version': 'dynamic-join-v9-trajectory-portfolio', 'mode': 'offline', 'real_api_enabled': False, 'logical_bi...etic', 'base_url': 'https://mock.invalid/v1', 'model_id': 'exact-fixture', 'key_env': 'UNUSED_FIXTURE_KEY', ...}}, ...}
+formal = False, required_aliases = {'deepseekflash', 'gpt4o'}, role_scope = None
+
+    def validate_bindings(config: dict, *, formal: bool, required_aliases=None, role_scope=None) -> dict:
+        strict_keys(config, {"protocol_version", "mode", "real_api_enabled", "logical_bindings", "judge_binding"}, {"note","execution_limits","runtime_budgets","execution_scope","campaign_budget"})
+        if config["protocol_version"] != PROTOCOL_VERSION:
+            raise DynamicError("wrong_protocol", config["protocol_version"])
+        if config["mode"] not in {"offline", "scripted-test", "api"}:
+            raise DynamicError("invalid_mode", str(config["mode"]))
+        if set(config["logical_bindings"]) != {"gpt4o", "deepseekflash"} or config["judge_binding"] not in {"gpt4o","deepseekflash"}:
+            raise DynamicError("invalid_model_aliases", "Only the two specified aliases and candidate judges are defined")
+        if role_scope=='judge':required_aliases={config['judge_binding']}
+        active=set(config['logical_bindings']) if required_aliases is None else set(required_aliases)
+        if not active or not active<=set(config['logical_bindings']):raise DynamicError('invalid_active_aliases','Unknown or empty role scope')
+        required = {"provider", "base_url", "model_id", "key_env", "context_window", "max_output_tokens", "supported_parameters"}
+        unresolved = []
+        for alias, binding in config["logical_bindings"].items():
+            strict_keys(binding, required, {'capability','api','compat','output_token_parameter','thinking','reasoning_effort','engineering_counting'})
+            unresolved += [f"{alias}.{key}" for key in required if binding[key] is None]
+            for key in ('api','compat','output_token_parameter'):
+                if binding.get(key) is None:unresolved.append(alias+'.'+key)
+            if binding.get('engineering_counting') not in (None,'deepseek-v41-text-v1'):raise DynamicError('request_counting_policy_unknown',alias)
+            if binding.get('thinking') not in (None,'enabled','disabled'):raise DynamicError('invalid_thinking_mode',alias)
+            if binding.get('reasoning_effort') not in (None,'high'):raise DynamicError('invalid_thinking_effort',alias)
+>           if alias=='gpt4o' and binding.get('thinking')=='enabled':raise DynamicError('invalid_thinking_mode','GPT4o cannot use DeepSeek thinking')
+                                                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E           trustfork.runtime.dynamic.common.DynamicError: invalid_thinking_mode: GPT4o cannot use DeepSeek thinking
+
+trustfork/runtime/dynamic/schema.py:75: DynamicError
+=========================== short test summary info ============================
+FAILED tests/dynamic/integration/test_stream_review_pressure.py::test_120_pi_turns_incremental_reasoning_text_and_tool_arguments
+1 failed in 8.05s

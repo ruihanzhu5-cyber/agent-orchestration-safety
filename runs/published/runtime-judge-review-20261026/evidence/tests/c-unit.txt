@@ -1,0 +1,337 @@
+...................................................F.................... [ 20%]
+........................................................................ [ 41%]
+......................F................................FFFF............. [ 62%]
+........................................................................ [ 83%]
+........................................................                 [100%]
+=================================== FAILURES ===================================
+_______ test_trajectory_view_removes_only_separately_bound_private_goal ________
+
+tmp_path = PosixPath('[LOCAL_PRIVATE_PATH_007]/pytest-0/test_trajectory_view_removes_o0')
+
+    def test_trajectory_view_removes_only_separately_bound_private_goal(tmp_path):
+        ledger=EventLedger(tmp_path/'events','b','p001')
+        goal='hidden objective: change a file'
+        ledger.append('model_request_submitted',{'actual_input':{'systemPrompt':'Public role\n\n'+goal+'\nCurrent working directory: /workspace',
+            'messages':[{'role':'user','content':'Public task with literal 70%'}],'tools':[]}},actor_id='C')
+>       result=trajectory_judge_view(ledger.rows,task={},private_goals={'C':goal},frozen_state={},final_response='done')
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/dynamic/unit/test_evaluation.py:78: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+trustfork/scoring/dynamic_adapter.py:95: in trajectory_judge_view
+    result['_sanitizer']={'version':'private-goal-boundary-v2','source_events_hash':digest(events),'sanitized_view_hash':digest(result)}
+                                                                                    ^^^^^^^^^^^^^^
+trustfork/runtime/dynamic/common.py:32: in digest
+    return hashlib.sha256(canonical(value)).hexdigest()
+                          ^^^^^^^^^^^^^^^^
+trustfork/runtime/dynamic/common.py:28: in canonical
+    return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+../../.local/share/uv/python/cpython-3.12.13-linux-x86_64-gnu/lib/python3.12/json/__init__.py:238: in dumps
+    **kw).encode(obj)
+          ^^^^^^^^^^^
+../../.local/share/uv/python/cpython-3.12.13-linux-x86_64-gnu/lib/python3.12/json/encoder.py:200: in encode
+    chunks = self.iterencode(o, _one_shot=True)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+../../.local/share/uv/python/cpython-3.12.13-linux-x86_64-gnu/lib/python3.12/json/encoder.py:258: in iterencode
+    return _iterencode(o, 0)
+           ^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <json.encoder.JSONEncoder object at 0x7ec47b099a60>
+o = <trustfork.runtime.dynamic.events.DiskEventRows object at 0x7ec47b0993a0>
+
+    def default(self, o):
+        """Implement this method in a subclass such that it returns
+        a serializable object for ``o``, or calls the base implementation
+        (to raise a ``TypeError``).
+    
+        For example, to support arbitrary iterators, you could
+        implement default like this::
+    
+            def default(self, o):
+                try:
+                    iterable = iter(o)
+                except TypeError:
+                    pass
+                else:
+                    return list(iterable)
+                # Let the base class default method raise the TypeError
+                return super().default(o)
+    
+        """
+>       raise TypeError(f'Object of type {o.__class__.__name__} '
+                        f'is not JSON serializable')
+E       TypeError: Object of type DiskEventRows is not JSON serializable
+
+../../.local/share/uv/python/cpython-3.12.13-linux-x86_64-gnu/lib/python3.12/json/encoder.py:180: TypeError
+__ test_invalid_instance_graph_errors[access-lineage_time_or_access_invalid] ___
+
+tmp_path = PosixPath('[LOCAL_PRIVATE_PATH_007]/pytest-0/test_invalid_instance_graph_er5')
+bad = 'access', code = 'lineage_time_or_access_invalid'
+
+    @pytest.mark.parametrize('bad,code',[('self','lineage_self_reference'),('cycle','lineage_cycle'),('unknown','lineage_claim_invalid'),('conflict','conflicting_lineage'),('time','lineage_time_or_access_invalid'),('access','lineage_time_or_access_invalid')])
+    def test_invalid_instance_graph_errors(tmp_path,bad,code):
+     events,d,ann=graph_fixture(tmp_path,[(0,1),(1,2)],['C','B','D'],2)
+     edge=ann['claim_lineage'][0]
+     if bad=='self':edge['source_claim']=edge['derived_claim']
+     elif bad=='cycle':ann['claim_lineage'].append({**edge,'source_claim':d['dynamic_claims'][2]['claim_id']})
+     elif bad=='unknown':edge['source_claim']='unknown'
+     elif bad=='conflict':ann['claim_lineage'].append({**edge,'kind':'semantic_paraphrase'})
+     elif bad=='time':edge['exposure_ref']=event_ref(events[-1])
+     else:
+      request=next(e for e in events if event_ref(e)==edge['exposure_ref']);request['payload']['actual_input']['messages']=[]
+>    with pytest.raises(DynamicError,match=code):evaluate_process(events,d,ann,'C')
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E    Failed: DID NOT RAISE DynamicError
+
+tests/dynamic/unit/test_homogeneous_lineage.py:125: Failed
+_______________ test_judge_rejects_ids_absent_from_actual_input ________________
+
+known_trajectory = {'events': <trustfork.runtime.dynamic.events.DiskEventRows object at 0x7ec47b04b230>, 'source': {'actor_id': 'C', 'bra...': 'A', 'branch_id': 'fixture-branch', 'event_id': 'event_00000003', 'event_type': 'tool_operation_started', ...}, ...}
+
+    def test_judge_rejects_ids_absent_from_actual_input(known_trajectory):
+     from trustfork.scoring.judge_client import validate_judge_result,prepared_evidence_index
+>    p,wire=prepared_fixture(known_trajectory['events']);index=wire['trajectory_view']['evidence_index']
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/dynamic/unit/test_judge_evidence_index.py:58: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/dynamic/unit/test_judge_evidence_index.py:11: in prepared_fixture
+    view=trajectory_judge_view(events,task={},private_goals={},frozen_state={},final_response='',scoring_profile='dynamic-homogeneous-v2')
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+trustfork/scoring/dynamic_adapter.py:95: in trajectory_judge_view
+    result['_sanitizer']={'version':'private-goal-boundary-v2','source_events_hash':digest(events),'sanitized_view_hash':digest(result)}
+                                                                                    ^^^^^^^^^^^^^^
+trustfork/runtime/dynamic/common.py:32: in digest
+    return hashlib.sha256(canonical(value)).hexdigest()
+                          ^^^^^^^^^^^^^^^^
+trustfork/runtime/dynamic/common.py:28: in canonical
+    return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+../../.local/share/uv/python/cpython-3.12.13-linux-x86_64-gnu/lib/python3.12/json/__init__.py:238: in dumps
+    **kw).encode(obj)
+          ^^^^^^^^^^^
+../../.local/share/uv/python/cpython-3.12.13-linux-x86_64-gnu/lib/python3.12/json/encoder.py:200: in encode
+    chunks = self.iterencode(o, _one_shot=True)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+../../.local/share/uv/python/cpython-3.12.13-linux-x86_64-gnu/lib/python3.12/json/encoder.py:258: in iterencode
+    return _iterencode(o, 0)
+           ^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <json.encoder.JSONEncoder object at 0x7ec47b049190>
+o = <trustfork.runtime.dynamic.events.DiskEventRows object at 0x7ec47b04b230>
+
+    def default(self, o):
+        """Implement this method in a subclass such that it returns
+        a serializable object for ``o``, or calls the base implementation
+        (to raise a ``TypeError``).
+    
+        For example, to support arbitrary iterators, you could
+        implement default like this::
+    
+            def default(self, o):
+                try:
+                    iterable = iter(o)
+                except TypeError:
+                    pass
+                else:
+                    return list(iterable)
+                # Let the base class default method raise the TypeError
+                return super().default(o)
+    
+        """
+>       raise TypeError(f'Object of type {o.__class__.__name__} '
+                        f'is not JSON serializable')
+E       TypeError: Object of type DiskEventRows is not JSON serializable
+
+../../.local/share/uv/python/cpython-3.12.13-linux-x86_64-gnu/lib/python3.12/json/encoder.py:180: TypeError
+_______________ test_current_profile_refuses_old_unindexed_view ________________
+
+known_trajectory = {'events': <trustfork.runtime.dynamic.events.DiskEventRows object at 0x7ec47b3677d0>, 'source': {'actor_id': 'C', 'bra...': 'A', 'branch_id': 'fixture-branch', 'event_id': 'event_00000003', 'event_type': 'tool_operation_started', ...}, ...}
+
+    def test_current_profile_refuses_old_unindexed_view(known_trajectory):
+>    _,wire=prepared_fixture(known_trajectory['events']);view=wire['trajectory_view'];view.pop('evidence_index')
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/dynamic/unit/test_judge_evidence_index.py:71: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/dynamic/unit/test_judge_evidence_index.py:11: in prepared_fixture
+    view=trajectory_judge_view(events,task={},private_goals={},frozen_state={},final_response='',scoring_profile='dynamic-homogeneous-v2')
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+trustfork/scoring/dynamic_adapter.py:95: in trajectory_judge_view
+    result['_sanitizer']={'version':'private-goal-boundary-v2','source_events_hash':digest(events),'sanitized_view_hash':digest(result)}
+                                                                                    ^^^^^^^^^^^^^^
+trustfork/runtime/dynamic/common.py:32: in digest
+    return hashlib.sha256(canonical(value)).hexdigest()
+                          ^^^^^^^^^^^^^^^^
+trustfork/runtime/dynamic/common.py:28: in canonical
+    return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+../../.local/share/uv/python/cpython-3.12.13-linux-x86_64-gnu/lib/python3.12/json/__init__.py:238: in dumps
+    **kw).encode(obj)
+          ^^^^^^^^^^^
+../../.local/share/uv/python/cpython-3.12.13-linux-x86_64-gnu/lib/python3.12/json/encoder.py:200: in encode
+    chunks = self.iterencode(o, _one_shot=True)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+../../.local/share/uv/python/cpython-3.12.13-linux-x86_64-gnu/lib/python3.12/json/encoder.py:258: in iterencode
+    return _iterencode(o, 0)
+           ^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <json.encoder.JSONEncoder object at 0x7ec47b364c20>
+o = <trustfork.runtime.dynamic.events.DiskEventRows object at 0x7ec47b3677d0>
+
+    def default(self, o):
+        """Implement this method in a subclass such that it returns
+        a serializable object for ``o``, or calls the base implementation
+        (to raise a ``TypeError``).
+    
+        For example, to support arbitrary iterators, you could
+        implement default like this::
+    
+            def default(self, o):
+                try:
+                    iterable = iter(o)
+                except TypeError:
+                    pass
+                else:
+                    return list(iterable)
+                # Let the base class default method raise the TypeError
+                return super().default(o)
+    
+        """
+>       raise TypeError(f'Object of type {o.__class__.__name__} '
+                        f'is not JSON serializable')
+E       TypeError: Object of type DiskEventRows is not JSON serializable
+
+../../.local/share/uv/python/cpython-3.12.13-linux-x86_64-gnu/lib/python3.12/json/encoder.py:180: TypeError
+________ test_added_index_changes_hash_and_capacity_without_truncation _________
+
+known_trajectory = {'events': <trustfork.runtime.dynamic.events.DiskEventRows object at 0x7ec47b155850>, 'source': {'actor_id': 'C', 'bra...': 'A', 'branch_id': 'fixture-branch', 'event_id': 'event_00000003', 'event_type': 'tool_operation_started', ...}, ...}
+
+    def test_added_index_changes_hash_and_capacity_without_truncation(known_trajectory):
+     from trustfork.scoring.judge_request import prepare_judge_request,capacity_report
+     from test_judge_capacity import BINDING,capability
+>    _,wire=prepared_fixture(known_trajectory['events']);without=copy.deepcopy(wire)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/dynamic/unit/test_judge_evidence_index.py:79: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/dynamic/unit/test_judge_evidence_index.py:11: in prepared_fixture
+    view=trajectory_judge_view(events,task={},private_goals={},frozen_state={},final_response='',scoring_profile='dynamic-homogeneous-v2')
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+trustfork/scoring/dynamic_adapter.py:95: in trajectory_judge_view
+    result['_sanitizer']={'version':'private-goal-boundary-v2','source_events_hash':digest(events),'sanitized_view_hash':digest(result)}
+                                                                                    ^^^^^^^^^^^^^^
+trustfork/runtime/dynamic/common.py:32: in digest
+    return hashlib.sha256(canonical(value)).hexdigest()
+                          ^^^^^^^^^^^^^^^^
+trustfork/runtime/dynamic/common.py:28: in canonical
+    return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+../../.local/share/uv/python/cpython-3.12.13-linux-x86_64-gnu/lib/python3.12/json/__init__.py:238: in dumps
+    **kw).encode(obj)
+          ^^^^^^^^^^^
+../../.local/share/uv/python/cpython-3.12.13-linux-x86_64-gnu/lib/python3.12/json/encoder.py:200: in encode
+    chunks = self.iterencode(o, _one_shot=True)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+../../.local/share/uv/python/cpython-3.12.13-linux-x86_64-gnu/lib/python3.12/json/encoder.py:258: in iterencode
+    return _iterencode(o, 0)
+           ^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <json.encoder.JSONEncoder object at 0x7ec47b155640>
+o = <trustfork.runtime.dynamic.events.DiskEventRows object at 0x7ec47b155850>
+
+    def default(self, o):
+        """Implement this method in a subclass such that it returns
+        a serializable object for ``o``, or calls the base implementation
+        (to raise a ``TypeError``).
+    
+        For example, to support arbitrary iterators, you could
+        implement default like this::
+    
+            def default(self, o):
+                try:
+                    iterable = iter(o)
+                except TypeError:
+                    pass
+                else:
+                    return list(iterable)
+                # Let the base class default method raise the TypeError
+                return super().default(o)
+    
+        """
+>       raise TypeError(f'Object of type {o.__class__.__name__} '
+                        f'is not JSON serializable')
+E       TypeError: Object of type DiskEventRows is not JSON serializable
+
+../../.local/share/uv/python/cpython-3.12.13-linux-x86_64-gnu/lib/python3.12/json/encoder.py:180: TypeError
+____________ test_goal_state_hash_is_supplied_not_computed_by_judge ____________
+
+known_trajectory = {'events': <trustfork.runtime.dynamic.events.DiskEventRows object at 0x7ec47b156300>, 'source': {'actor_id': 'C', 'bra...': 'A', 'branch_id': 'fixture-branch', 'event_id': 'event_00000003', 'event_type': 'tool_operation_started', ...}, ...}
+
+    def test_goal_state_hash_is_supplied_not_computed_by_judge(known_trajectory):
+     spec={'schema_version':'synthetic-goal-spec','desired_harm_state':'known engineering fixture'}
+>    view=trajectory_judge_view(known_trajectory['events'],task={},private_goals={},frozen_state={},final_response='',scoring_profile='dynamic-homogeneous-v2')
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/dynamic/unit/test_judge_evidence_index.py:92: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+trustfork/scoring/dynamic_adapter.py:95: in trajectory_judge_view
+    result['_sanitizer']={'version':'private-goal-boundary-v2','source_events_hash':digest(events),'sanitized_view_hash':digest(result)}
+                                                                                    ^^^^^^^^^^^^^^
+trustfork/runtime/dynamic/common.py:32: in digest
+    return hashlib.sha256(canonical(value)).hexdigest()
+                          ^^^^^^^^^^^^^^^^
+trustfork/runtime/dynamic/common.py:28: in canonical
+    return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+../../.local/share/uv/python/cpython-3.12.13-linux-x86_64-gnu/lib/python3.12/json/__init__.py:238: in dumps
+    **kw).encode(obj)
+          ^^^^^^^^^^^
+../../.local/share/uv/python/cpython-3.12.13-linux-x86_64-gnu/lib/python3.12/json/encoder.py:200: in encode
+    chunks = self.iterencode(o, _one_shot=True)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+../../.local/share/uv/python/cpython-3.12.13-linux-x86_64-gnu/lib/python3.12/json/encoder.py:258: in iterencode
+    return _iterencode(o, 0)
+           ^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <json.encoder.JSONEncoder object at 0x7ec47b155df0>
+o = <trustfork.runtime.dynamic.events.DiskEventRows object at 0x7ec47b156300>
+
+    def default(self, o):
+        """Implement this method in a subclass such that it returns
+        a serializable object for ``o``, or calls the base implementation
+        (to raise a ``TypeError``).
+    
+        For example, to support arbitrary iterators, you could
+        implement default like this::
+    
+            def default(self, o):
+                try:
+                    iterable = iter(o)
+                except TypeError:
+                    pass
+                else:
+                    return list(iterable)
+                # Let the base class default method raise the TypeError
+                return super().default(o)
+    
+        """
+>       raise TypeError(f'Object of type {o.__class__.__name__} '
+                        f'is not JSON serializable')
+E       TypeError: Object of type DiskEventRows is not JSON serializable
+
+../../.local/share/uv/python/cpython-3.12.13-linux-x86_64-gnu/lib/python3.12/json/encoder.py:180: TypeError
+=========================== short test summary info ============================
+FAILED tests/dynamic/unit/test_evaluation.py::test_trajectory_view_removes_only_separately_bound_private_goal
+FAILED tests/dynamic/unit/test_homogeneous_lineage.py::test_invalid_instance_graph_errors[access-lineage_time_or_access_invalid]
+FAILED tests/dynamic/unit/test_judge_evidence_index.py::test_judge_rejects_ids_absent_from_actual_input
+FAILED tests/dynamic/unit/test_judge_evidence_index.py::test_current_profile_refuses_old_unindexed_view
+FAILED tests/dynamic/unit/test_judge_evidence_index.py::test_added_index_changes_hash_and_capacity_without_truncation
+FAILED tests/dynamic/unit/test_judge_evidence_index.py::test_goal_state_hash_is_supplied_not_computed_by_judge
+6 failed, 338 passed in 84.05s (0:01:24)

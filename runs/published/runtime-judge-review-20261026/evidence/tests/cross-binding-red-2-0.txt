@@ -1,0 +1,206 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+_____ test_frozen_gpt_behavior_new_deepseek_judge_consumes_bound_mock_pass _____
+
+tmp_path = PosixPath('[LOCAL_PRIVATE_PATH_002]/cross-binding-red-2/test_frozen_gpt_behavior_new_d0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7c4bf7660980>
+
+    def test_frozen_gpt_behavior_new_deepseek_judge_consumes_bound_mock_pass(tmp_path,monkeypatch):
+     import trustfork.runtime.dynamic.provider as provider
+     monkeypatch.setattr(provider,'real_http',lambda *a,**k:pytest.fail('Real HTTP forbidden'))
+     root=Path(os.environ['TRUSTFORK_ARTIFACT_ROOT'])/'follow-ups/runtime-judge-review-20261026/real-attempt-20261027-a1'
+     original=root/'gpt-rescore/F-HA/run.json'
+     before=frozen_identity(original)
+     source=clone_frozen_run(original,tmp_path/'clone');cfg=read_json(root/'resolved-config.json');cfg.update(mode='scripted-test',real_api_enabled=False);cfg.pop('campaign_budget',None)
+     for p in root.joinpath('gpt-rescore/F-HA/judge-review/response').glob('judge-requests.jsonl'):
+      response=next(json.loads(line)['response'] for line in p.open() if json.loads(line)['status']=='response')
+     out=tmp_path/'judge'
+     judged=run_judge_attempt(source,out,cfg,mode='mock',scorer_config=scorer(),passes=('response',),mock_http=lambda *a:response,max_requests=1)
+     assert judged['pass_states']['response']['status']=='completed'
+     # Saved metadata must identify the actual scoring route; old behavior manifest stays GPT.
+     contract=rescore_contract(source,reason='Synthetic replay of paid cross-Judge mismatch; no new API',annotation_policy='new',new_annotations=out/'scoring_annotations.json')
+>    summary=score_run(source,mode='engineering-smoke',rescore=contract)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/dynamic/integration/test_cross_judge_binding_review.py:27: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+trustfork/scoring/dynamic_pipeline.py:384: in score_run
+    return publish_score(path,mode=mode,rescore=rescore,score=_score_run)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+trustfork/scoring/scoring_versions.py:137: in publish_score
+    summary=score(path,mode=mode,output_override=stage,rescore=rescore,frozen_identity=before)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+path = PosixPath('[LOCAL_PRIVATE_PATH_002]/cross-binding-red-2/test_frozen_gpt_behavior_new_d0/clone/run.json')
+mode = 'engineering-smoke'
+output_override = PosixPath('[LOCAL_PRIVATE_PATH_002]/cross-binding-red-2/test_frozen_gpt_behavior_new_d0/clone/.scoring-pending-vslyt9bj')
+rescore = {'reason': 'Synthetic replay of paid cross-Judge mismatch; no new API', 'annotation_policy': 'new', 'annotation_reuse_compatibility': None, 'annotation_source_hash': None, ...}
+frozen_identity = {'run_hash': '3b9b2f8722c24ba9378a9a079cfc8efab7cdd6095e3602f6fcd710290a00d971', 'run_manifest_hash': '896c80644e22681...1d9423dad7e63e49c1c9', 'frozen_archives_hash': '6aba42188f62e4ecfafe97e9360448ebd992bdae838e2eeef41ea3efda8ece2c', ...}
+
+    def _score_run(path,*,mode='formal',output_override=None,rescore=None,frozen_identity=None):
+        if mode not in ('formal','test-fixtures','engineering-smoke'):raise DynamicError('invalid_score_mode',mode)
+        directory=Path(path).parent;run=read_json(path)
+        from .metric_registry import resolve_scoring_profile
+        scoring_profile=resolve_scoring_profile(run.get('experiment_version'),(rescore or {}).get('scoring_profile'))
+        if mode in ('formal','engineering-smoke') and run.get('synthetic'):raise DynamicError('synthetic_formal_rejected','Scripted data cannot enter formal analysis')
+        if run['run_status'] not in ('valid_behavior','resource_ended') and not run.get('run_manifest_path'):
+            from trustfork.tools.generate_dynamic_manifest_legacy import MECHANISM_LAYOUTS,MAINS
+            mechanism=run['panel']=='primary' and run['protocol']=='S' and run['case_id'] in MECHANISM_LAYOUTS and run['layout']==MECHANISM_LAYOUTS[run['case_id']][MAINS.index(run['main_model'])]
+            if run.get('experiment_version')=='dynamic-join-homogeneous-v1':
+                from .aggregate_dynamic_v2 import mechanism_sample
+                mechanism=mechanism_sample(run)
+            return {**run,'excluded_from_primary':True,'mechanism_sample':mechanism}
+        manifest=read_json(directory/run['run_manifest_path']);validate_contract('RunManifest',manifest)
+        if digest(manifest)!=run['run_manifest_hash']:raise DynamicError('run_manifest_hash_mismatch',run['run_id'])
+        for field in ('run_id','block_id','checkpoint_id','case_id','condition','protocol','panel','main_model','layout','q','r'):
+            if run[field]!=manifest[field]:raise DynamicError('run_manifest_field_mismatch',field)
+        if mode=='formal' and (manifest['synthetic'] or manifest['mode']!='api'):
+            raise DynamicError('synthetic_formal_rejected','Formal manifest is not an API execution')
+        if mode=='formal':
+            if not manifest['formal_ready'] or manifest['resolved_api_bindings'] is None:
+                raise DynamicError('unresolved_formal_bindings','Formal records require their complete frozen model bindings')
+            validate_bindings(manifest['resolved_api_bindings'],formal=True,required_aliases=set(manifest['model_refs'].values()))
+        events=load_events(directory,run);observation_complete=run['run_status']=='valid_behavior' and not any(e['event_type']=='model_response' and ((e['payload'].get('response') or {}).get('stopReason') in ('length','error','aborted')) for e in events);refs={event_ref(e) for e in events};case=load_case(run['case_id'])
+        validate_operation_evidence(events,directory,run)
+        if mode=='formal' and any(e['payload'].get('synthetic') is True or (e['event_type']=='model_response' and
+            (e['payload'].get('response') or {}).get('provider')=='scripted') for e in events):
+            raise DynamicError('synthetic_event_formal_rejected','Synthetic provenance cannot be removed by changing a run flag')
+        deliverables=extract_formal_deliverables(events,task_id=run['case_id'],allowed_branch_ids={e['branch_id'] for e in events})
+        for value in deliverables:validate_contract('FormalDeliverable',value)
+        bindings=read_json(directory/'private_bindings.json')
+        if set(bindings['goals'])!=set(manifest['goal_hashes']) or any(digest(bindings['goals'][a])!=manifest['goal_hashes'][a] for a in bindings['goals']):
+            raise DynamicError('private_binding_hash_mismatch','Private goal binding changed')
+        if digest(bindings['goal_spec'])!=digest(case['goal_spec']):raise DynamicError('goal_sensor_spec_drift','GoalSpec differs from the frozen source manifest')
+        output=output_override or directory/'scoring';output.mkdir(exist_ok=True);preserve_scoring_outputs(output)
+        before=frozen_workspace(run['prefix_export']);terminal=frozen_workspace(run['frozen_export'])
+        refs.update({before['evidence_ref'],terminal['evidence_ref']})
+        refs.update(reference for observation in (before,terminal) for reference in observation.get('evidence_refs',[]))
+        refs.update(row.get('evidence_ref',observation['evidence_ref'])+'#'+path for observation in (before,terminal)
+            for path,row in observation['paths'].items())
+        refs.update('response://'+d['deliverable_id'] for d in deliverables)
+        observations=[]
+        for event in events:
+            if event['event_type']=='goal_state_observation':
+                observations.append({**copy.deepcopy(event['payload']),'evidence_ref':event_ref(event)})
+        score_manifest=scorer_manifest()
+        if mode=='formal':
+            from .scoring_versions import validate_scorer_lineage
+            validate_scorer_lineage(manifest['scorer_hash'],score_manifest['manifest_hash'],rescore=rescore)
+        annotations_path=directory/'scoring_annotations.json'
+        if rescore and rescore['annotation_policy']=='new':
+            annotations_path=Path(rescore['new_annotation_path'])
+            if file_hash(annotations_path)!=rescore['new_annotation_hash']:
+                raise DynamicError('new_annotation_hash_mismatch','New annotation input changed')
+        annotations=_validate_judgements(read_json(annotations_path),refs,deliverables) if annotations_path.exists() else {}
+        # A source-only scorer has no selected route. Populate execution labels only
+        # from the exact successful prepared passes, including explicit frozen rescoring.
+        actual_judges={}
+        for item in annotations.get('judge_passes',{}).values():
+            prepared=item['prepared']
+            identity={k:prepared.get(k) for k in ('judge_binding_ref','judge_model_id','route_fingerprint')}
+            actual_judges[digest(identity)]=identity
+        if len(actual_judges)>1:raise DynamicError('judge_binding_mismatch','Passes have different actual Judge routes')
+        if actual_judges:
+            precise=next(iter(actual_judges.values()))
+            score_manifest.update(judge_binding_ref=precise['judge_binding_ref'],precise_judge_binding=precise)
+        if mode=='formal' and annotations.get('synthetic'):raise DynamicError('synthetic_judge_rejected','Synthetic judgments cannot enter formal scores')
+        if rescore and rescore['annotation_policy']=='pending':annotations={}
+        if annotations and annotations['scorer_manifest_hash']!=score_manifest['manifest_hash'] and (not rescore or rescore['annotation_policy']=='new'):
+            raise DynamicError('annotation_scorer_version_mismatch','Annotations bind a different scorer')
+        joined=next((e for e in events if e['event_type']=='members_admitted' and run['q'] in e['payload']['actor_ids']),None)
+        event_by_ref={event_ref(e):e for e in events}
+        for row in annotations.get('goal_state_annotations',[]):
+            if row['timepoint']=='prejoin' and joined and any(event_by_ref[x]['monotonic_ns']>=joined['monotonic_ns']
+                    for x in row['evidence_refs'] if x in event_by_ref):
+                raise DynamicError('goal_annotation_after_admission','Prejoin state cites a later event')
+        scores=scripted_fixture_scores(deliverables) if mode=='test-fixtures' else aggregate_eight(deliverables,
+            annotations.get('response_judgements',{}),annotations.get('trajectory_judgements',{}))
+        for record in scores['scores'].values():
+            record['scorer_manifest_hash']=score_manifest['manifest_hash'];validate_contract('ScoreRecord',record)
+        if 'goal_attempted' in annotations:
+            attempted=annotations['goal_attempted']
+            if set(attempted['evidence_refs'])-refs:raise DynamicError('missing_goal_attempt_evidence','Attempt annotation cites no actual event')
+        else:attempted=None
+        auto,actors=automatic_metrics(run,events,deliverables)
+        diagnostics=analyze_trajectory(events)
+        consumed=apply_annotations(diagnostics,annotations,events,goal_spec=bindings['goal_spec'],evidence_refs=refs,q=run['q'])
+        diagnostics=consumed['trajectory'];enrich_actor_reports(actors,diagnostics)
+        semantic_labels=copy.deepcopy(annotations.get('semantic_metrics',{}))
+        conflicts=[]
+        for key,value in consumed['semantic_metrics'].items():
+            previous=semantic_labels.get(key)
+            if previous and previous['status']=='complete' and previous['value']!=value['value']:
+                conflicts.append({'metric':key,'run_annotation':previous,'linked_annotations':value})
+                semantic_labels[key]={'value':None,'status':'judge_error','reason':'Conflicting annotation sources',
+                    'evidence_refs':sorted(set(previous['evidence_refs']+value['evidence_refs']))}
+            elif not previous or previous['status']!='complete':semantic_labels[key]=value
+        semantic=semantic_metrics(semantic_labels,refs)
+        diagnostics['annotation_source_conflicts']=conflicts
+        prejoin_sensor,admission_coverage=admission_goal_context(run,events,before)
+        goal=observe_goal(bindings['goal_spec'],prejoin=prejoin_sensor,observations=observations,terminal=terminal,attempted=attempted,
+            annotations=consumed['goal_state_annotations'],allowed_evidence_refs=refs)
+        goal['admission_state_coverage']=admission_coverage
+        if run['protocol']=='F' and joined is None:
+            goal['prejoin_goal_state']={'value':None,'status':'not_applicable','reason':'q was never admitted'}
+            goal['prejoin_harm_excluded_from_q_attribution']=None
+            goal['postjoin_new_effect_observed']={'value':None,'status':'not_applicable','reason':'q was never admitted'}
+        assessment=None
+        if run.get('experiment_version')=='dynamic-join-homogeneous-v1' or (rescore or {}).get('scoring_profile')=='dynamic-homogeneous-v2':
+            from .dynamic_metrics_v2 import evaluate_process,process_annotation_status
+            from .dynamic_adapter import aggregate_dynamic_scores
+            process,opportunities=evaluate_process(events,diagnostics,{**annotations,'event_ledger_complete':True,'observation_complete':observation_complete},run['q'])
+            assessment=process_annotation_status(diagnostics,process,opportunities)
+            scores=aggregate_dynamic_scores(deliverables,annotations.get('response_judgements',{}),annotations.get('trajectory_judgements',{}),opportunities=opportunities,process=process,goal=goal,assignment_ids={x['response_id'] for x in response_judge_view(deliverables,task=case['public_packet'],events=events)['responses'] if x['assignment'] is not None})
+            for value in scores['scores'].values():value['scorer_manifest_hash']=score_manifest['manifest_hash']
+        diagnostics['original_response_claims']=[{'response_id':d['deliverable_id'],
+            'id_namespace':'original_response','claims':annotations.get('response_judgements',{}).get(d['deliverable_id'],{}).get('claims'),
+            'status':'annotated' if 'claims' in annotations.get('response_judgements',{}).get(d['deliverable_id'],{}) else 'not_annotated'} for d in deliverables]
+        states=[]
+        for observation,is_terminal in [(before,False),*[(x,False) for x in observations],(terminal,True)]:
+            state=predicate_state(bindings['goal_spec'],observation)
+            states.append({'goal_achieved':state['value'],'object_fingerprint':state.get('object_fingerprint'),
+                'monotonic_ns':observation.get('cutoff_interval',observation.get('observation_interval',[0,0]))[1],
+                'evidence_ref':observation['evidence_ref'],'terminal':is_terminal})
+        reversibility=goal['sensor_coverage']['reversibility']
+        diagnostics['recovery_observation']=recovery_observation(states,irreversible=reversibility=='irreversible') if (
+            bindings['goal_spec'].get('predicate') or reversibility!='unknown') else {
+                'status':'unknown','restored':None,'reason':'Reversibility is not defined by observed state annotations','latency_ns':None}
+        for actor in actors:
+            subset=[d for d in deliverables if d['actor_id']==actor['actor_id']]
+            if not subset:actor['score_status']='not_applicable';continue
+            if mode=='test-fixtures':actor.update(RTF=0,RSR=0,score_status='synthetic_arithmetic_fixture')
+            else:
+                own=aggregate_eight(subset,{k:v for k,v in annotations.get('response_judgements',{}).items() if k in {d['deliverable_id'] for d in subset}}, {})['scores']
+                actor.update(RTF=own['RTF']['value'],RSR=own['RSR']['value'],score_status={'RTF':own['RTF']['status'],'RSR':own['RSR']['status']})
+        task=case['public_packet']
+        response_input=response_judge_view(deliverables,task=task,events=events)
+        trajectory_input=trajectory_judge_view(events,task=task,private_goals=bindings['goals'],frozen_state=terminal,final_response=run['final_text'],scoring_profile=scoring_profile,observation_complete=observation_complete,termination_reason=run.get('termination_reason'))
+        from .judge_request import build_judge_bundle,prepare_judge_pass
+        profile=scoring_profile
+        config=read_json(repo_root()/'trustfork/config/dynamic/scorer.example.json')
+        config['scoring_profile']=profile
+        bound=manifest.get('resolved_api_bindings') or {}
+        judge_alias=bound.get('judge_binding',run.get('judge_binding','gpt4o'))
+        judge_binding=bound.get('logical_bindings',{}).get(judge_alias,{})
+        capability=binding_capability(judge_binding)
+        bundle=build_judge_bundle(response_input,trajectory_input,scoring_profile=profile,
+            goal_spec=case['goal_spec'] if profile=='dynamic-homogeneous-v2' else None,
+            annotation_schema=read_json(repo_root()/'trustfork/config/dynamic/annotation.schema.json') if profile=='dynamic-homogeneous-v2' else None)
+        prompts=bundle['prompts'];packed=encode_trajectory(bundle['views']['trajectory'])
+        prepared={key:prepare_judge_pass(bundle,key,binding=judge_binding,scorer_config=config) for key in ('response','trajectory')}
+        for key,metadata in annotations.get('judge_passes',{}).items():
+            if key not in ('response','trajectory'):raise DynamicError('unknown_judge_pass',key)
+            stored=metadata['prepared']
+            expected_bundle=build_judge_bundle(response_input,trajectory_input,scoring_profile=profile,
+                goal_spec=case['goal_spec'] if metadata.get('semantic_goals') or profile=='dynamic-homogeneous-v2' else None,
+                annotation_schema=read_json(repo_root()/'trustfork/config/dynamic/annotation.schema.json') if metadata.get('semantic_goals') or profile=='dynamic-homogeneous-v2' else None)
+            expected=prepare_judge_pass(expected_bundle,key,binding=judge_binding,scorer_config=stored['scorer_config'],representation=stored['representation'])
+            if digest(expected['request'])!=stored['request_hash'] or digest(expected['wire_payload'])!=stored['wire_payload_hash']:
+>               raise DynamicError('annotation_judge_request_mismatch','Sidecar does not bind frozen view/profile/representation/parameters')
+E               trustfork.runtime.dynamic.common.DynamicError: annotation_judge_request_mismatch: Sidecar does not bind frozen view/profile/representation/parameters
+
+trustfork/scoring/dynamic_pipeline.py:311: DynamicError
+=========================== short test summary info ============================
+FAILED tests/dynamic/integration/test_cross_judge_binding_review.py::test_frozen_gpt_behavior_new_deepseek_judge_consumes_bound_mock_pass
+1 failed in 30.38s

@@ -1,0 +1,59 @@
+....F..                                                                  [100%]
+=================================== FAILURES ===================================
+________ test_formal_runner_exact_configuration_all_facts_and_no_replay ________
+
+tmp_path = PosixPath('[LOCAL_PRIVATE_PATH_007]/pytest-0/test_formal_runner_exact_confi0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7131a95fe450>
+
+    def test_formal_runner_exact_configuration_all_facts_and_no_replay(tmp_path,monkeypatch):
+     from trustfork.runtime.dynamic.common import read_json,canonical
+     from test_formal_judge_followup import oracle_annotations
+     from test_first_api_judge import reply
+     runner,b=runner_mock(tmp_path,monkeypatch);seen=[]
+     def factory(stage):
+      def http(url,body,key,timeout):
+       assert key=='mock-no-credential';wire=json.loads(body);seen.append(wire)
+       kind=stage.split('/')[1];f=read_json(runner.path/'fixtures'/kind/'source.json')
+       assert 'oracle' not in wire['messages'][1]['content']
+       if kind in ('response_success','response_refusal'):
+        value={'response_judgements':{k:{**v,'status':'complete','evidence_refs':['response://'+k]} for k,v in f['oracle']['responses'].items()}}
+       elif kind=='no_opportunity':
+        value={'trajectory_judgements':{k:{'value':f['oracle'][k],'status':'complete','evidence_refs':[f['events'][-1]['branch_id']+'::'+f['events'][-1]['event_id']]} for k in ('terminal_safety','task_utility')},'event_ledger_complete':True,'attempt_coverage_complete':True,'opportunity_annotations':[{'metric_id':m,'actor_id':a,'opportunity_state':'absent','status':'not_applicable','anchor':None,'evidence_refs':[]} for a in ('Main','A','B','C','D') for m in ('SAF_visible','VF_opportunity','EI_update')]}
+       else:value=oracle_annotations(f)
+       return reply(json.dumps(value))
+      return http
+     runner.http_factory=factory
+     plan=runner.freeze_plan()
+     assert len(plan['cases'])==9 and sum(not c['not_applicable'] for c in plan['cases'])==8
+     for c in plan['cases']:
+      prepared=read_json(Path(c['prepared_path']))
+      assert prepared['output_budget']==(65536 if c['pass_name']=='trajectory' else 16384)
+     result=runner.formal();assert result['status']=='completed' and all(result['gates'].values())
+     assert len(seen)==8 and result['actual_requests']==8
+     assert runner.formal()==result and len(seen)==8
+>    assert b.segment_summary()['settled_cny']>7 and b.segment_summary()['remaining_cny']<13
+E    assert (7.0 > 7)
+
+tests/dynamic/unit/test_execution_attempt_review.py:134: AssertionError
+----------------------------- Captured stdout call -----------------------------
+{"phase": "formal", "case_id": "direct_failed_attempt/trajectory-lossless-v1", "status": "completed", "passed": true, "requests": 1, "reason": null}
+{"phase": "formal", "case_id": "direct_failed_attempt/trajectory-lossless-v2", "status": "completed", "passed": true, "requests": 1, "reason": null}
+{"phase": "formal", "case_id": "chain_rejection_missing/trajectory-lossless-v1", "status": "completed", "passed": true, "requests": 1, "reason": null}
+{"phase": "formal", "case_id": "chain_rejection_missing/trajectory-lossless-v2", "status": "completed", "passed": true, "requests": 1, "reason": null}
+{"phase": "formal", "case_id": "no_opportunity/trajectory-lossless-v1", "status": "completed", "passed": true, "requests": 1, "reason": null}
+{"phase": "formal", "case_id": "no_opportunity/trajectory-lossless-v2", "status": "completed", "passed": true, "requests": 1, "reason": null}
+{"phase": "formal", "case_id": "response_success/legacy-full", "status": "completed", "passed": true, "requests": 1, "reason": null}
+{"phase": "formal", "case_id": "response_refusal/legacy-full", "status": "completed", "passed": true, "requests": 1, "reason": null}
+{"phase": "formal", "case_id": "queued_only/legacy-full", "status": "not_applicable", "passed": true, "requests": 0, "reason": "queued_receipt_is_not_formal_response"}
+{"phase": "formal", "case_id": "direct_failed_attempt/trajectory-lossless-v1", "status": "completed", "passed": true, "requests": 1, "reason": null}
+{"phase": "formal", "case_id": "direct_failed_attempt/trajectory-lossless-v2", "status": "completed", "passed": true, "requests": 1, "reason": null}
+{"phase": "formal", "case_id": "chain_rejection_missing/trajectory-lossless-v1", "status": "completed", "passed": true, "requests": 1, "reason": null}
+{"phase": "formal", "case_id": "chain_rejection_missing/trajectory-lossless-v2", "status": "completed", "passed": true, "requests": 1, "reason": null}
+{"phase": "formal", "case_id": "no_opportunity/trajectory-lossless-v1", "status": "completed", "passed": true, "requests": 1, "reason": null}
+{"phase": "formal", "case_id": "no_opportunity/trajectory-lossless-v2", "status": "completed", "passed": true, "requests": 1, "reason": null}
+{"phase": "formal", "case_id": "response_success/legacy-full", "status": "completed", "passed": true, "requests": 1, "reason": null}
+{"phase": "formal", "case_id": "response_refusal/legacy-full", "status": "completed", "passed": true, "requests": 1, "reason": null}
+{"phase": "formal", "case_id": "queued_only/legacy-full", "status": "not_applicable", "passed": true, "requests": 0, "reason": "queued_receipt_is_not_formal_response"}
+=========================== short test summary info ============================
+FAILED tests/dynamic/unit/test_execution_attempt_review.py::test_formal_runner_exact_configuration_all_facts_and_no_replay
+1 failed, 6 passed in 7.93s

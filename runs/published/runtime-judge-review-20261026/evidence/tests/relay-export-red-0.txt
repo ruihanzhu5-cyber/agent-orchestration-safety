@@ -1,0 +1,17 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+______________ test_reconnected_jsonl_journals_remain_publishable ______________
+
+tmp_path = PosixPath('[LOCAL_PRIVATE_PATH_007]/pytest-3/test_reconnected_jsonl_journal0')
+
+    def test_reconnected_jsonl_journals_remain_publishable(tmp_path):
+     for prefix in ('provider-requests-relay-','judge-requests-relay-'):
+      p=tmp_path/'deepseek'/'history'/(prefix+'fixed.jsonl')
+>     assert allowed(p,tmp_path)
+E     AssertionError: assert False
+E      +  where False = allowed(PosixPath('[LOCAL_PRIVATE_PATH_007]/pytest-3/test_reconnected_jsonl_journal0/deepseek/history/provider-requests-relay-fixed.jsonl'), PosixPath('[LOCAL_PRIVATE_PATH_007]/pytest-3/test_reconnected_jsonl_journal0'))
+
+tests/dynamic/unit/test_review_relay_publication.py:6: AssertionError
+=========================== short test summary info ============================
+FAILED tests/dynamic/unit/test_review_relay_publication.py::test_reconnected_jsonl_journals_remain_publishable
+1 failed in 2.79s

@@ -1,0 +1,26 @@
+.F..................                                                     [100%]
+=================================== FAILURES ===================================
+__________ test_export_large_compressible_jsonl_is_bounded_and_atomic __________
+
+tmp_path = PosixPath('[LOCAL_PRIVATE_PATH_007]/pytest-0/test_export_large_compressible0')
+
+    def test_export_large_compressible_jsonl_is_bounded_and_atomic(tmp_path):
+     from trustfork.runtime.dynamic.review_export import export_campaign
+     source=tmp_path/'source';source.mkdir();write_json(source/'campaign.json',{'status':'stopped','campaign_id':'bounded-offline','identity':{'commit':'synthetic'}})
+     path=source/'tests/large.jsonl';path.parent.mkdir()
+     with path.open('wb') as f:
+      for i in range(160):f.write(canonical({'sequence':i,'payload':'abc🙂'*32768})+b'\n')
+     before=hashlib.sha256(path.read_bytes()).hexdigest()
+     tracemalloc.start()
+     result=export_campaign(source,tmp_path/'public',max_part_bytes=512*1024,max_total_bytes=2*1024*1024)
+     _,peak=tracemalloc.get_traced_memory();tracemalloc.stop()
+     # Input >35MiB; threshold allows 20 shard buffers plus interpreter/redactor overhead,
+     # deliberately far below cumulative uncompressed output. No absolute RSS assertion.
+>    assert peak<20*512*1024+8*1024*1024,peak
+E    AssertionError: 36849939
+E    assert 36849939 < (((20 * 512) * 1024) + ((8 * 1024) * 1024))
+
+tests/dynamic/unit/test_bounded_evidence_review.py:38: AssertionError
+=========================== short test summary info ============================
+FAILED tests/dynamic/unit/test_bounded_evidence_review.py::test_export_large_compressible_jsonl_is_bounded_and_atomic
+1 failed, 19 passed in 9.47s

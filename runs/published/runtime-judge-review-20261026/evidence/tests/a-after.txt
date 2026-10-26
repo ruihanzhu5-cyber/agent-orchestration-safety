@@ -1,0 +1,29 @@
+F........                                                                [100%]
+=================================== FAILURES ===================================
+_________ test_wait_releases_permit_deduplicates_wake_and_closes_race __________
+
+tmp_path = PosixPath('[LOCAL_PRIVATE_PATH_007]/pytest-0/test_wait_releases_permit_dedu0')
+
+    def test_wait_releases_permit_deduplicates_wake_and_closes_race(tmp_path):
+     l,m,life,s=state(tmp_path)
+     s.enqueue_batch(["Main","A","B"],reason="test")
+     assert s.permit(actors=["Main"])
+     v=s.observable_version("Main")
+     # Arrival after the tool's check, before the actor's completion cannot be lost.
+     s.notify(["Main"],"message")
+     assert s.complete("Main",outcome={"state":"waiting","after_version":v,"timeout_seconds":10,"pending_work":True})=="changed"
+     assert len([r for r in s.queue if r["actor_id"]=="Main"])==1
+     assert s.permit(actors=["Main"])
+     v=s.observable_version("Main")
+     assert s.complete("Main",outcome={"state":"waiting","after_version":v,"timeout_seconds":10,"pending_work":True})=="waiting"
+     assert "Main" not in s.active and "Main" in s.waiting
+     for actor in ["A","B"]:
+>     assert s.permit(actors=[actor])
+E     AssertionError: assert None
+E      +  where None = permit(actors=['A'])
+E      +    where permit = <trustfork.runtime.dynamic.scheduler.Scheduler object at 0x74a3d03707a0>.permit
+
+tests/dynamic/unit/test_explicit_wait_review.py:29: AssertionError
+=========================== short test summary info ============================
+FAILED tests/dynamic/unit/test_explicit_wait_review.py::test_wait_releases_permit_deduplicates_wake_and_closes_race
+1 failed, 8 passed in 4.66s

@@ -1,0 +1,49 @@
+....FF.F.                                                                [100%]
+=================================== FAILURES ===================================
+_________ test_independent_response_survives_trajectory_capacity_block _________
+
+tmp_path = PosixPath('[LOCAL_PRIVATE_PATH_007]/pytest-0/test_independent_response_surv0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x71209c0869f0>
+
+    def test_independent_response_survives_trajectory_capacity_block(tmp_path,monkeypatch):
+     run,c,s,replies=setup(tmp_path,monkeypatch)
+     result=run_judge_attempt(run,tmp_path/"attempt",c,mode="mock",scorer_config=s,mock_replies=replies)
+>    assert result["pass_states"]["response"]["status"]=="completed"
+E    AssertionError: assert 'blocked' == 'completed'
+E      
+E      - completed
+E      + blocked
+
+tests/dynamic/unit/test_followup_judge_passes.py:30: AssertionError
+__________ test_first_single_pass_pending_and_explicit_success_reuse ___________
+
+tmp_path = PosixPath('[LOCAL_PRIVATE_PATH_007]/pytest-0/test_first_single_pass_pending0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x71209c0b15e0>
+
+    def test_first_single_pass_pending_and_explicit_success_reuse(tmp_path,monkeypatch):
+     run,c,s,replies=setup(tmp_path,monkeypatch)
+     first=run_judge_attempt(run,tmp_path/"first",c,mode="mock",scorer_config=s,mock_replies=replies,passes=("response",))
+>    assert first["judge_attempts"]==1 and first["pass_states"]["trajectory"]["status"]=="pending"
+E    assert (0 == 1)
+
+tests/dynamic/unit/test_followup_judge_passes.py:39: AssertionError
+_____ test_completed_response_reuse_survives_other_pass_output_calibration _____
+
+tmp_path = PosixPath('[LOCAL_PRIVATE_PATH_007]/pytest-0/test_completed_response_reuse_0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x71209c0b2f30>
+
+    def test_completed_response_reuse_survives_other_pass_output_calibration(tmp_path,monkeypatch):
+     run,c,s,replies=setup(tmp_path,monkeypatch)
+     first=run_judge_attempt(run,tmp_path/"first",c,mode="mock",scorer_config=s,mock_replies=replies,passes=("response",))
+     changed=copy.deepcopy(s);changed["trajectory_output_budget_tokens"]*=2
+     again=run_judge_attempt(run,tmp_path/"calibrated",c,mode="mock",scorer_config=changed,mock_replies={},prior_attempt=tmp_path/"first")
+>    assert again["judge_attempts"]==0 and again["pass_states"]["response"]["reused"]
+                                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E    KeyError: 'reused'
+
+tests/dynamic/unit/test_followup_judge_passes.py:68: KeyError
+=========================== short test summary info ============================
+FAILED tests/dynamic/unit/test_followup_judge_passes.py::test_independent_response_survives_trajectory_capacity_block
+FAILED tests/dynamic/unit/test_followup_judge_passes.py::test_first_single_pass_pending_and_explicit_success_reuse
+FAILED tests/dynamic/unit/test_followup_judge_passes.py::test_completed_response_reuse_survives_other_pass_output_calibration
+3 failed, 6 passed in 4.93s
