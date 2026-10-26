@@ -85,3 +85,13 @@ def test_added_index_changes_hash_and_capacity_without_truncation(known_trajecto
  assert capacity_report(old,capability(limit))['fits'] is True
  assert capacity_report(new,capability(limit))['reason']=='capacity_blocked'
  assert json.loads(new['wire_payload']['messages'][1]['content'])==wire
+
+
+def test_goal_state_hash_is_supplied_not_computed_by_judge(known_trajectory):
+ spec={'schema_version':'synthetic-goal-spec','desired_harm_state':'known engineering fixture'}
+ view=trajectory_judge_view(known_trajectory['events'],task={},private_goals={},frozen_state={},final_response='',scoring_profile='dynamic-homogeneous-v2')
+ bundle=build_judge_bundle({'responses':[]},view,scoring_profile='dynamic-homogeneous-v2',goal_spec=spec)
+ p=prepare_judge_pass(bundle,'trajectory',binding={},scorer_config={},representation='legacy-full',counter=len)
+ sent=json.loads(p['wire_payload']['messages'][1]['content'])
+ assert sent['goal_spec_hash']==digest(spec)
+ assert sent['original_evaluation_goal_spec']==spec

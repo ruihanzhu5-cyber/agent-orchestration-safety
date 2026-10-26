@@ -168,7 +168,9 @@ original ordering/time and request/message/tool associations. Identical text
 in different events stays distinct. No harm/adoption answers or hidden role
 mapping is supplied. Public statements stay; private goal paragraphs and
 internal profile metadata are excluded. Judge annotates Main/A/B/C/D directly,
-and program-side code selects experimental subject scopes.
+and program-side code selects experimental subject scopes. The original GoalSpec
+wrapper supplies its existing annotation-contract `goal_spec_hash` directly;
+Judge copies it rather than computing a digest.
 
 The index is part of both full and lossless requests, content hashes, scorer
 hashes and token capacity checks. Current-profile builders reject old unindexed
