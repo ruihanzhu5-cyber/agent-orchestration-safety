@@ -1,10 +1,10 @@
 """Deterministic white-list review copy; original evidence is never edited."""
-import base64,csv,hashlib,io,json,re,sqlite3
+import base64,csv,hashlib,io,json,re,sqlite3,posixpath
 from pathlib import Path
 from .artifacts import safe_slug
 from .common import DynamicError,canonical,file_hash,read_json
 
-VERSION='dynamic-review-export-v1'
+VERSION='dynamic-review-export-v2'
 ROOT_FILES={'campaign.json','plan.jsonl','resolved-config.json','results.json','cost-summary.json'}
 ROLE_DIRS={'blocks','history','probes','diagnostics','test-results','analysis'}
 RUNTIME_NAMES={'run.json','run_manifest.json','events.jsonl','prefix-events.json','delivery_receipts.json',
@@ -18,15 +18,15 @@ def jsonlines(p):return [json.loads(x) for x in p.read_text().splitlines() if x.
 class Redactor:
  def __init__(self,secrets=(),private_paths=()):
   self.secrets=sorted({s for s in secrets if isinstance(s,str) and s},key=lambda s:(-len(s),s))
-  self.paths=sorted({str(p) for p in private_paths if str(p)},key=lambda s:-len(s));self.changes=[]
+  self.paths=sorted({str(p) for p in private_paths if str(p)},key=lambda s:(-len(s),s));self.changes=[]
  def text(self,s,ref):
   for i,secret in enumerate(self.secrets,1):
    if secret in s:
     s=s.replace(secret,f'[REDACTED_CREDENTIAL_{i:03d}]')
     self.changes.append({'reference':ref,'reason':'known_real_credential','placeholder':i})
-  for p in self.paths:
+  for i,p in enumerate(self.paths,1):
    if p in s:
-    s=s.replace(p,'[LOCAL_PRIVATE_PATH]');self.changes.append({'reference':ref,'reason':'real_local_path'})
+    s=s.replace(p,f'[LOCAL_PRIVATE_PATH_{i:03d}]');self.changes.append({'reference':ref,'reason':'real_local_path','placeholder':i})
   def header(m):
    self.changes.append({'reference':ref,'reason':'authentication_header'})
    return m.group(1)+'[REDACTED_AUTH_HEADER]'
@@ -120,13 +120,14 @@ def export_campaign(source,destination,*,secrets=(),private_paths=(),snapshot=Fa
   if chunk or not names:
    name=prefix+f'.part-{len(names):04d}.jsonl';put(name,b''.join(chunk));names.append(name)
   return names
- runs=[]
+ runs=[];history_indices=[]
  for p in candidates:
   if p.name=='run.json':
    run=read_json(p)
    if isinstance(run,dict) and run.get('run_id'):
     runs.append((p,run,'trajectories/'+safe_slug(str(run.get('block_id',run['run_id']))+'|'+str(run.get('condition'))+'|'+run['run_id'])))
  def mapped(rel):
+  rel=Path(rel).as_posix()
   path=source/rel
   for p,run,prefix in runs:
    if path.parent==p.parent or p.parent in path.parents:return prefix+'/'+path.relative_to(p.parent).as_posix()
@@ -148,6 +149,10 @@ def export_campaign(source,destination,*,secrets=(),private_paths=(),snapshot=Fa
   if p.is_symlink():excluded.append({'source':p.relative_to(source).as_posix(),'reason':'symlink_not_followed'})
   elif p.is_file() and not allowed(p,source):excluded.append({'source':p.relative_to(source).as_posix(),'reason':'outside_explicit_text_whitelist_original_retained_locally'})
  plans=red.value(jsonlines(source/'plan.jsonl'),'plan')
+ resolved=read_json(source/'results.json') if (source/'results.json').exists() else {}
+ outcome_rows=resolved.get('plan_results',[]) if isinstance(resolved,dict) else []
+ outcomes={v['plan_id']:v for v in outcome_rows if v.get('plan_id')}
+ plans=[{**v,'initial_status':v.get('status'),**red.value(outcomes.get(v.get('plan_id'),{}),'plan-status')} for v in plans]
  put('plan.jsonl',b''.join(canonical(p)+b'\n' for p in plans));results=[]
  for p,run,prefix in runs:
   run=red.value(run,p.relative_to(source).as_posix());rows=events.get(p.parent,[])
@@ -171,6 +176,8 @@ def export_campaign(source,destination,*,secrets=(),private_paths=(),snapshot=Fa
   result_row.update(kind='t3',billing_run_id=run['run_id'],metric_summary=read_json(metric).get('scores') if metric.exists() else None,
    observation_complete=read_json(metric).get('observation_complete') if metric.exists() else None,
    unknown_reason=None if metric.exists() else 'No completed scoring artifact')
+  match=next((v for v in outcome_rows if v.get('run_id')==run['run_id']),{})
+  if match.get('unknown_reason'):result_row['unknown_reason']=match['unknown_reason']
   results.append(result_row)
  for p in candidates:
   if p.name=='history-execution.json':
@@ -178,7 +185,13 @@ def export_campaign(source,destination,*,secrets=(),private_paths=(),snapshot=Fa
    rel=p.relative_to(source)
    team=rel.parts[1] if len(rel.parts)>1 and rel.parts[1] in ('gpt4o','deepseekflash') else None
    results.append({'run_id':v.get('history_id'),'case_id':v.get('task_id'),'team_model':team,'run_status':v.get('status'),'kind':'history','billing_run_id':next((e.get('branch_id') for e in events.get(p.parent,[]) if e.get('branch_id')),None),'source_ref':mapped(rel)})
-   put('history/'+safe_slug(str(v.get('history_id')))+'-state-diff.json',canonical(state_difference(raw.get('initial_state'),raw.get('frozen_state'),red,str(rel)+'/state-diff'))+b'\n')
+   slug='history/'+safe_slug(str(v.get('history_id')))
+   put(slug+'-state-diff.json',canonical(state_difference(raw.get('initial_state'),raw.get('frozen_state'),red,str(rel)+'/state-diff'))+b'\n')
+   base=mapped((p.parent/'events.jsonl').relative_to(source).as_posix()).removesuffix('.jsonl')
+   parts_found=sorted(n for n in files if n.startswith(base+'.part-') and n.endswith('.jsonl'))
+   history_indices.append(slug+'/README.md')
+   put(slug+'/README.md',f"# History {v.get('history_id')}\n\nCase {v.get('task_id')}; model {team}; status {v.get('status')}. Status is not a judged task-success claim.\n\n[Execution record]("+posixpath.relpath(mapped(rel),slug)+") · [Captured state difference]("+posixpath.relpath(slug+'-state-diff.json',slug)+")\n\nComplete ordered event/tool/model-view records:\n\n"+'\n'.join('- ['+Path(n).name+']('+posixpath.relpath(n,slug)+')' for n in parts_found)+'\n')
+
  started={(r.get('case_id'),r.get('team_model') or r.get('main_model'),r.get('protocol'),r.get('condition')) for r in results}
  for plan in plans:
   if plan.get('kind') in ('t3','history') and (plan.get('case_id'),plan.get('team_model'),plan.get('protocol'),plan.get('condition')) not in started:
@@ -204,15 +217,30 @@ def export_campaign(source,destination,*,secrets=(),private_paths=(),snapshot=Fa
  tests=[(p.relative_to(source).as_posix(),mapped(p.relative_to(source).as_posix())) for p in candidates if p.relative_to(source).parts[0]=='test-results']
  put('tests.md','# Test evidence\n\n'+('\n'.join('- ['+a+']('+b+')' for a,b in tests) if tests else 'No retained test receipt; no pass claimed.')+'\n\nActual Docker tests, mock responses and real probes are separate evidence scopes.\n')
  links='\n'.join('- ['+red.text(r['run_id'],'index')+']('+prefix+'/README.md)' for _,r,prefix in runs)
- put('README.md',f"# {campaign.get('campaign_id',source.name)}\n\nStatus: {campaign.get('status')}; "+('explicit partial snapshot' if snapshot else 'stopped campaign')+f".\n\nExecution code SHA: {campaign.get('identity',{}).get('commit','unknown')}.\n\nCampaign ceiling CNY100; interface_probe sub-ceiling CNY20 is included. Consult costs.csv and diagnostics for settlement and unknown charges. Engineering smoke is not a main experiment.\n\n[Plan](plan.jsonl) · [Results](results.csv) · [Costs](costs.csv) · [Tests](tests.md) · [Configuration](config.redacted.json) · [Manifest](manifest.json)\n\nRecorded T3 runs: {len(runs)}; plan rows: {len(plans)}. Unstarted items are retained.\n\n"+links+"\n\nOriginal binary archives/databases remain local. Selected complete text evidence is shared; exclusions and distinct source/export hashes are recorded in manifest.json.\n")
+ history_links='\n'.join('- ['+Path(n).parent.name+']('+n+')' for n in history_indices)
+ overview='\n\nRecorded plan outcomes: '+json.dumps(resolved.get('plan_counts',{}),sort_keys=True)+'. Completed histories are unjudged execution endings, not demonstrated task successes.\n\n'
+ if (source/'cost-summary.json').exists():
+  money=read_json(source/'cost-summary.json')
+  overview+='CNY accounting upper bound / unknown reservation / remaining: '+json.dumps(money.get('guard',{}),sort_keys=True)+'. Supplier invoice reconciliation remains unknown.\n\n'
+ overview+='[Probe comparison](evidence/probes/summary.json) · [Request diagnostics](evidence/diagnostics/first-api-diagnostics.json) · [Formal report](../../../docs/dynamic-join/Runtime_Budget_And_First_API_Report_20261026.md)\n\n## Retained histories\n\n'+history_links+'\n\n## T3 trajectories\n\n'
+ put('README.md',f"# {campaign.get('campaign_id',source.name)}\n\nStatus: {campaign.get('status')}; "+('explicit partial snapshot' if snapshot else 'stopped campaign')+f".\n\nExecution code SHA: {campaign.get('identity',{}).get('commit','unknown')}.\n\nCampaign ceiling CNY100; interface_probe sub-ceiling CNY20 is included. Consult costs.csv and diagnostics for settlement and unknown charges. Engineering smoke is not a main experiment.\n\n[Plan](plan.jsonl) · [Results](results.csv) · [Costs](costs.csv) · [Tests](tests.md) · [Configuration](config.redacted.json) · [Manifest](manifest.json)\n\nRecorded T3 runs: {len(runs)}; plan rows: {len(plans)}. Unstarted items are retained.\n\n"+overview+links+"\n\nOriginal binary archives/databases remain local. Selected complete text evidence is shared; exclusions and distinct source/export hashes are recorded in manifest.json.\n")
  if before!={p.relative_to(source).as_posix():file_hash(p) for p in sorted(source.rglob('*')) if p.is_file() and allowed(p,source)}:raise DynamicError('review_source_changed','Stop writers or use a new snapshot')
- if sum(map(len,files.values()))>max_total_bytes:raise DynamicError('review_export_size_exceeded','Do not silently omit evidence or push huge files')
+ packing=None
+ if sum(map(len,files.values()))>max_total_bytes:
+  from .review_packing import pack_review_files
+  files,renames,packing=pack_review_files(files)
+  for row in mappings:
+   for item in row['exports']:
+    item['path']=renames.get(item['path'],item['path']);item['export_hash']=sha(files[item['path']]);item['size']=len(files[item['path']])
+  files['README.md']+=b'\nLarge evidence is losslessly packed: duplicate JSON uses content-reference-v1; large JSON/JSONL uses gzip. Conversation event order/IDs and links to complete payloads remain. See manifest.json packing and trustfork/runtime/dynamic/review_packing.py for reconstruction. GitHub may not expand gzip.\n'
+ if sum(map(len,files.values()))>max_total_bytes:raise DynamicError('review_export_size_exceeded','Lossless packing still exceeds publication limit; do not silently omit evidence')
  manifest={'version':VERSION,'campaign_id':campaign.get('campaign_id',source.name),'execution_code_sha':campaign.get('identity',{}).get('commit'),
-  'snapshot':snapshot,'snapshot_boundary':{'source_files':before,'campaign_status':campaign.get('status')},'source_export_mapping':mappings,
+  'exporter_source_hash':file_hash(Path(__file__)),'snapshot':snapshot,'snapshot_boundary':{'source_files':before,'campaign_status':campaign.get('status')},'source_export_mapping':mappings,
   'redactions':red.changes,'missing_or_excluded':excluded,'binary_exclusion_policy':['environment archives','databases','dependencies','caches','unlisted file types'],
   'files':[{'path':n,'size':len(v),'export_hash':sha(v)} for n,v in sorted(files.items())],'size_bytes_excluding_manifest':sum(map(len,files.values())),
-  'known_credential_scan':'passed','human_diff_review_required':True}
+  'known_credential_scan':'passed','human_diff_review_required':True,'packing':packing}
  put('manifest.json',canonical(manifest)+b'\n')
+ if sum(map(len,files.values()))>max_total_bytes:raise DynamicError('review_export_size_exceeded','Manifest included exceeds publication limit')
  if destination.exists():
   actual={p.relative_to(destination).as_posix():p.read_bytes() for p in destination.rglob('*') if p.is_file()}
   if actual!=files:raise DynamicError('review_export_exists_changed','Choose a new explicit publication version')

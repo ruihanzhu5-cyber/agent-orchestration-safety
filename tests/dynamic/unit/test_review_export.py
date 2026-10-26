@@ -87,3 +87,26 @@ def test_state_diff_reads_frozen_archives_without_mutating_source(tmp_path):
  after=diff['filesystem_changes'][0]['after']
  assert b'REAL_LOCAL_KEY' not in base64.b64decode(after['content_b64'])
  assert all(p.read_bytes()==data for p,data in before.items())
+
+def test_plan_outcomes_and_history_indexes_are_review_only(tmp_path):
+ root=setup(tmp_path)
+ original=(root/'plan.jsonl').read_bytes()
+ atomic_json(root/'results.json',{'plan_results':[{'plan_id':'p','status':'not_started','unknown_reason':'prefix_invalid'}]})
+ (root/'plan.jsonl').write_text(json.dumps({'plan_id':'p','kind':'t3','status':'planned','case_id':'p001','team_model':'deepseekflash','protocol':'S','condition':'HP'})+'\n')
+ declared=(root/'plan.jsonl').read_bytes()
+ d=root/'history/gpt4o/history/0';d.mkdir(parents=True)
+ atomic_json(d/'history-execution.json',{'history_id':'h1','task_id':'p002','status':'failed_history_retained','initial_state':None,'frozen_state':None})
+ (d/'events.jsonl').write_text(json.dumps({'branch_id':'h','event_id':'e1','sequence':1,'event_type':'history_execution_failed','payload':{'code':'fixture'}})+'\n')
+ out=tmp_path/'out';export_campaign(root,out)
+ assert json.loads((out/'plan.jsonl').read_text())['status']=='not_started'
+ assert (root/'plan.jsonl').read_bytes()==declared
+ history_index=next((out/'history').glob('*/README.md'))
+ assert 'failed_history_retained' in history_index.read_text() and 'events.part-' in history_index.read_text()
+ assert 'Retained histories' in (out/'README.md').read_text()
+
+def test_distinct_private_paths_have_distinct_stable_placeholders():
+ from trustfork.runtime.dynamic.review_export import Redactor
+ r=Redactor(private_paths=['/actual/private/a','/actual/private/b'])
+ value=r.text('/actual/private/a/file /actual/private/b/file','fixture')
+ assert '/actual/private/' not in value and 'PATH_001' in value and 'PATH_002' in value
+ assert r.text('/actual/private/a/file /actual/private/b/file','repeat')==value
