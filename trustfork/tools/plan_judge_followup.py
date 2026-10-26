@@ -31,7 +31,7 @@ def formal_fixtures(segment):
   # oracle remains a separate local/source record, never part of fixture['bundle'].
   for representation in ("trajectory-lossless-v1","trajectory-lossless-v2"):
    out=directory/representation
-   prepared=prepare_judge_pass(fixture["bundle"],"trajectory",binding=binding,scorer_config={**scorer(representation),"trajectory_output_budget_tokens":16384})
+   prepared=prepare_judge_pass(fixture["bundle"],"trajectory",binding=binding,scorer_config=scorer(representation))
    write_json(out/"prepared.json",prepared)
    t=ProviderTransport(c,mode="api",journal=out/"judge-requests.jsonl",authorize_real=True,kind="judge",max_requests=2)
    try:

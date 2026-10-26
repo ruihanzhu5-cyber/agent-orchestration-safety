@@ -63,7 +63,8 @@ def run_judge_attempt(run_path,out,config,*,mode,scorer_config,semantic_goals=Fa
    if old.get('identity')!=statuses[key]['identity']:raise DynamicError('judge_prior_pass_mismatch','Prior source, view, scorer, model or parameters differ')
    saved=read_json(prior/(key+'-result.json'))
    if digest(saved)!=old.get('result_hash') or saved.get('original_request_hash',saved.get('request_hash'))!=value['request_hash']:raise DynamicError('judge_prior_pass_mismatch','Prior result identity differs')
-   validate_judge_result(saved['result'],pass_name=key,response_ids=ids,evidence_refs=refs,scoring_profile=profile,evidence_index=prepared_evidence_index(value))
+   from trustfork.scoring.judge_contract import validate_complete_result
+   validate_complete_result(saved['result'],pass_name=key,response_ids=ids,evidence_refs=refs,scoring_profile=profile,evidence_index=prepared_evidence_index(value),events=events,goal_spec=goal,q=run['q'],prepared=value)
    reuse[key]=saved
  def consume(candidate):
   consumed=apply_annotations(analyze_trajectory(events),candidate,events,goal_spec=goal,evidence_refs=refs,q=run['q'])
@@ -87,7 +88,7 @@ def run_judge_attempt(run_path,out,config,*,mode,scorer_config,semantic_goals=Fa
     if transport.count>=max_requests:raise DynamicError('judge_request_budget_blocked','Independent request ceiling exhausted; other pass results retained')
    except DynamicError as error:
     state.update(status='blocked',reason=error.code,error=error.record());write_json(out/(key+'-error.json'),error.record());save();continue
-   try:result=client.send_with_repair({**value,'behavior_run_id':run['run_id']},request_id='judge_'+uuid.uuid4().hex,pass_name=key,response_ids=ids,evidence_refs=refs)
+   try:result=client.send_with_repair({**value,'behavior_run_id':run['run_id']},request_id='judge_'+uuid.uuid4().hex,pass_name=key,response_ids=ids,evidence_refs=refs,validator=consume)
    except DynamicError as error:
     blocked=error.code in ('repair_input_overflow','provider_capacity_blocked','campaign_cost_exhausted','campaign_segment_cost_exhausted','campaign_phase_cost_exhausted','provider_route_paused')
     state.update(status='blocked' if blocked else 'failed',reason=error.code,error=error.record());write_json(out/(key+'-error.json'),error.record());save();continue

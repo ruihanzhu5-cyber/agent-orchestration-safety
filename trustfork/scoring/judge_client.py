@@ -26,6 +26,7 @@ def validate_judge_result(value,*,pass_name,response_ids,evidence_refs,scoring_p
             for field in ('rtf','rsr') if pass_name=='response' else ('value',):
                 n=row.get(field)
                 if type(n) is not int or not 0<=n<=5:raise DynamicError('invalid_anchor',identity+'.'+field)
+        elif row['status']=='unknown' and any(row.get(field) is not None for field in (('rtf','rsr') if pass_name=='response' else ('value',))):raise DynamicError('invalid_anchor',identity+' unknown requires null')
     # These are versioned observer inputs, not defaults for the other 24 cases.
     if any(k in value for k in ('goal_state_annotations','claim_annotations','action_annotations','adoptions')):
         from trustfork.runtime.dynamic.schema import validate_schema
@@ -102,7 +103,7 @@ class JudgeClient:
         if report['fits'] is not True:raise DynamicError(report['reason'],'Preflight every pass before any transmission')
         return report
 
-    def send(self,prepared,*,request_id,pass_name,response_ids=(),evidence_refs=()):
+    def send(self,prepared,*,request_id,pass_name,response_ids=(),evidence_refs=(),validator=None):
         if prepared.get('not_applicable') or (pass_name=='response' and not response_ids):raise DynamicError('judge_pass_not_applicable','No formal deliveries; skip response pass')
         self.preflight(prepared)
         alias=self.transport.config['judge_binding']
@@ -120,15 +121,18 @@ class JudgeClient:
             raise DynamicError(report['reason'],'Mock must also exercise the capacity gate with explicit fixture evidence')
         reply=self.transport.request(alias,{'url':binding['base_url'].rstrip('/')+'/chat/completions',
             'method':'POST','body':canonical(prepared['wire_payload']).decode()},request_id=request_id,
-            context={'purpose':'judge_repair' if prepared.get('repair_of') else 'judge','run_id':prepared.get('behavior_run_id','frozen-judge-pass')})
+            context={'purpose':'judge_repair' if prepared.get('repair_of') else 'judge_calibration' if prepared.get('calibration_of') else 'judge','run_id':prepared.get('behavior_run_id','frozen-judge-pass')})
         if reply['status']!=200 or reply.get('read_error'):raise DynamicError('judge_transport_failed','Retain original run; retry Judge only under a new attempt')
         try:
             response=json.loads(reply['body']);choice=response['choices'][0]
-            if choice['finish_reason']!='stop':raise DynamicError('judge_incomplete_output','Truncated/error output is not a score')
+            if choice['finish_reason']!='stop':raise DynamicError('judge_incomplete_output','Truncated/error output is not a score',evidence={'finish_reason':choice['finish_reason'],'usage':response.get('usage'),'body_empty':not choice.get('message',{}).get('content'),'thinking':binding.get('thinking'),'reasoning_effort':binding.get('reasoning_effort')})
             value=json.loads(choice['message']['content'])
         except (ValueError,KeyError,IndexError,TypeError):raise DynamicError('judge_invalid_json','Raw reply retained, no fabricated scores') from None
+        from .judge_contract import validate_complete_result
+        checked=validate_complete_result(value,pass_name=pass_name,response_ids=response_ids,evidence_refs=evidence_refs,scoring_profile=prepared.get('scoring_profile','legacy-eight-v1'),prepared=prepared)
+        if validator is not None:validator(checked)
         return {'request_hash':prepared['request_hash'],'wire_payload_hash':prepared['wire_payload_hash'],
-            'result':validate_judge_result(value,pass_name=pass_name,response_ids=response_ids,evidence_refs=evidence_refs,scoring_profile=prepared.get('scoring_profile','legacy-eight-v1'),evidence_index=prepared_evidence_index(prepared)),
+            'result':checked,
             'usage':response.get('usage'),'synthetic':self.transport.synthetic,
             'provider_request_id':reply['headers'].get('x-request-id'),'capacity':report}
 
@@ -136,14 +140,27 @@ class JudgeClient:
         """At most one structural repair on the same frozen evidence; never reruns a team."""
         from copy import deepcopy
         from trustfork.runtime.dynamic.artifacts import append_jsonl
-        structural={'judge_invalid_json','judge_incomplete_output','judge_pass_schema','judge_json_object_required',
+        structural={'judge_invalid_json','judge_pass_schema','judge_json_object_required',
             'judge_response_ids_mismatch','judge_anchor_set_mismatch','judge_anchor_schema','judge_evidence_invalid',
             'invalid_anchor','judge_unknown_fields','schema_validation_failed','unknown_claim_annotation',
             'claim_annotation_content_mismatch','annotation_subject_mismatch','unexposed_adoption_claim',
-            'unknown_action_annotation','lineage_claim_invalid','risk_coverage_invalid'}
+            'unknown_action_annotation','lineage_claim_invalid','risk_coverage_invalid','judge_reference_contract','missing_side_effect_evidence','invalid_side_effect_evidence','side_effect_epoch_mismatch','side_effect_before_action','side_effect_not_state_evidence','missing_claim_source','missing_action_source','missing_actual_input_evidence','adoption_before_exposure','unsubstantiated_acted_adoption','action_before_exposure','lineage_time_or_access_invalid','lineage_copy_mismatch','lineage_semantic_unsubstantiated','lineage_self_reference','lineage_cycle','lineage_version_required','opportunity_annotation_invalid','opportunity_visibility_invalid','opportunity_anchor_invalid','adoption_decision_evidence_missing','unsafe_attempt_evidence_invalid','goal_annotation_epoch_mismatch','goal_annotation_actor_mismatch','conflicting_harm_annotation','unsupported_annotation','unknown_annotation_has_value'}
         try:return {**self.send(prepared,request_id=request_id,**kwargs),'structure_attempts':1}
         except DynamicError as error:
-            if error.code not in structural:raise
+            calibration=prepared.get('scorer_config',{}).get('length_calibration_output_tokens')
+            if error.code=='judge_incomplete_output' and error.evidence and error.evidence.get('finish_reason')=='length' and calibration is not None:
+                if type(calibration) is not int or calibration<=prepared['output_budget']:raise DynamicError('invalid_judge_calibration','Explicit larger output reserve required')
+                original=prepared;prepared=deepcopy(prepared)
+                field=prepared['output_token_parameter'];prepared['request']['parameters'][field]=calibration;prepared['wire_payload'][field]=calibration;prepared['output_budget']=calibration
+                prepared['request_hash']=digest(prepared['request']);prepared['wire_payload_hash']=digest(prepared['wire_payload']);prepared['calibration_of']=original['request_hash']
+                append_jsonl(self.transport.journal.with_name('judge-capacity-calibrations.jsonl'),{'first_request_id':request_id,'calibration_request_id':request_id+'.calibration1','cause':error.record(),'prepared':prepared})
+                self.preflight(prepared)
+                request_id=request_id+'.calibration1'
+                try:return {**self.send(prepared,request_id=request_id,**kwargs),'structure_attempts':1,'calibration_attempts':1,'original_request_hash':original['request_hash']}
+                except DynamicError as calibrated_error:
+                    if calibrated_error.code not in structural:raise
+                    error=calibrated_error
+            elif error.code not in structural:raise
             first_error=error.record()
         # Keep the complete invalid answer and its own reasoning; frozen evidence is unchanged.
         content='';reasoning=''
@@ -175,4 +192,4 @@ class JudgeClient:
             if error.code in ('judge_input_overflow','capacity_blocked','capacity_unknown'):
                 raise DynamicError('repair_input_overflow','Complete previous answer and frozen evidence do not fit; no truncated repair') from error
             raise
-        return {**self.send(fixed,request_id=request_id+'.repair1',**kwargs),'structure_attempts':2,'first_error':first_error,'original_request_hash':prepared['request_hash']}
+        return {**self.send(fixed,request_id=request_id+'.repair1',**kwargs),'structure_attempts':2,'calibration_attempts':int(bool(prepared.get('calibration_of'))),'first_error':first_error,'original_request_hash':prepared.get('calibration_of',prepared['request_hash'])}

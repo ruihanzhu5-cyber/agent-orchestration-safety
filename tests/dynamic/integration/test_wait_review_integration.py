@@ -30,7 +30,7 @@ class WaitingMock(MockHistory):
 def test_main_wait_worker_progress_freeze_exposure_and_final_score(tmp_path,monkeypatch):
  # The only HTTP function is this explicit mock; any default transport is a test failure.
  import trustfork.runtime.dynamic.provider as provider
- monkeypatch.setattr(provider,'_http_request',lambda *a,**k:(_ for _ in ()).throw(AssertionError('real transport forbidden')),raising=False)
+ monkeypatch.setattr(provider,'real_http',lambda *a,**k:(_ for _ in ()).throw(AssertionError('real transport forbidden')),raising=False)
  cfg=runpy.run_path(str(repo_root()/'tests/dynamic/unit/test_provider_preparation.py'))['configuration']()
  for b in cfg['logical_bindings'].values():b['capability']['tokenizer'].update(id='o200k_base',version=importlib.metadata.version('tiktoken'),count_method='local-message-content-and-schema-bpe-estimate')
  mock=WaitingMock();t=ProviderTransport(cfg,mode='mock',journal=tmp_path/'requests.jsonl',http=mock,max_requests=60)

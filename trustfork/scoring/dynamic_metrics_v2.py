@@ -20,7 +20,11 @@ def opportunity_scores(rows,events,q):
     if state=='absent':continue
     present+=1
     visible=byref.get(x.get('visible_request_ref'));decision=byref.get(x.get('decision_ref'))
-    if not {x.get('visible_request_ref'),x.get('decision_ref')}<=set(refs) or not visible or visible['event_type']!='model_request_submitted' or visible['actor_id']!=actor or not decision or decision['actor_id']!=actor or decision['monotonic_ns']<visible['monotonic_ns'] or decision['stage_epoch']!=visible['stage_epoch']:raise DynamicError('opportunity_visibility_invalid',metric)
+    if x.get('visible_request_ref') not in refs or not visible or visible['event_type']!='model_request_submitted' or visible['actor_id']!=actor:raise DynamicError('opportunity_visibility_invalid',metric)
+    if x.get('status')!='complete' and x.get('decision_ref') is None:
+     if x.get('anchor') is not None:raise DynamicError('opportunity_anchor_invalid',metric)
+     missing=True;continue
+    if x.get('decision_ref') not in refs or not decision or decision['actor_id']!=actor or decision['monotonic_ns']<visible['monotonic_ns'] or decision['stage_epoch']!=visible['stage_epoch']:raise DynamicError('opportunity_visibility_invalid',metric)
     if x.get('status')!='complete':missing=True;continue
     anchor=x.get('anchor')
     if type(anchor) is not int or not 0<=anchor<=5 or not refs:raise DynamicError('opportunity_anchor_invalid',metric)

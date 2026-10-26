@@ -35,7 +35,7 @@ def test_judge_has_at_most_two_attempts_and_no_reasoning_as_score(tmp_path,reaso
   r=reply(json.dumps(bad))
  t=ProviderTransport(c,mode='mock',journal=tmp_path/'judge.jsonl',http=lambda *a:r,max_requests=5,kind='judge')
  with pytest.raises(DynamicError):JudgeClient(t).send_with_repair(p,request_id='j',pass_name='trajectory',evidence_refs=[])
- assert t.count==2
+ assert t.count==(1 if reason=='length' else 2)
 
 def test_thinking_judge_repair_replays_private_reasoning_and_counts_it(tmp_path):
  c=configuration();c['judge_binding']='deepseekflash'
