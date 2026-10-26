@@ -70,3 +70,16 @@ def test_account_rate_cost_bounds_use_returned_cache_and_offpeak_receipt_time():
  g={**row,'usage':{'prompt_tokens':1000,'completion_tokens':500,'prompt_tokens_details':{'cached_tokens':100}},'settled':26250}
  lo,hi=judge_cost_bounds([g],'gpt4o')
  assert lo<.0258125<hi and hi-lo<.000015
+
+def test_selected_judge_propagates_to_future_team_manifest_without_switching_team(monkeypatch,tmp_path):
+ from trustfork.tools import first_dynamic_api as runner
+ c={'judge_binding':'gpt4o','campaign_budget':{'phase':'interface_probe'},'logical_bindings':{'gpt4o':{},'deepseekflash':{}}}
+ resolved=runner.smoke_config(c,{'selected':'deepseekflash'})
+ assert resolved['judge_binding']=='deepseekflash' and c['judge_binding']=='gpt4o'
+ captured={}
+ def fake_transport(config,**kwargs):captured.update(config=config,**kwargs);return object()
+ monkeypatch.setattr(runner,'ProviderTransport',fake_transport)
+ runner.transport(resolved,tmp_path,team='gpt4o')
+ assert captured['experiment'].judge_binding=='deepseekflash'
+ assert set(captured['experiment'].model_refs.values())=={'gpt4o'}
+ assert captured['config']['execution_scope']=='engineering_smoke'

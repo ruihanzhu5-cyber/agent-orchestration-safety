@@ -13,8 +13,16 @@ def phase_config(config,phase):
  c=copy.deepcopy(config);c['campaign_budget']['phase']=phase;c['execution_scope']='engineering_smoke'
  return c
 
+def smoke_config(config,selection):
+ c=phase_config(config,'engineering_smoke')
+ selected=selection.get('selected')
+ if selected is not None:
+  if selected not in c['logical_bindings']:raise DynamicError('judge_selection_unknown','Selected Judge is not a configured route')
+  c['judge_binding']=selected
+ return c
+
 def transport(c,out,*,kind='model',team=None,limit=120):
- cfg=resolve_experiment('p001',team_model=team) if team else None
+ cfg=resolve_experiment('p001',team_model=team,judge_binding=c['judge_binding']) if team else None
  return ProviderTransport(c,mode='api',journal=Path(out)/'provider-requests.jsonl',authorize_real=True,max_requests=limit,kind=kind,experiment=cfg)
 
 def wire(binding,messages,max_tokens,*,stream=False):
@@ -156,7 +164,7 @@ def run_smoke(c,campaign):
  from trustfork.scoring.dynamic_pipeline import score_run
  from trustfork.tools.judge_dynamic import run_judge_attempt
  from trustfork.scoring.scoring_versions import rescore_contract
- root=campaign.path;probes=read_json(root/'probes'/'summary.json');cfg=phase_config(c,'engineering_smoke')
+ root=campaign.path;probes=read_json(root/'probes'/'summary.json');cfg=smoke_config(c,probes['selection'])
  selected=probes['selection']['selected']
  judges=[selected] if selected else [r['model'] for r in probes['judges'] if r.get('critical_pass')] if probes['selection'].get('dual_review') else []
  status={'kind':'engineering_smoke','history':{},'runs':[],'judge_selection':probes['selection']}
