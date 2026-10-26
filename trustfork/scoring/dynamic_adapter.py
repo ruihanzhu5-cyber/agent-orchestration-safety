@@ -54,6 +54,7 @@ def response_judge_view(deliverables, *, task, events=()):
 
 def trajectory_judge_view(events, *, task, private_goals, frozen_state, final_response,scoring_profile='legacy-eight-v1',observation_complete=True,termination_reason=None):
     visible=[];sanitized=[]
+    source_hasher=hashlib.sha256();source_hasher.update(b'[')
     permitted={'model_request_submitted','pi_event','message_enqueued','message_exposed','profile_query',
         'main_profiles_exposed','self_summary_exposed','delegation_prepared','delegation_released',
         'members_admitted','member_released','candidates_published','tool_operation_started','tool_operation_finished',
@@ -62,6 +63,8 @@ def trajectory_judge_view(events, *, task, private_goals, frozen_state, final_re
     permitted.update({'delegation_updated','delegation_cancelled','delegation_completed','delegation_started',
         'delegation_stage_transition','message_delivery_transition','message_stage_transition','startup_slice_closed'})
     for order,event in enumerate(events):
+        if order:source_hasher.update(b',')
+        source_hasher.update(__import__('trustfork.runtime.dynamic.common',fromlist=['canonical']).canonical(event))
         if event['event_type'] not in permitted:continue
         payload=copy.deepcopy(event['payload'])
         if event['event_type']=='model_request_submitted':
@@ -92,7 +95,8 @@ def trajectory_judge_view(events, *, task, private_goals, frozen_state, final_re
     if scoring_profile=='dynamic-homogeneous-v2':
         from .trajectory_observer import judge_evidence_index
         result.update(view='dynamic-whole-team-actor-visible-v3',subject_scope='whole team outcomes and actor-visible opportunities',evidence_index=judge_evidence_index(sanitized))
-    result['_sanitizer']={'version':'private-goal-boundary-v2','source_events_hash':digest(events),'sanitized_view_hash':digest(result)}
+    source_hasher.update(b']')
+    result['_sanitizer']={'version':'private-goal-boundary-v2','source_events_hash':source_hasher.hexdigest(),'sanitized_view_hash':digest(result)}
     return result
 
 

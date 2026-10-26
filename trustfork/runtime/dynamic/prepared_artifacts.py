@@ -37,13 +37,16 @@ def prepare_history(runtime,source,path):
  import hashlib,os
  files=set(path.parent.glob('**/events.jsonl'))|set(path.parent.glob('**/network-guard.jsonl'))
  if runtime.provider is not None and runtime.provider.journal.exists():files.add(runtime.provider.journal)
- value['request_ledger_prefixes']=[{'path':os.path.relpath(p,path.parent),'bytes':p.stat().st_size,'sha256':hashlib.sha256(p.read_bytes()).hexdigest()} for p in sorted(files)]
+ value['request_ledger_prefixes']=[{'path':os.path.relpath(p,path.parent),'bytes':p.stat().st_size,'sha256':file_hash(p)} for p in sorted(files)]
  from trustfork.tools.audit_model_calls import audit_request_events
  import json
- audits=[audit_request_events([json.loads(line) for line in p.read_text().splitlines()]) for p in path.parent.glob('**/events.jsonl')]
+ audits=[]
+ for p in path.parent.glob('**/events.jsonl'):
+  with p.open() as lines:audits.append(audit_request_events(json.loads(line) for line in lines))
  value['accounting']['actual_provider_calls']={'real':sum(a['real_model_calls_in_observed_scope'] or 0 for a in audits),'submitted':sum(len(a['request_records']) for a in audits),'source':'actual bridge request submissions; no summary constants'}
  if journal is not None and journal.exists():
-  with journal.open('rb') as stream:stream.seek(journal_start);submitted=[json.loads(line) for line in stream.read().splitlines() if line.strip()]
+  with journal.open('rb') as stream:
+   stream.seek(journal_start);submitted=[row for line in stream if line.strip() for row in [json.loads(line)] if row.get('status')=='submitted']
   submitted=[r for r in submitted if r.get('status')=='submitted']
  else:submitted=[]
  unresolved=any(r.get('source') not in ('api','mock') for r in submitted)
@@ -60,9 +63,14 @@ def load_history(runtime,path,*,reuse_journal=None):
  for ref in value.get('request_ledger_prefixes',[]):
   log=(Path(path).parent/ref['path']).resolve()
   try:
-   with log.open('rb') as stream:data=stream.read(ref['bytes'])
+   h=hashlib.sha256();size=0
+   with log.open('rb') as stream:
+    while size<ref['bytes']:
+     chunk=stream.read(min(1024*1024,ref['bytes']-size))
+     if not chunk:break
+     h.update(chunk);size+=len(chunk)
   except OSError:raise DynamicError('history_ledger_unavailable','Retained request evidence missing') from None
-  if len(data)!=ref['bytes'] or hashlib.sha256(data).hexdigest()!=ref['sha256']:raise DynamicError('history_ledger_prefix_changed','Original request evidence changed')
+  if size!=ref['bytes'] or h.hexdigest()!=ref['sha256']:raise DynamicError('history_ledger_prefix_changed','Original request evidence changed')
  h=copy.deepcopy(value['history'])
  if h['tasks']!=runtime.history_task_ids or h.get('environment_carry') is not False or set(h['actor_states'])!={'Main','A','B'}:raise DynamicError('history_scope_mismatch','Only complete actor-scoped sessions may carry')
  for actor,states in h['actor_states'].items():

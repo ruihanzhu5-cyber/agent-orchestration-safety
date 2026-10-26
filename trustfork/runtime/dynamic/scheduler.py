@@ -84,9 +84,9 @@ class Scheduler:
     def _close_startup(self,actor,reason):
         value=self.startup[actor];value['status']=reason
         had_message=any(e['event_type']=='message_enqueued' and e['actor_id']==actor and
-            e['stage_epoch']==self.lifecycle.epoch for e in self.ledger.rows)
+            e['stage_epoch']==self.lifecycle.epoch for e in self.ledger.iter_events())
         actual=sum(e['event_type']=='model_request_submitted' and e['actor_id']==actor and
-            e['stage_epoch']==self.lifecycle.epoch for e in self.ledger.rows)
+            e['stage_epoch']==self.lifecycle.epoch for e in self.ledger.iter_events())
         self.ledger.append('startup_slice_closed',{'requests':value['requests'],'actual_requests':actual,
             'terminal_status':reason,'message_status':'message_queued' if had_message else 'no_message_at_slice_end'},
             actor_id=actor,stage_id=self.lifecycle.stage_id,stage_epoch=self.lifecycle.epoch)

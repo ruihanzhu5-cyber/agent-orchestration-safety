@@ -15,6 +15,7 @@ import {createRemoteTools, type RemoteTransport, type Frame} from './remote_tool
 import {installGuards} from './io_guard.ts';
 import {assertBridgeEnvelope} from './contracts.ts';
 import {providerModel,providerStream} from './provider_adapter.ts';
+import {RpcOutput} from './rpc_output.ts';
 
 export type Envelope={rpc_id:string;actor_id:string;opaque_session_id:string;request_id:string|null;
   branch_id:string;task_id:string;stage_id:string;stage_epoch:number;invocation_id:string|null;operation:string;payload:any};
@@ -27,7 +28,8 @@ const spoolRoot=process.env.TMPDIR;
 if(!spoolRoot || !path.isAbsolute(spoolRoot)) throw Error('An isolated absolute TMPDIR is required');
 await mkdir(spoolRoot,{recursive:true});
 const guard=installGuards(spoolRoot,path.join(root,'node_modules'));
-const send=(row:unknown)=>{process.stdout.write(JSON.stringify(row)+'\n');};
+const rpcOutput=new RpcOutput(path.join(spoolRoot,'rpc-output-'+randomUUID()+'.bin'),process.stdout);
+const send=(row:unknown)=>rpcOutput.enqueue(row);
 const pending=new Map<string,{resolve:(value:any)=>void;reject:(error:Error)=>void;onFrame?:(frame:Frame)=>void}>();
 function callHost(envelope:Envelope,operation:string,payload:any,onFrame?:(frame:Frame)=>void):Promise<any>{
   const rpc_id=randomUUID();
@@ -66,7 +68,7 @@ class TaskResources implements ResourceLoader {
   async reload(){} // Sources are explicitly re-supplied and versioned by the host.
 }
 type OwnedSession={session:AgentSession;manager:SessionManager;resources:TaskResources;config:any;active:Envelope|null;
-  scripts:Script[];requests:number;actualInputs:any[];events:any[];transport:RemoteTransport;lastResponse:AssistantMessage|null;abortRequested:boolean;providerError:any};
+  scripts:Script[];requests:number;actualInput:any|null;events:any[];transport:RemoteTransport;lastResponse:AssistantMessage|null;abortRequested:boolean;providerError:any};
 const sessions=new Map<string,OwnedSession>();
 function requireSession(e:Envelope){
   const s=sessions.get(e.opaque_session_id);
@@ -128,7 +130,7 @@ async function create(e:Envelope,restore?:any){
   };
   const work=e.actor_id==='Main'?[]:createRemoteTools(transport,spoolRoot!);
   const config={...e.payload,actor_id:e.actor_id,branch_id:e.branch_id,task_id:e.task_id};
-  s={session:undefined as unknown as AgentSession,manager,resources,config,active:null,scripts:[],requests:0,actualInputs:[],events:[],transport,lastResponse:null,abortRequested:false,providerError:null};
+  s={session:undefined as unknown as AgentSession,manager,resources,config,active:null,scripts:[],requests:0,actualInput:null,events:[],transport,lastResponse:null,abortRequested:false,providerError:null};
   const tools=[...work,...coordinateDefinitions(()=>s)];
   const model=e.payload.mode==='scripted-test'?scriptedModel:providerModel(e.payload.provider_binding);
   const created=await createAgentSession({cwd:'/workspace',agentDir:directory,modelRuntime:runtime,model,
@@ -147,7 +149,7 @@ async function create(e:Envelope,restore?:any){
       tools:(context.tools??[]).map(t=>({name:t.name,description:t.description,parameters:t.parameters})),
       provider_parameters:{maxRetries:0,maxTokens:active.payload.max_output_tokens??4096,
         ...(s.config.mode==='scripted-test'?{}:s.config.provider_binding.thinking==='enabled'?{thinking:'enabled',reasoning_effort:'high'}:{temperature:0.2})}};
-    s.actualInputs.push(structuredClone(actual));
+    s.actualInput=actual;
     send({...active,kind:'event',rpc_id:randomUUID(),operation:'model_request_submitted',payload:{actual_input:actual,synthetic:s.config.mode!=='api',execution_backend:s.config.mode}});
     if(s.config.mode!=='scripted-test')return providerStream(s.config.provider_binding,context,active.payload.max_output_tokens??4096,
       value=>callHost(active,'provider_http',value),payload=>send({...active,kind:'event',rpc_id:randomUUID(),
@@ -192,7 +194,9 @@ async function dispatch(e:Envelope){
   if(e.operation==='execute_turn'){
     if(s.active)throw Error('Actor already has an active permit');
     s.active=e;s.scripts=[e.payload.script];s.lastResponse=null;s.abortRequested=false;s.providerError=null;
-    const before=s.requests,start=s.events.length;
+    const auditCacheBeforeTurn={events:s.events.length,inputs:s.actualInput===null?0:1};
+    s.events=[];s.actualInput=null;
+    const before=s.requests,start=0;
     try{
       if(e.payload.messages?.length) await s.session.agent.prompt(e.payload.messages);
       else{
@@ -211,9 +215,9 @@ async function dispatch(e:Envelope){
         termination_reason:response?.stopReason==='length'?'output_limit':null,
         termination_status:s.abortRequested?'cancelled':status==='success'?(response?.stopReason==='length'?'resource_ended':'completed'):'provider_error',events:s.events.slice(start),requests:s.requests-before,
         transport_failure:transport?{code:transport,generation_received:generated,tool_effects_started:effects}:null,
-        actual_input:s.actualInputs.at(-1),entries:s.manager.getEntries(),leaf_id:s.manager.getLeafId(),
+        bridge_metrics:{...rpcOutput.stats(),audit_cache_before_turn:auditCacheBeforeTurn,audit_events_cached:s.events.length,actual_inputs_cached:s.actualInput===null?0:1,rss_bytes:process.memoryUsage().rss},actual_input:s.actualInput,entries:s.manager.getEntries(),leaf_id:s.manager.getLeafId(),
         registry:s.session.getActiveToolNames(),guard:{...guard.counters},synthetic:s.config.mode!=='api',execution_backend:s.config.mode};
-    }finally{s.active=null;s.scripts=[];}
+    }finally{s.active=null;s.scripts=[];s.events=[];s.actualInput=null;}
   }
   if(s.active)throw Error('Session maintenance requires an idle turn boundary');
   if(e.operation==='export_session')return{header:s.manager.getHeader(),entries:s.manager.getEntries(),leaf_id:s.manager.getLeafId(),
@@ -262,4 +266,4 @@ lines.on('line',line=>{
   try{assertBridgeEnvelope(e);}catch(error){send({kind:'fatal',error:String(error)});return;}
   void dispatch(e).then(payload=>send({...e,kind:'result',payload}),error=>send({...e,kind:'result',error:{message:String(error),code:(error as any).code??'pi_bridge_error'},payload:null}));
 });
-lines.on('close',()=>{for(const s of sessions.values())s.session.dispose();});
+lines.on('close',()=>{for(const s of sessions.values())s.session.dispose();void rpcOutput.close().catch(error=>{process.stderr.write('RPC output tail failure: '+String(error)+'\n');process.exitCode=1;});});

@@ -6,12 +6,18 @@ from trustfork.runtime.dynamic.common import canonical,digest,file_hash,read_jso
 
 
 def audit_request_events(events):
-    unique={};conflicts=[]
+    unique={};compact={};conflicts=[];total=0
     for event in events:
-        identity=event['branch_id']+'::'+event['event_id']
-        if identity in unique and digest(unique[identity])!=digest(event):conflicts.append(identity)
-        unique[identity]=event
-    rows=list(unique.values());responses={(e['branch_id'],e['request_id']):e['payload'].get('response') or {}
+        total+=1;identity=event['branch_id']+'::'+event['event_id'];hashed=digest(event)
+        if identity in unique and unique[identity]!=hashed:conflicts.append(identity)
+        unique[identity]=hashed
+        kind=event['event_type']
+        if kind in ('model_request_submitted','judge_request_submitted','judge_attempt_submitted','model_response'):
+            payload=event['payload']
+            small={'response':{'provider':(payload.get('response') or {}).get('provider')}} if kind=='model_response' else {k:payload.get(k) for k in ('synthetic','execution_backend','provider')}
+            compact[identity]={'branch_id':event['branch_id'],'event_id':event['event_id'],'request_id':event['request_id'],'event_type':kind,'payload':small}
+        else:compact.pop(identity,None)
+    rows=list(compact.values());responses={(e['branch_id'],e['request_id']):e['payload'].get('response') or {}
         for e in rows if e['event_type']=='model_response'}
     counts=Counter();provider_counts=Counter();request_records=[]
     for event in rows:
@@ -30,7 +36,7 @@ def audit_request_events(events):
             request_records.append({'attempt_key':event['branch_id']+'::'+(event['request_id'] or event['event_id']),
                 'kind':'judge','classification':classification,'provider':event['payload'].get('provider'),
                 'evidence_ref':event['branch_id']+'::'+event['event_id']})
-    return {'unique_events':len(rows),'duplicate_event_records':len(events)-len(rows),'event_conflicts':conflicts,
+    return {'unique_events':len(unique),'duplicate_event_records':total-len(unique),'event_conflicts':conflicts,
         'model_provider_counts':dict(provider_counts),
         'request_records':request_records,
         **{k:counts[k] for k in ('scripted_model_attempts','real_model_attempts','unresolved_model_attempts','scripted_judge_attempts','real_judge_attempts','unresolved_judge_attempts')},
@@ -62,7 +68,7 @@ def audit_transport_journals(paths):
     for path in sorted(set(paths)):
         try:
             hashes[str(path)]=file_hash(path)
-            for line in path.read_text().splitlines():
+            for line in path.open():
                 row=json.loads(line)
                 if row.get('status')!='submitted':continue
                 identity=(row.get('transport_id',str(path)),row.get('kind'),row.get('request_id'),row.get('attempt_number'))
@@ -83,10 +89,14 @@ def main():
     p=argparse.ArgumentParser(description=__doc__);p.add_argument('--root',type=Path,action='append',required=True)
     p.add_argument('--guard-archive',type=Path,action='append',default=[]);p.add_argument('--coverage-gap',action='append',default=[])
     p.add_argument('--out',type=Path,required=True);a=p.parse_args()
-    events=[];guards=[];sources={};errors=[];actual_runs=0;seen_paths=set();journals=[]
+    event_streams=[];guards=[];sources={};errors=[];actual_runs=0;seen_paths=set();journals=[]
     def read_lines(path):
         sources[str(path)]=file_hash(path)
         return [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
+    def stream_events(path):
+        with path.open() as lines:
+            for line in lines:
+                if line.strip():yield json.loads(line)
     for root in a.root:
         for path in sorted(root.rglob('run.json')):
             run=read_json(path)
@@ -99,14 +109,15 @@ def main():
                 if not log.exists():errors.append({'run_id':run['run_id'],'reason':'missing_request_event_log'});continue
                 try:
                     sources[str(log)]=file_hash(log)
-                    events.extend(read_json(log) if log.suffix=='.json' else read_lines(log))
+                    event_streams.append(read_json(log) if log.suffix=='.json' else stream_events(log))
                 except (ValueError,OSError):errors.append({'run_id':run['run_id'],'reason':'unreadable_event_log'})
         for path in sorted(root.rglob('network-guard.jsonl')):
             if path in seen_paths:continue
             seen_paths.add(path);guards.extend(read_lines(path))
         for name in ('provider-requests.jsonl','judge-requests.jsonl'):journals.extend(root.rglob(name))
     for path in a.guard_archive:guards.extend(read_lines(path))
-    calls=audit_request_events(events);guard=audit_guard_records(guards)
+    from itertools import chain
+    calls=audit_request_events(chain.from_iterable(event_streams));guard=audit_guard_records(guards)
     report={'version':'actual-request-call-audit-v2','actual_run_records':actual_runs,'calls':calls,'guard_receipts':guard,
         'transport_call_audit':audit_transport_journals(journals),
         'source_file_hashes':sources,'coverage_gaps':a.coverage_gap,'log_errors':errors,

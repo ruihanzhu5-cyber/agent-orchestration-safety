@@ -1,10 +1,10 @@
 """Deterministic white-list review copy; original evidence is never edited."""
-import base64,csv,hashlib,io,json,re,sqlite3,posixpath
+import base64,csv,hashlib,io,json,re,sqlite3,posixpath,tempfile,shutil,os
 from pathlib import Path
 from .artifacts import safe_slug
 from .common import DynamicError,canonical,file_hash,read_json
 
-VERSION='dynamic-review-export-v3'
+VERSION='dynamic-review-export-v4'
 FOLLOWUP_ROOT_FILES={'segment.json','budget-summary.json','input-size-audit.json','input-size-audit-initial.json','tokenizer-provenance.json','offline-acceptance.json','parent-frozen-seal.json','baseline-source-hashes.json'}
 ROOT_FILES=FOLLOWUP_ROOT_FILES|{'campaign.json','plan.jsonl','resolved-config.json','results.json','cost-summary.json'}
 ROLE_DIRS={'blocks','history','probes','diagnostics','test-results','analysis','fixtures','gpt-rescore','deepseek','actions','tests'}
@@ -105,7 +105,10 @@ def export_campaign(source,destination,*,secrets=(),private_paths=(),snapshot=Fa
  if max_part_bytes<100:raise DynamicError('review_part_size_invalid','Part limit too small')
  candidates=sorted(p for p in source.rglob('*') if p.is_file() and allowed(p,source))
  before={p.relative_to(source).as_posix():file_hash(p) for p in candidates}
- red=Redactor(secrets,(*private_paths,str(source)));files={};mappings=[];excluded=[];events={}
+ destination.parent.mkdir(parents=True,exist_ok=True)
+ staging=tempfile.TemporaryDirectory(prefix='.review-spool-',dir=destination.parent)
+ from .review_spool import ReviewFiles
+ red=Redactor(secrets,(*private_paths,str(source)));files=ReviewFiles(Path(staging.name)/'leaves',red.scan);mappings=[];excluded=[];events={}
  def put(name,data):
   raw=data.encode() if isinstance(data,str) else data
   if name in files and files[name]!=raw:raise DynamicError('review_export_collision',name)
@@ -140,9 +143,7 @@ def export_campaign(source,destination,*,secrets=(),private_paths=(),snapshot=Fa
   rel=p.relative_to(source).as_posix();target=mapped(rel)
   try:
    if p.suffix=='.jsonl':
-    if p.name=='events.jsonl' and any(p.parent==run_file.parent for run_file,_,_ in runs):
-     rows=red.value(jsonlines(p),rel);events[p.parent]=rows
-    else:
+    if p.suffix=='.jsonl':
      # History/prefix shards need no retained in-memory conversation index.
      # Stream every row, preserving byte order and the same stable redaction refs.
      def stream_rows(path=p,reference=rel):
@@ -152,7 +153,16 @@ def export_campaign(source,destination,*,secrets=(),private_paths=(),snapshot=Fa
         value=red.value(json.loads(line),reference+'/'+str(i))
         if path.name=='events.jsonl' and path.parent not in events:events[path.parent]=[value]
         yield value
-     rows=stream_rows()
+     if p.name=='events.jsonl' and any(p.parent==run_file.parent for run_file,_,_ in runs):
+      # Bind the source per view; do not capture loop variables for later conversations.
+      class EventRows:
+       def __init__(self,path,reference):self.path,self.reference=path,reference
+       def __iter__(self):
+        with self.path.open() as lines:
+         for i,line in enumerate(lines):
+          if line.strip():yield red.value(json.loads(line),self.reference+'/'+str(i))
+      rows=EventRows(p,rel);events[p.parent]=rows
+     else:rows=stream_rows()
     names=parts(target.removesuffix('.jsonl'),rows)
    elif p.suffix=='.json':
     put(target,canonical(red.value(read_json(p),rel))+b'\n');names=[target]
@@ -172,15 +182,19 @@ def export_campaign(source,destination,*,secrets=(),private_paths=(),snapshot=Fa
  put('plan.jsonl',b''.join(canonical(p)+b'\n' for p in plans));results=[]
  for p,run,prefix in runs:
   run=red.value(run,p.relative_to(source).as_posix());rows=events.get(p.parent,[])
-  seen=set();conversation=[f"# {run['run_id']}",'',f"Status: {run.get('run_status','unknown')}",'']
-  for e in rows:
-   key=(e.get('branch_id'),e.get('event_id'))
-   if key in seen:raise DynamicError('review_duplicate_event_id',str(key))
-   seen.add(key)
-   if e.get('event_type') in ('model_request_submitted','model_response','message_enqueued','tool_visibility','pi_event'):
-    conversation += [f"## {e.get('sequence')} · {e.get('event_type')} · actor={e.get('actor_id')} · request={e.get('request_id')} · event={e.get('event_id')}",'','~~~json',json.dumps(e['payload'],ensure_ascii=False,indent=2),'~~~','']
-  put(prefix+'/conversation.md','\n'.join(conversation))
-  names=parts(prefix+'/requests',[e for e in rows if e.get('event_type') in ('provider_payload','model_response')])
+  def conversation_rows():
+   yield f"# {run['run_id']}\n\nStatus: {run.get('run_status','unknown')}\n\n"
+   seen=set()
+   for e in rows:
+    key=(e.get('branch_id'),e.get('event_id'))
+    if key in seen:raise DynamicError('review_duplicate_event_id',str(key))
+    seen.add(key)
+    if e.get('event_type') in ('model_request_submitted','model_response','message_enqueued','tool_visibility','pi_event'):
+     yield f"## {e.get('sequence')} · {e.get('event_type')} · actor={e.get('actor_id')} · request={e.get('request_id')} · event={e.get('event_id')}\n\n~~~json\n"
+     yield json.dumps(e['payload'],ensure_ascii=False,indent=2)
+     yield '\n~~~\n\n'
+  files.put_stream(prefix+'/conversation.md',conversation_rows())
+  names=parts(prefix+'/requests',(e for e in rows if e.get('event_type') in ('provider_payload','model_response')))
   metric=p.parent/'scoring'/'run_summary.json'
   put(prefix+'/metrics.json',canonical(red.value(read_json(metric),str(metric.relative_to(source))) if metric.exists() else {'value':None,'status':'not_annotated','reason':'No completed scoring artifact'})+b'\n')
   frozen=run.get('frozen_export')
@@ -253,27 +267,29 @@ def export_campaign(source,destination,*,secrets=(),private_paths=(),snapshot=Fa
   overview='\n\nParent campaign: '+campaign['parent_campaign_id']+'; previous behavior and new scorer versions are separate. New segment CNY20 ceiling is included in the original CNY100, never reset.\n\n[Segment provenance](segment.json) · [Input size audit](input-size-audit.json) · [Formal fixtures](evidence/fixtures/summary.json) · [Report](../../../docs/dynamic-join/Plan_Judge_Followup_Report_20261026.md)\n\n## Retained histories\n\n'+history_links+'\n\n## Frozen and new trajectories\n\n'
  put('README.md',f"# {campaign.get('campaign_id',source.name)}\n\nStatus: {campaign.get('status')}; "+('explicit partial snapshot' if snapshot else 'stopped campaign')+f".\n\nExecution code SHA: {campaign.get('identity',{}).get('commit','unknown')}.\n\nCampaign ceiling CNY100; interface_probe sub-ceiling CNY20 is included. Consult costs.csv and diagnostics for settlement and unknown charges. Engineering smoke is not a main experiment.\n\n[Plan](plan.jsonl) · [Results](results.csv) · [Costs](costs.csv) · [Tests](tests.md) · [Configuration](config.redacted.json) · [Manifest](manifest.json)\n\nRecorded T3 runs: {len(runs)}; plan rows: {len(plans)}. Unstarted items are retained.\n\n"+overview+links+"\n\nOriginal binary archives/databases remain local. Selected complete text evidence is shared; exclusions and distinct source/export hashes are recorded in manifest.json.\n")
  if before!={p.relative_to(source).as_posix():file_hash(p) for p in sorted(source.rglob('*')) if p.is_file() and allowed(p,source)}:raise DynamicError('review_source_changed','Stop writers or use a new snapshot')
- packing=None
- if sum(map(len,files.values()))>max_total_bytes:
-  from .review_packing import pack_review_files
-  files,renames,packing=pack_review_files(files)
-  for row in mappings:
-   for item in row['exports']:
-    item['path']=renames.get(item['path'],item['path']);item['export_hash']=sha(files[item['path']]);item['size']=len(files[item['path']])
-  files['README.md']+=b'\nLarge evidence is losslessly packed: duplicate JSON uses content-reference-v1; large JSON uses gzip and large JSONL uses XZ. Conversation event order/IDs and links to complete payloads remain. See manifest.json packing and trustfork/runtime/dynamic/review_packing.py for reconstruction. GitHub may not expand gzip/XZ.\n'
- if sum(map(len,files.values()))>max_total_bytes:raise DynamicError('review_export_size_exceeded','Lossless packing still exceeds publication limit; do not silently omit evidence')
+ # Leaves were already compressed as soon as each shard completed.
+ files,renames,packing=files.finalize()
+ for row in mappings:
+  for item in row['exports']:
+   item['path']=renames.get(item['path'],item['path']);item.update(files.stored_info(item['path']))
+ if files.stored_total()>max_total_bytes:raise DynamicError('review_export_size_exceeded','Lossless packing exceeds publication limit; retain all evidence locally')
  manifest={'version':VERSION,'campaign_id':campaign.get('campaign_id',source.name),'execution_code_sha':campaign.get('identity',{}).get('commit'),
   'exporter_source_hash':file_hash(Path(__file__)),'snapshot':snapshot,'snapshot_boundary':{'source_files':before,'campaign_status':campaign.get('status')},'source_export_mapping':mappings,
   'redactions':red.changes,'missing_or_excluded':excluded,'binary_exclusion_policy':['environment archives','databases','dependencies','caches','unlisted file types'],
-  'files':[{'path':n,'size':len(v),'export_hash':sha(v)} for n,v in sorted(files.items())],'size_bytes_excluding_manifest':sum(map(len,files.values())),
+  'files':[files.stored_info(n) for n in sorted(files)],'size_bytes_excluding_manifest':files.stored_total(),'streaming_memory':{'uncompressed_shards_retained':0,'max_part_bytes':max_part_bytes,'max_leaf_bytes':files.max_leaf,'storage':'disk compressed at shard completion; one decoded shard/record at a time'},
   'known_credential_scan':'passed','human_diff_review_required':True,'packing':packing}
  put('manifest.json',canonical(manifest)+b'\n')
- if sum(map(len,files.values()))>max_total_bytes:raise DynamicError('review_export_size_exceeded','Manifest included exceeds publication limit')
+ if files.stored_total()>max_total_bytes:raise DynamicError('review_export_size_exceeded','Manifest included exceeds publication limit')
  if destination.exists():
-  actual={p.relative_to(destination).as_posix():p.read_bytes() for p in destination.rglob('*') if p.is_file()}
-  if actual!=files:raise DynamicError('review_export_exists_changed','Choose a new explicit publication version')
-  return manifest
- destination.mkdir(parents=True)
- for name,data in files.items():
-  p=destination/name;p.parent.mkdir(parents=True,exist_ok=True);p.write_bytes(data)
- return manifest
+  actual={p.relative_to(destination).as_posix():{'size':p.stat().st_size,'hash':file_hash(p)} for p in destination.rglob('*') if p.is_file()}
+  expected={n:{'size':m['stored_size'],'hash':m['stored_hash']} for n,m in files.meta.items()}
+  if actual!=expected:raise DynamicError('review_export_exists_changed','Choose a new explicit publication version')
+  staging.cleanup();return manifest
+ publish=Path(staging.name)/'publish';publish.mkdir()
+ for name,m in files.meta.items():
+  p=publish/name;p.parent.mkdir(parents=True,exist_ok=True);shutil.copyfile(m['disk'],p)
+  if file_hash(p)!=m['stored_hash']:raise DynamicError('review_export_write_mismatch',name)
+  with p.open('rb') as stream:os.fsync(stream.fileno())
+ # Completion becomes visible only after all files and manifest are verified.
+ os.rename(publish,destination)
+ staging.cleanup();return manifest

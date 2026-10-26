@@ -522,7 +522,7 @@ class PiDynamic:
                 else:self.delegations.prepare(assignment['recipient'],assignment['task_text'],source='initial_plan',epoch=0,stage_id=self.lifecycle.stage_id,context_refs=assignment.get('context_refs',[]))
             self.ledger.append('initial_plan',plan,actor_id='Main',stage_id=self.lifecycle.stage_id)
             self.lifecycle.transition('PLAN_READY')
-            if any(x['actor_id']!='Main' and x['event_type'] in ('model_request_ready','tool_operation_started') for x in self.ledger.rows):
+            if any(x['actor_id']!='Main' and x['event_type'] in ('model_request_ready','tool_operation_started') for x in self.ledger.iter_events()):
                 raise DynamicError('prejoin_worker_execution','Sub work occurred before PLAN_READY')
             snapshot=save_checkpoint(self.directory/'checkpoint.json',environment=self.environment,client=self.client,sessions=self.sessions,
                 membership=self.membership,delegations=self.delegations,mailbox=self.mailbox,scheduler=self.scheduler,budget=self.budget,
@@ -623,6 +623,7 @@ class PiDynamic:
                         self.pending_final=None;self.confirming_final=True;self.scheduler.enqueue_batch(['Main'],reason='confirm_stale_final')
                     else:
                         if self.protocol=='F':self.scheduler.terminate_startup('main_final_before_slice_end')
+                        self.scheduler.cancel_waits('stage_closed',requeue=False)
                         self.final_text=self.pending_final['text'];return
                 if self.budget.available() and not self.termination_reason:
                     while self.budget.available() and (permit:=self.scheduler.permit(actors=('Main',) if self.confirming_final else None)) is not None:
@@ -729,7 +730,7 @@ class PiDynamic:
             write_json(self.directory/'delivery_receipts.json',{'messages':self.mailbox.messages,'delegations':self.delegations.rows,
                 'membership':self.membership.directory(private=True),'startup':self.scheduler.startup,'queue':list(self.scheduler.queue)})
             from trustfork.tools.audit_model_calls import audit_request_events
-            actual_calls=audit_request_events(snapshot['prefix_events']+self.ledger.rows)
+            actual_calls=audit_request_events(__import__('itertools').chain(snapshot['prefix_events'],self.ledger.iter_events()))
             result={'schema_version':'1.0','protocol_version':'dynamic-join-v9-trajectory-portfolio','run_id':branch,'block_id':self.block_id,
                 'checkpoint_id':snapshot['checkpoint_id'],'case_id':self.case['case_id'],'layout':self.layout,'main_model':self.main_model,
                 'protocol':self.protocol,'panel':self.panel,'condition':condition,'q':self.q,'r':self.r,'split':self.case['split'],'suite':self.case['suite'],
@@ -828,7 +829,7 @@ class PiDynamic:
                 'remaining_calls':self.budget.request_limit-len(self.budget.attempts),
                 'remaining_output_tokens':self.budget.token_limit-self.budget.output_tokens,
                 'opportunity_status':'unknown','reason':'Opportunity assessment is passive and performed from frozen goal evidence',
-                'evidence_refs':[self.ledger.branch_id+'::'+e['event_id'] for e in self.ledger.rows if e['event_type']=='late_join_trigger']}
+                'evidence_refs':[self.ledger.branch_id+'::'+e['event_id'] for e in self.ledger.iter_events() if e['event_type']=='late_join_trigger']}
             late.pop('content_hash');late.pop('checkpoint_id')
             late['checkpoint_id']='checkpoint_'+digest(late)
             late['content_hash']=digest(late)

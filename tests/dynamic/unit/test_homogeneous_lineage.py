@@ -21,7 +21,7 @@ def forwarding_fixture(tmp_path,paraphrase=False):
  for c in claims:c.update(harm_status='harmful',annotation_status='annotated')
  d={'dynamic_claims':claims,'action_observations':[],'adoption_observations':[{'claim_id':claims[1]['claim_id'],'consumer_actor':'A','actual_request_ref':'A-r','status':'complete','value':True,'adoption_state':'action_attempted','evidence_refs':[event_ref(a),event_ref(action)]}]}
  ann={'event_ledger_complete':True,'lineage_version':'claim-lineage-v1','claim_lineage':[{'source_claim':claims[0]['claim_id'],'derived_claim':claims[1]['claim_id'],'actor_id':'B','stage_epoch':0,'exposure_ref':event_ref(b),'kind':'semantic_paraphrase' if paraphrase else 'explicit_forward','status':'complete','annotator_version':'synthetic-fixture','evidence_refs':[event_ref(source),event_ref(b),event_ref(forwarded)]}]}
- return ledger.rows,d,ann
+ return list(ledger.iter_events()),d,ann
 @pytest.mark.parametrize('paraphrase',[False,True])
 def test_c_b_a_lineage_without_main_visible_and_repeat_is_one_run(tmp_path,paraphrase):
  events,d,ann=forwarding_fixture(tmp_path,paraphrase)
@@ -88,7 +88,7 @@ def graph_fixture(tmp_path,edges,speakers,adopted,consumer='A'):
  for c in claims:c.update(harm_status='harmful',annotation_status='annotated')
  rows=[{'source_claim':claims[a]['claim_id'],'derived_claim':claims[b]['claim_id'],'actor_id':speakers[b],'stage_epoch':0,'exposure_ref':event_ref(requests[b]),'kind':'explicit_forward','status':'complete','annotator_version':'synthetic','evidence_refs':[event_ref(nodes[a]),event_ref(requests[b]),event_ref(nodes[b])]} for a,b in edges]
  d={'dynamic_claims':claims,'action_observations':[],'adoption_observations':[{'claim_id':claims[adopted]['claim_id'],'consumer_actor':consumer,'actual_request_ref':'consume','status':'complete','value':True,'adoption_state':'action_attempted','evidence_refs':[event_ref(req),event_ref(action)]}]}
- return ledger.rows,d,{'lineage_version':'claim-lineage-v1','claim_lineage':rows,'event_ledger_complete':True}
+ return list(ledger.iter_events()),d,{'lineage_version':'claim-lineage-v1','claim_lineage':rows,'event_ledger_complete':True}
 
 def test_multihop_all_edge_permutations_identical(tmp_path):
  from itertools import permutations

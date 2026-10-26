@@ -31,7 +31,7 @@ def save_checkpoint(path, *, environment, client, sessions, membership, delegati
             'ready_seq':scheduler.ready_seq,'batch_seq':scheduler.batch_seq,'startup':copy.deepcopy(scheduler.startup),
             'continuations':sorted(scheduler.continuations),**scheduler.coordination_snapshot()},
         'budget':budget.snapshot(),'history':copy.deepcopy(history),'bindings':copy.deepcopy(bindings),
-        'environment':env,'prefix_events':copy.deepcopy(lifecycle.ledger.rows),
+        'environment':env,'prefix_events':list(lifecycle.ledger.iter_events()),
         'synthetic':getattr(client,'mode','scripted-test')!='api','validation':{'idle_boundary':True,'environment_restore':'not_yet_tested'}}
     snapshot['checkpoint_id']='checkpoint_'+digest(snapshot)
     snapshot['content_hash']=digest(snapshot)

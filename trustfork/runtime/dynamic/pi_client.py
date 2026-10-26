@@ -2,7 +2,6 @@
 from __future__ import annotations
 import concurrent.futures
 import errno
-import copy
 import json
 import os
 import subprocess
@@ -27,7 +26,7 @@ class PiClient:
         node = Path(os.environ.get('TRUSTFORK_NODE_BIN', str(Path.home()/'.local/share/trustfork-env/node-v24.15.0-linux-x64/bin/node')))
         if not node.is_file():
             raise DynamicError('missing_locked_node', 'Set TRUSTFORK_NODE_BIN to audited Linux Node 24.15.0')
-        self.pending, self.scopes, self.sessions, self.actual_inputs = {}, {}, {}, {}
+        self.pending, self.scopes, self.sessions = {}, {}, {}
         self.request_deadlines={}
         self.lock, self.write_lock = threading.RLock(), threading.RLock()
         self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=12, thread_name_prefix='pi-rpc')
@@ -37,8 +36,12 @@ class PiClient:
         self.process = subprocess.Popen([str(node), str(runtime/'pi_bridge.ts')], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
             stderr=self.stderr_file, text=True, bufsize=1, cwd=runtime,
             env={'PATH':str(node.parent)+':/usr/bin:/bin', 'LANG':'C.UTF-8', 'TMPDIR':str(spool), 'PI_OFFLINE':'1'})
-        self.reader = threading.Thread(target=self._read, daemon=True)
-        self.reader.start()
+        from .rpc_spool import RpcSpool
+        self.rpc_spool=RpcSpool(self.root/'rpc-inbound.spool')
+        self.returned_results=0;self.transport_failure=None
+        self.processor=threading.Thread(target=self._process_frames,daemon=True,name='pi-ordered-evidence')
+        self.reader = threading.Thread(target=self._read, daemon=True,name='pi-durable-ingress')
+        self.processor.start();self.reader.start()
         self.closed = False
         self.cleanup_errors=[]
 
@@ -50,31 +53,35 @@ class PiClient:
             self.process.stdin.flush()
 
     def _read(self):
+        error=None
         try:
-            for line in self.process.stdout:
-                row = json.loads(line)
-                if row.get('kind') == 'result':
+            for line in self.process.stdout:self.rpc_spool.append(line)
+        except (OSError,ValueError,DynamicError) as caught:error=caught
+        finally:self.rpc_spool.finish(error)
+
+    def _process_frames(self):
+        try:
+            for line,end in self.rpc_spool.frames_iter():
+                row=json.loads(line)
+                if row.get('kind')=='result':
                     with self.lock:
-                        future = self.pending.pop(row['rpc_id'], None)
-                        self.scopes.pop(row['rpc_id'], None)
-                    if future is None:
-                        raise DynamicError('unknown_bridge_result', row['rpc_id'])
+                        future=self.pending.pop(row['rpc_id'],None)
+                        scope=self.scopes.pop(row['rpc_id'],None)
+                        if scope and scope['operation']=='execute_turn':self.request_deadlines.pop(scope['request_id'],None)
+                    if future is None:raise DynamicError('unknown_bridge_result',row['rpc_id'])
                     if row.get('error'):
-                        error=row['error']
-                        future.set_exception(DynamicError(error.get('code','pi_bridge_error'),error.get('message','Bridge error')) if isinstance(error,dict) else DynamicError('pi_bridge_error',error))
-                    else:
-                        future.set_result(row['payload'])
-                elif row.get('kind') == 'event':
-                    if row.get('operation') in ('model_request_submitted','pi_event','provider_payload','tool_visibility'):
-                        self._handle_event(row)
-                    else:
-                        self.executor.submit(self._handle_event, row)
-                else:
-                    raise DynamicError('invalid_bridge_frame', str(row.get('kind')))
-        except (OSError, ValueError, DynamicError) as error:
-            self._fail_pending(error)
-        finally:
-            self._fail_pending(DynamicError('bridge_transport_closed', 'Pi transport closed before a response'))
+                        error=row['error'];future.set_exception(DynamicError(error.get('code','pi_bridge_error'),error.get('message','Bridge error')) if isinstance(error,dict) else DynamicError('pi_bridge_error',error))
+                    else:future.set_result(row['payload'])
+                    self.returned_results+=1
+                elif row.get('kind')=='event':
+                    if row.get('operation') in ('model_request_submitted','pi_event','provider_payload','tool_visibility'):self._handle_event(row)
+                    else:self.executor.submit(self._handle_event,row)
+                else:raise DynamicError('invalid_bridge_frame',str(row.get('kind')))
+                self.rpc_spool.acknowledge(end)
+        except (OSError,ValueError,DynamicError) as error:
+            self.transport_failure=error
+            self.rpc_spool.finish(error);self._fail_pending(error)
+        finally:self._fail_pending(DynamicError('bridge_transport_closed','Pi transport closed before a response'))
 
     def _fail_pending(self, error):
         with self.lock:
@@ -95,10 +102,9 @@ class PiClient:
             self._validate_scope(row)
             operation, payload = row['operation'], row['payload']
             if operation in ('model_request_submitted','pi_event','provider_payload','tool_visibility'):
-                if operation=='model_request_submitted':self.actual_inputs[row['request_id']] = copy.deepcopy(payload['actual_input'])
                 if operation=='tool_visibility' and self.ledger:
                     ids=['op_'+digest({'session':row['opaque_session_id'],'request':row['request_id'],'op':op}) for op in payload['raw_operation_ids']]
-                    raw=[e for e in self.ledger.rows if e['event_type']=='tool_operation_finished' and e.get('tool_call_id') in ids]
+                    raw=[e for e in self.ledger.iter_events(event_type='tool_operation_finished') if e['event_type']=='tool_operation_finished' and e.get('tool_call_id') in ids]
                     payload={**payload,'raw_operation_ids':ids,
                         'raw_result_refs':[e['payload']['receipt']['raw_result_ref'] for e in raw],
                         'raw_event_refs':[e['branch_id']+'::'+e['event_id'] for e in raw],
@@ -204,6 +210,13 @@ class PiClient:
         self.process.stdin.close()
         try:self.process.wait(timeout=10)
         except subprocess.TimeoutExpired:self.process.kill();self.process.wait(timeout=5)
+        self.reader.join(timeout=10);self.processor.join(timeout=10)
+        from .common import write_json
+        stats={**self.rpc_spool.stats(),'returned_results':self.returned_results,'bridge_exit_code':self.process.returncode,'reader_alive':self.reader.is_alive(),'processor_alive':self.processor.is_alive(),'transport_failure':getattr(self.transport_failure,'code',None)}
+        write_json(self.root/'transport-metrics.json',stats)
         self.executor.shutdown(wait=True,cancel_futures=False)
+        if self.reader.is_alive() or self.processor.is_alive() or stats['unprocessed_tail_bytes']:
+            raise DynamicError('rpc_spool_tail_incomplete','Required RPC tail has not completed',evidence=stats)
+        self.rpc_spool.close()
         self.stderr_file.close()
         self.closed=True

@@ -75,7 +75,7 @@ def tool_probe(c,root,team):
     client.call(session,'close');session,_=client.create_session('A',branch_id=branch,task_id='p001',system_prompt='This is a short tool protocol check in a disposable task environment. Follow the user request.',snapshot=state)
     continue
    finished=result['response']['stopReason']=='stop';break
-  visibility=[e['payload'] for e in ledger.rows if e['event_type']=='tool_visibility']
+  visibility=[e['payload'] for e in ledger.iter_events() if e['event_type']=='tool_visibility']
   names=[v['name'] for v in visibility]
   saw=any(v['name']=='read' and marker in json.dumps(v['result']) for v in visibility)
   result={'status':'passed' if finished and 'write' in names and saw else 'failed','tools':names,'read_marker_observed':saw,

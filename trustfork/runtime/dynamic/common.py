@@ -33,7 +33,10 @@ def digest(value: Any) -> str:
 
 
 def file_hash(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+    h=hashlib.sha256()
+    with path.open('rb') as stream:
+        while chunk:=stream.read(1024*1024):h.update(chunk)
+    return h.hexdigest()
 
 
 def read_json(path: Path) -> Any:

@@ -90,7 +90,7 @@ def execute_task(runtime,source,previous):
     record={'task_id':runtime.case['case_id'],'source_task_path':runtime.case['source_task_path'],
         'planning_contract':planning_identity(),'model_bindings_hash':digest(runtime.resolved_api_bindings),'started_ns':start,'finished_ns':time.monotonic_ns(),
         'initial_state':initial,'frozen_state':frozen,'status':status,'termination_reason':runtime.termination_reason,'budget':runtime.budget.snapshot(),
-        'request_ledger_hash':digest(runtime.ledger.rows),'session_hashes':{a:digest(s) for a,s in sessions.items()},
+        'request_ledger_hash':runtime.ledger.content_hash(),'session_hashes':{a:digest(s) for a,s in sessions.items()},
         'synthetic':runtime.synthetic,'execution_backend':runtime.execution_mode,'environment_carry':False}
     record['history_id']='history_'+digest(record);write_json(runtime.directory/'history-execution.json',record)
     return sessions,record

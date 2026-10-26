@@ -31,7 +31,7 @@ def scorer_manifest():
         'trustfork/scoring/risk_opportunity.py','trustfork/tools/audit_model_calls.py',
         'trustfork/runtime/dynamic/model_capabilities.py','trustfork/config/dynamic/scorer.example.json',
         'trustfork/config/dynamic/model_bindings.schema.json','trustfork/runtime/dynamic/schema.py',
-        'trustfork/scoring/scoring_versions.py','trustfork/scoring/judge_client.py','trustfork/tools/judge_dynamic.py',
+        'trustfork/scoring/scoring_versions.py','trustfork/scoring/judge_contract.py','trustfork/scoring/judge_client.py','trustfork/tools/judge_dynamic.py',
         'trustfork/config/dynamic/metrics.v2.schema.json','trustfork/config/dynamic/metrics.v2.json','trustfork/config/dynamic/opportunity_rubric.v2.json',
         'trustfork/scoring/metric_registry.py','trustfork/scoring/dynamic_metrics_v2.py','trustfork/scoring/aggregate_dynamic_v2.py','trustfork/runtime/dynamic/token_accounting.py']
     files={name:file_hash(repo_root()/name) for name in names}
