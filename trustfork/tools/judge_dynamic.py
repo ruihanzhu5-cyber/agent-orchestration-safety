@@ -38,8 +38,8 @@ def run_judge_attempt(run_path,out,config,*,mode,scorer_config,semantic_goals=Fa
    if prior_attempt is None:raise DynamicError('judge_prior_pass_required','Explicit prior successful pass required')
    prior=Path(prior_attempt);old=read_json(prior/(key+'-prepared.json'));saved=read_json(prior/(key+'-result.json'))
    if old['request_hash']!=value['request_hash'] or old['wire_payload_hash']!=value['wire_payload_hash'] or saved['request_hash']!=value['request_hash'] or saved['synthetic']!=transport.synthetic:raise DynamicError('judge_prior_pass_mismatch','Prior pass differs from exact frozen request')
-   from trustfork.scoring.judge_client import validate_judge_result
-   validate_judge_result(saved['result'],pass_name=key,response_ids=ids,evidence_refs=refs,scoring_profile=profile)
+   from trustfork.scoring.judge_client import validate_judge_result,prepared_evidence_index
+   validate_judge_result(saved['result'],pass_name=key,response_ids=ids,evidence_refs=refs,scoring_profile=profile,evidence_index=prepared_evidence_index(value))
  try:
   for key,value in prepared.items():
    if key in passes:client.preflight(value)
@@ -51,8 +51,8 @@ def run_judge_attempt(run_path,out,config,*,mode,scorer_config,semantic_goals=Fa
    if prior_attempt is None:raise DynamicError('judge_prior_pass_required','Retry only failed passes with an explicit prior attempt')
    prior=Path(prior_attempt);stored=read_json(prior/(key+'-prepared.json'));saved=read_json(prior/(key+'-result.json'))
    if stored['request_hash']!=value['request_hash'] or stored['wire_payload_hash']!=value['wire_payload_hash'] or saved['request_hash']!=value['request_hash'] or saved['synthetic']!=transport.synthetic:raise DynamicError('judge_prior_pass_mismatch','Prior successful pass must bind the exact request and provenance')
-   from trustfork.scoring.judge_client import validate_judge_result
-   validate_judge_result(saved['result'],pass_name=key,response_ids=ids,evidence_refs=refs,scoring_profile=profile)
+   from trustfork.scoring.judge_client import validate_judge_result,prepared_evidence_index
+   validate_judge_result(saved['result'],pass_name=key,response_ids=ids,evidence_refs=refs,scoring_profile=profile,evidence_index=prepared_evidence_index(value))
    annotation.update(saved['result']);annotation['judge_passes'][key]={'prepared':value,'result_hash':digest(saved),'semantic_goals':False,'synthetic':transport.synthetic,'prior_attempt_result_hash':digest(saved)}
    continue
   if value['not_applicable']:
@@ -69,11 +69,13 @@ def run_judge_attempt(run_path,out,config,*,mode,scorer_config,semantic_goals=Fa
  from trustfork.scoring.annotation_contracts import apply_annotations
  from trustfork.scoring.trajectory_observer import analyze_trajectory
  consumed=apply_annotations(analyze_trajectory(events),annotation,events,goal_spec=load_case(run['case_id'])['goal_spec'],evidence_refs=refs,q=run['q'])
+ assessment=None
  if profile=='dynamic-homogeneous-v2':
-  from trustfork.scoring.dynamic_metrics_v2 import evaluate_process
-  evaluate_process(events,consumed['trajectory'],annotation,run['q'])
+  from trustfork.scoring.dynamic_metrics_v2 import evaluate_process,process_annotation_status
+  process,opportunities=evaluate_process(events,consumed['trajectory'],annotation,run['q'])
+  assessment=process_annotation_status(consumed['trajectory'],process,opportunities)
  write_json(out/'scoring_annotations.json',annotation)
- return {'judge_attempts':transport.count,'synthetic':transport.synthetic,'formal_ready':False,'annotations':'scoring_annotations.json'}
+ return {'judge_attempts':transport.count,'synthetic':transport.synthetic,'formal_ready':False,'annotations':'scoring_annotations.json','process_annotation_status':assessment}
 def main():
  p=argparse.ArgumentParser(description=__doc__);p.add_argument('--mode',choices=['mock','api'],default='mock');p.add_argument('--run',type=Path,required=True);p.add_argument('--bindings',type=Path,required=True);p.add_argument('--out',type=Path,required=True);p.add_argument('--scorer-config',type=Path);p.add_argument('--judge-output-budget',type=int);p.add_argument('--request-ceiling',type=int,required=True);p.add_argument('--allow-real-api',action='store_true');p.add_argument('--mock-responses',type=Path);p.add_argument('--semantic-goals',action='store_true');p.add_argument('--passes',nargs='+',choices=['response','trajectory'],default=['response','trajectory']);p.add_argument('--prior-attempt',type=Path);p.add_argument('--trajectory-view',type=Path,help='Explicit source-bound derived view for an audited migration');p.add_argument('--trajectory-representation',choices=['legacy-full','trajectory-lossless-v1']);a=p.parse_args()
  if a.mode=='mock' and not a.mock_responses:p.error('--mock-responses required')

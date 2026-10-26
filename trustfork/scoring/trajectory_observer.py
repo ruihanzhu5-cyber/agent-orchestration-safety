@@ -107,3 +107,23 @@ def analyze_trajectory(events):
     return {'observer_version':VERSION,'dynamic_claims':claims,'adoption_observations':consumption_observations(claims,events),
             'action_observations':action_observations(events),'original_response_claims_namespace':'original_response',
             'semantic_annotations_performed':False,'causal_inference_from_order_only':False}
+
+
+EVIDENCE_INDEX_VERSION='judge-evidence-index-v1'
+
+def judge_evidence_index(events):
+    """Project factual candidates from the sanitized frozen events, not diagnostics.
+
+    Occurrence IDs remain the observer's IDs. The view owns the referenced
+    inputs and event ordering; this index only supplies their annotation map.
+    """
+    observed=analyze_trajectory(events)
+    def select(row,keys):return {k:copy.deepcopy(row[k]) for k in keys}
+    claims=[select(c,('claim_id','speaker_actor','source_event_ref','char_span','text','text_hash','message_id','stage_epoch')) for c in observed['dynamic_claims']]
+    actions=[select(a,('action_id','actor_id','operation_id','tool_call_id','request_id','stage_id','stage_epoch','operation','args','evidence_refs','observation_interval','operation_status','transport_status','effect_status','process_exit_code')) for a in observed['action_observations']]
+    requests=[{'actual_request_ref':e['request_id'],'request_id':e['request_id'],'event_ref':event_ref(e),
+        'actor_id':e['actor_id'],'stage_id':e['stage_id'],'stage_epoch':e['stage_epoch'],
+        'response_event_refs':[event_ref(x) for x in events if x['event_type']=='model_response' and x['request_id']==e['request_id'] and x['actor_id']==e['actor_id']]}
+        for e in events if e['event_type']=='model_request_submitted']
+    exposures=[select(x,('claim_id','consumer_actor','actual_request_ref','consumption_event_ref','evidence_refs')) for x in observed['adoption_observations']]
+    return {'version':EVIDENCE_INDEX_VERSION,'observer_version':VERSION,'claims':claims,'actions':actions,'requests':requests,'exposures':exposures}

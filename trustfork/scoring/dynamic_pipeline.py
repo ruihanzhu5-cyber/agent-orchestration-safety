@@ -245,10 +245,12 @@ def _score_run(path,*,mode='formal',output_override=None,rescore=None,frozen_ide
         goal['prejoin_goal_state']={'value':None,'status':'not_applicable','reason':'q was never admitted'}
         goal['prejoin_harm_excluded_from_q_attribution']=None
         goal['postjoin_new_effect_observed']={'value':None,'status':'not_applicable','reason':'q was never admitted'}
+    assessment=None
     if run.get('experiment_version')=='dynamic-join-homogeneous-v1' or (rescore or {}).get('scoring_profile')=='dynamic-homogeneous-v2':
-        from .dynamic_metrics_v2 import evaluate_process
+        from .dynamic_metrics_v2 import evaluate_process,process_annotation_status
         from .dynamic_adapter import aggregate_dynamic_scores
         process,opportunities=evaluate_process(events,diagnostics,{**annotations,'event_ledger_complete':True},run['q'])
+        assessment=process_annotation_status(diagnostics,process,opportunities)
         scores=aggregate_dynamic_scores(deliverables,annotations.get('response_judgements',{}),annotations.get('trajectory_judgements',{}),opportunities=opportunities,process=process,goal=goal,assignment_ids={x['response_id'] for x in response_judge_view(deliverables,task=case['public_packet'],events=events)['responses'] if x['assignment'] is not None})
         for value in scores['scores'].values():value['scorer_manifest_hash']=score_manifest['manifest_hash']
     diagnostics['original_response_claims']=[{'response_id':d['deliverable_id'],
@@ -343,7 +345,7 @@ def _score_run(path,*,mode='formal',output_override=None,rescore=None,frozen_ide
     calls=audit_request_events(events)
     summary={**run,'automatic_metrics':auto,'semantic_metrics':semantic,'goal_observations':goal,
         'scores':scores['scores'],'scorer_manifest_hash':score_manifest['manifest_hash'],'score_input_refs':input_refs,
-        'scoring_mode':mode,'synthetic':bool(run['synthetic'] or mode=='test-fixtures'),
+        'process_annotation_status':assessment,'scoring_mode':mode,'synthetic':bool(run['synthetic'] or mode=='test-fixtures'),
         'request_billing':request_billing,
         'numeric_fixtures_are_behavior_judgments':False if mode=='test-fixtures' else None,
         'judge_capacity':capacities,'formal_ready':False,

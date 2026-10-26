@@ -53,14 +53,15 @@ def response_judge_view(deliverables, *, task, events=()):
 
 
 def trajectory_judge_view(events, *, task, private_goals, frozen_state, final_response,scoring_profile='legacy-eight-v1'):
-    visible=[]
+    visible=[];sanitized=[]
     permitted={'model_request_submitted','pi_event','message_enqueued','message_exposed','profile_query',
         'main_profiles_exposed','self_summary_exposed','delegation_prepared','delegation_released',
         'members_admitted','member_released','candidates_published','tool_operation_started','tool_operation_finished',
         'formal_deliverable','formal_deliverable_forwarded','lifecycle','final_stale','late_join_trigger'}
+    permitted.update({'model_response','goal_state_observation','service_state_observation','workspace_state_observation'})
     permitted.update({'delegation_updated','delegation_cancelled','delegation_completed','delegation_started',
         'delegation_stage_transition','message_delivery_transition','message_stage_transition','startup_slice_closed'})
-    for event in events:
+    for order,event in enumerate(events):
         if event['event_type'] not in permitted:continue
         payload=copy.deepcopy(event['payload'])
         if event['event_type']=='model_request_submitted':
@@ -77,15 +78,20 @@ def trajectory_judge_view(events, *, task, private_goals, frozen_state, final_re
                 if end<len(actual['systemPrompt']) and actual['systemPrompt'][end]!='\n':
                     raise DynamicError('private_goal_view_boundary','Private prompt boundary does not match')
                 actual['systemPrompt']=actual['systemPrompt'][:start]+actual['systemPrompt'][end:]
-        for key in ('condition','q','r','goal_hash','private_goal','hypothesis','model_binding_ref'):
+        for key in ('condition','q','r','goal_hash','private_goal','hypothesis','model_binding_ref','profile_metadata'):
             payload.pop(key,None)
+        sanitized.append({**event,'payload':payload})
         visible.append({'event_ref':event['branch_id']+'::'+event['event_id'],'actor_id':event['actor_id'],
+                        'event_order':order,'monotonic_ns':event['monotonic_ns'],
+                        'request_id':event.get('request_id'),'message_id':event.get('message_id'),'tool_call_id':event.get('tool_call_id'),
                         'stage_id':event['stage_id'],'stage_epoch':event['stage_epoch'],
                         'event_type':event['event_type'],'payload':payload})
     result={'view':'dynamic-main-orchestration-original-rubric','subject_scope':'Main orchestration',
         'task':copy.deepcopy(task),'trajectory':visible,'workspace_after':copy.deepcopy(frozen_state),
         'final_response':final_response,'private_goals_removed':True}
-    if scoring_profile=='dynamic-homogeneous-v2':result.update(view='dynamic-whole-team-actor-visible-v2',subject_scope='whole team outcomes and actor-visible opportunities')
+    if scoring_profile=='dynamic-homogeneous-v2':
+        from .trajectory_observer import judge_evidence_index
+        result.update(view='dynamic-whole-team-actor-visible-v3',subject_scope='whole team outcomes and actor-visible opportunities',evidence_index=judge_evidence_index(sanitized))
     result['_sanitizer']={'version':'private-goal-boundary-v2','source_events_hash':digest(events),'sanitized_view_hash':digest(result)}
     return result
 

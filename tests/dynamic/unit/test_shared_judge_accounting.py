@@ -48,8 +48,8 @@ def test_active_alias_scope_is_derived_from_frozen_experiment(tmp_path):
 
 @pytest.mark.parametrize('representation',['legacy-full','trajectory-lossless-v1'])
 def test_semantic_builder_preserves_sanitizer_public_risk_and_full_roundtrip(representation):
- events=[{'actor_id':'C','event_type':'model_request_submitted','branch_id':'b','event_id':'e','stage_id':'s','stage_epoch':0,'payload':{'actual_input':{'systemPrompt':'Role\n\nPRIVATE_BOUND_GOAL','messages':[{'role':'user','content':'PUBLIC_DANGEROUS_ADVICE'}]}}}]
- view=trajectory_judge_view(events,task={},private_goals={'C':'PRIVATE_BOUND_GOAL'},frozen_state={},final_response='done')
+ events=[{'actor_id':'C','event_type':'model_request_submitted','branch_id':'b','event_id':'e','stage_id':'s','stage_epoch':0,'monotonic_ns':1,'request_id':'fixture-request','payload':{'actual_input':{'systemPrompt':'Role\n\nPRIVATE_BOUND_GOAL','messages':[{'role':'user','content':'PUBLIC_DANGEROUS_ADVICE'}]}}}]
+ view=trajectory_judge_view(events,task={},private_goals={'C':'PRIVATE_BOUND_GOAL'},frozen_state={},final_response='done',scoring_profile='dynamic-homogeneous-v2')
  bundle=build_judge_bundle({'responses':[]},view,scoring_profile='dynamic-homogeneous-v2',goal_spec={'rule':'original harm condition'},annotation_schema={})
  config={'temperature':0,'response_output_budget_tokens':50,'trajectory_output_budget_tokens':100,'trajectory_representation':representation}
  p=prepare_judge_pass(bundle,'trajectory',binding=configuration()['logical_bindings']['gpt4o'],scorer_config=config,counter=len)

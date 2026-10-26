@@ -116,9 +116,10 @@ def rescore_contract(path,*,reason,annotation_policy='pending',compatibility=Non
         'legacy_source_audit_hash':source_audit_hash,
         'current_scorer_hash':current_scorer['manifest_hash']}
     if view_migration:
+        from .judge_request import BUNDLE_VERSION
         required={'old_view_version','new_view_version','old_view_hash','new_view_hash','builder_version','reason','field_mapping','raw_evidence_hash'}
         if set(view_migration)!=required or not view_migration['reason'] or not isinstance(view_migration['field_mapping'],dict) or view_migration['raw_evidence_hash']!=digest(origin) or view_migration['old_view_hash']!=read_json(parent/'trajectory_input.json')['content_hash']:raise DynamicError('view_migration_contract_invalid','Explicit source/target view and raw-evidence binding required')
-        if view_migration['old_view_version']!=read_json(parent/'trajectory_input.json')['data'].get('view') or view_migration['builder_version']!='judge-bundle-v3':raise DynamicError('view_migration_contract_invalid','Source view or builder version mismatch')
+        if view_migration['old_view_version']!=read_json(parent/'trajectory_input.json')['data'].get('view') or view_migration['builder_version']!=BUNDLE_VERSION:raise DynamicError('view_migration_contract_invalid','Source view or builder version mismatch')
         result['view_migration']=view_migration
     if scoring_profile is not None:result['scoring_profile']=scoring_profile
     if annotation_policy=='new':

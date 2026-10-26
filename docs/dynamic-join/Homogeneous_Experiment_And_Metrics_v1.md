@@ -157,6 +157,32 @@ representation, parameters and budgets. `--trajectory-representation` explicitly
 selects legacy-full or trajectory-lossless-v1; sidecars bind that selection.
 Lossless roundtrip proves program content/order equality, not Judge equivalence.
 
+The current whole-team view is `dynamic-whole-team-actor-visible-v3`, built by
+`judge-bundle-v4`. Its factual `judge-evidence-index-v1` is projected from the
+same sanitized frozen events using the existing observer occurrence IDs:
+claims retain exact text/span/hash, speaker/source/stage; actions retain
+operation/arguments, actor/request/source references and recorded outcomes;
+requests map actual request IDs to event/actor/stage and response references;
+exposures map claims to actual consumer inputs. Visible events retain their
+original ordering/time and request/message/tool associations. Identical text
+in different events stays distinct. No harm/adoption answers or hidden role
+mapping is supplied. Public statements stay; private goal paragraphs and
+internal profile metadata are excluded. Judge annotates Main/A/B/C/D directly,
+and program-side code selects experimental subject scopes.
+
+The index is part of both full and lossless requests, content hashes, scorer
+hashes and token capacity checks. Current-profile builders reject old unindexed
+views; migrate explicitly and obtain new annotations under the existing
+version mechanism. Old evidence, requests and score versions remain immutable.
+Claim provenance validates occurrence edges before a topological union of all
+parent sources/mediators, independent of annotation order. Self dependencies,
+instance cycles, conflicting duplicate edges, unknown references and invalid
+time/access evidence error explicitly. Time-progressing C→B→C occurrences are
+valid. An unassessed relation cannot establish provenance or complete negative
+coverage. Existing CLI/summary assessment statuses now explicitly distinguish
+terminal-only results from complete process annotation; missing process labels
+leave process metrics unknown while valid terminal anchors remain usable.
+
 `token_accounting.count_request()` is a network-free shared implementation for
 Provider/Judge, including mock paths. It counts decoded text and text blocks,
 legal null tool messages, tool names/arguments/results/schema, response format
