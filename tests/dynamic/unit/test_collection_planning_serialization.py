@@ -50,7 +50,7 @@ def test_h2_retry_requires_recorded_serialization_failure_and_all_settled(tmp_pa
  b.settle('h2',settled_cost_cny=.001,usage={})
  retry=verified_h2_serialization_retry(b,'parent');assert retry['stage']=='history/H2'
  child=ExecutionAttempt(b,tmp_path/'child',attempt_id='child',parent_attempt='parent',identity={'history_serialization_retry':retry})
- assert '/serialization-repair/parent/' in history_request_context({'execution_review_id':'round'},child,'history/H2')['model_generation_group_id']
+ assert history_request_context({'execution_review_id':'round/serialization-repair/parent'},child,'history/H2')['model_generation_group_id']=='round/serialization-repair/parent/history/H2'
  assert history_request_context({'execution_review_id':'round'},child,'history/H1')['model_generation_group_id']=='round/history/H1'
  with pytest.raises(DynamicError,match='history_retry_limit'):verified_h2_serialization_retry(b,'parent')
 

@@ -30,14 +30,23 @@ def verified_h2_serialization_retry(budget,parent_attempt):
   rows=[v for v in db.execute('SELECT * FROM requests') if json.loads(v['metadata']).get('execution_attempt_id')==parent_attempt and json.loads(v['metadata']).get('execution_stage_id')=='history/H2']
   if not rows or any(v['status']!='settled' for v in rows):raise DynamicError('history_retry_unknown_requests','Reconcile every original H2 request before a new preparation attempt')
   retry={'stage':'history/H2','source_attempt':parent_attempt,'source_hash':file_hash(path),'reason':'invalid_fields; explicit field-only format repair; retained failure, no task-outcome selection'}
-  for child in db.execute('SELECT identity FROM execution_attempts'):
-   if json.loads(child['identity']).get('history_serialization_retry',{}).get('source_attempt')==parent_attempt:raise DynamicError('history_retry_limit','The one engineering continuation already exists')
+  for child in db.execute('SELECT attempt_id,identity FROM execution_attempts'):
+   if (json.loads(child['identity']).get('history_serialization_retry') or {}).get('source_attempt')!=parent_attempt:continue
+   prior=list(db.execute('SELECT * FROM execution_stages WHERE attempt_id=?',(child['attempt_id'],)))
+   submitted=any(v['submitted_at'] is not None and json.loads(v['metadata']).get('execution_attempt_id')==child['attempt_id'] for v in db.execute('SELECT * FROM requests'))
+   # A source-hash rejection before any network submission did not consume an H2 retry.
+   safe=False
+   if not submitted and len(prior)==1 and prior[0]['stage_id']=='history/H1' and prior[0]['state']=='failed' and prior[0]['result']:
+    value=json.loads(prior[0]['result']);artifacts=json.loads(prior[0]['artifacts'])
+    safe=bool(artifacts) and all(Path(k).is_file() and file_hash(Path(k))==v for k,v in artifacts.items()) and read_json(Path(value['path']))['record']['termination_reason']=='fixed_generation_already_started'
+   if not safe:raise DynamicError('history_retry_limit','The one engineering H2 continuation already exists')
   return retry
 
 class CollectionRunner(ReviewRunner):
  def transport(self,stage,out,*,kind='model',limit=120,formal=False):
   t=super().transport(stage,out,kind=kind,limit=limit,formal=False)
-  t.execution_context['execution_review_id']=ROUND_ID
+  retry=self.attempt.identity.get('history_serialization_retry')
+  t.execution_context['execution_review_id']=ROUND_ID+('/serialization-repair/'+retry['source_attempt'] if retry and stage=='history' else '')
   if kind=='model':t.execution_context['model_generation_group_id']=ROUND_ID+'/'+stage
   return t
  def freeze_collection_plan(self):

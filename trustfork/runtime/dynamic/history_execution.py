@@ -15,8 +15,6 @@ from .initial_plan import parse_initial_plan, planning_contract, planning_identi
 def history_request_context(base,attempt,stage):
     context=dict(base)
     review=context.get('execution_review_id','runtime-judge-review-20261026')
-    retry=getattr(attempt,'identity',{}).get('history_serialization_retry')
-    if retry and retry['stage']==stage:review=review+'/serialization-repair/'+retry['source_attempt']
     context.update(execution_attempt_id=attempt.attempt_id,execution_stage_id=stage,
         execution_review_id=review,model_generation_group_id=review+'/'+stage)
     return context
