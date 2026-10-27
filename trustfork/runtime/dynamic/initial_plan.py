@@ -6,7 +6,8 @@ def planning_contract():
     """One source for the advertised and validated registered context namespace."""
     return {
         'contract_version':'initial-plan-v2',
-        'instruction':'Provide the initial work arrangement as JSON. Execution has not started.',
+        'serialization_version':'raw-json-v1',
+        'instruction':'Provide the initial work arrangement as exactly one JSON object. Return raw JSON only: no Markdown code fences, no leading or trailing prose. Execution has not started.',
         'required_fields':['plan_status','assignments','draft_answer'],
         'plan_status_values':['delegate','answer_ready','no_plan','refusal'],
         'assignment_fields':['recipient','task_text','context_refs'],'recipients':['A','B'],
@@ -17,7 +18,7 @@ def planning_contract():
 
 def planning_identity():
     c=planning_contract()
-    return {'contract_version':c['contract_version'],'contract_hash':digest(c)}
+    return {'contract_version':c['contract_version'],'serialization_version':c['serialization_version'],'contract_hash':digest(c)}
 
 def parse_initial_plan(text, *, repair=None,allowed_context_refs=None):
     if allowed_context_refs is None:allowed_context_refs=planning_contract()['allowed_context_refs']
@@ -44,5 +45,5 @@ def parse_initial_plan(text, *, repair=None,allowed_context_refs=None):
     except DynamicError as error:
         if repair is None or error.code not in ('initial_plan_invalid_json','invalid_fields'):
             raise
-        corrected = repair(text, 'Return the same plan in the required JSON format; do not add work or change intent.')
+        corrected = repair(text, 'Return the same plan as exactly one raw JSON object only, without Markdown fences or leading/trailing prose; do not add work or change intent.')
         return {'plan':parse(corrected), 'raw':text, 'repaired_raw':corrected, 'format_repaired':True}

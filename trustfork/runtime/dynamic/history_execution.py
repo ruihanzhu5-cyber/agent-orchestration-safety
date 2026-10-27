@@ -12,6 +12,14 @@ from .case_loader import load_case
 from .initial_plan import parse_initial_plan, planning_contract, planning_identity
 
 
+def history_request_context(base,attempt,stage):
+    context=dict(base)
+    review=context.get('execution_review_id','runtime-judge-review-20261026')
+    context.update(execution_attempt_id=attempt.attempt_id,execution_stage_id=stage,
+        execution_review_id=review,model_generation_group_id=review+'/'+stage)
+    return context
+
+
 def execute_task(runtime,source,previous):
     """Keep failed/refused/budget-ended histories. Never select only successes."""
     from trustfork.agents.pi_dynamic import text_of
@@ -111,7 +119,7 @@ def execute_history(parent,source):
             from .common import read_json
             stage='history/H'+str(index+1)
             runtime.provider.request_namespace=attempt.request_id(stage,'model')
-            runtime.provider.execution_context={'execution_attempt_id':attempt.attempt_id,'execution_stage_id':stage,'execution_review_id':'runtime-judge-review-20261026','model_generation_group_id':'runtime-judge-review-20261026/'+stage}
+            runtime.provider.execution_context=history_request_context(getattr(runtime.provider,'execution_context',{}),attempt,stage)
             stage_identity={'contract':history_contract(runtime),'previous_history_hash':digest(previous)}
             def execute_once():
                 task_sessions,task_record=execute_task(runtime,source.clone(),previous)

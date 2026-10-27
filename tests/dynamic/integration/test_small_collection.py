@@ -47,4 +47,5 @@ def test_four_behaviors_are_frozen_before_failed_judge_and_fork_isolated(tmp_pat
  before=len(mock.seen);again=runner.collect(runtime_factory=IsolationRuntime)
  assert again['status']=='completed' and len(mock.seen)==before and all(file_hash(p)==h for p,h in hashes.items())
  assert budget.segment_summary()['settled_cny']>=.5
+ assert all(v['metadata'].get('execution_review_id')=='small-api-collection-20261027' for v in budget.rows() if v['request_id']!='old-paid')
  assert not list(runner.path.rglob('scoring_annotations.json')) and not list(runner.path.rglob('scores.json'))

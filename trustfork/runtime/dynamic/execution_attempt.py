@@ -18,7 +18,8 @@ def migrate_attempts(path,*,apply=False,backup=None):
   policy=json.loads(before['policy'][0]['value'])
   if policy['campaign_id']!='first-api-20261026' or policy['total_micro_cny']!=100000000:raise DynamicError('execution_campaign_bucket_mismatch','Original CNY100 required')
   segment=next((r for r in before['segments'] if r['segment_id']=='plan-judge-followup-20261026'),None)
-  if segment is None or segment['ceiling']!=20000000:raise DynamicError('execution_segment_bucket_mismatch','Existing CNY20 segment required')
+  from .small_api_budget import authorized_segment_ceiling
+  if segment is None or not authorized_segment_ceiling(source,segment['segment_id'],segment['ceiling']):raise DynamicError('execution_segment_bucket_mismatch','Existing original segment or explicit user amendment required')
   result={'migration':MIGRATION,'needs_migration':not exists,'dry_run':not apply,'original_facts_hash':digest(before),'campaign_id':policy['campaign_id'],'segment_id':segment['segment_id'],'segment_identity':json.loads(segment['identity']),'segment_ceiling_micro_cny':segment['ceiling'],'request_rows':len(before['requests'])}
   if not apply:return result
   if backup is None:raise DynamicError('ledger_backup_required','Back up original ledger before transaction migration')

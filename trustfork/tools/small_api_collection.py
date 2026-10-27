@@ -21,7 +21,7 @@ class CollectionRunner(ReviewRunner):
   return t
  def freeze_collection_plan(self):
   from trustfork.runtime.dynamic.case_loader import load_case
-  plan={'version':PLAN_VERSION,'round_id':ROUND_ID,'behavior_execution_sha':self.code,'config_hash':digest(self.config),'matrix':fixed_matrix(),'history_tasks':['p002','p007'],'collection_order':['S/HP','S/HA','F/HP','F/HA'],'source_asset_hashes':{c:load_case(c)['deployed_asset_hash'] for c in ('p001','p002','p007')},'collection_depends_on_judge':False,'original_campaign_cny':100,'original_segment_cny':20,'new_judge_cost_ceiling_cny':2,'new_judge_request_limit':48,'per_scoring_item_max_requests':2,'planned_core_contract':'trustfork-core-v1','planned_extended_representation':'trajectory-lossless-v2','team_runtime_budgets':self.config.get('runtime_budgets'),'source_parent_seal':digest(self.seal)}
+  plan={'version':PLAN_VERSION,'round_id':ROUND_ID,'behavior_execution_sha':self.code,'config_hash':digest(self.config),'matrix':fixed_matrix(),'history_tasks':['p002','p007'],'collection_order':['S/HP','S/HA','F/HP','F/HA'],'source_asset_hashes':{c:load_case(c)['deployed_asset_hash'] for c in ('p001','p002','p007')},'collection_depends_on_judge':False,'original_campaign_cny':100,'original_segment_cny':20,'authorized_segment_cny':self.config['campaign_budget']['segment_cny'],'round_new_cost_ceiling_cny':50,'new_judge_cost_ceiling_cny':10,'new_judge_request_limit':48,'per_scoring_item_max_requests':2,'planned_core_contract':'trustfork-core-v1','planned_extended_representation':'trajectory-lossless-v2','team_runtime_budgets':self.config.get('runtime_budgets'),'source_parent_seal':digest(self.seal)}
   p=self.path/'plan.json'
   if p.exists() and read_json(p)!=plan:raise DynamicError('collection_plan_changed','Frozen matrix/config/code cannot change')
   if not p.exists():atomic_json(p,plan)
@@ -115,7 +115,7 @@ def main():
  if c['judge_binding']!='deepseekflash':raise DynamicError('collection_binding_mismatch','Use the retained official DeepSeek Judge configuration')
  dry=migrate_attempts(a.parent/'campaign-budget.sqlite3',apply=False)
  if dry['needs_migration']:raise DynamicError('execution_migration_required','Original association tables must already exist')
- budget=CampaignBudget(a.parent/'campaign-budget.sqlite3',campaign_id='first-api-20261026',must_exist=True,segment_id=SEGMENT_ID,segment_cny=20,segment_identity=dry['segment_identity'])
+ budget=CampaignBudget(a.parent/'campaign-budget.sqlite3',campaign_id='first-api-20261026',must_exist=True,segment_id=SEGMENT_ID,segment_cny=dry['segment_ceiling_micro_cny']/1e6,segment_identity=dry['segment_identity'])
  attempt=ExecutionAttempt(budget,a.out,attempt_id=a.attempt_id,parent_attempt='runtime-review-20261027-a1',identity={'execution_code_sha':code,'config_hash':digest(c),'allowed_actions':['fixed-behavior-collection-only'],'retry_reason':'Explicit authorized collection-first plan; never gated by Judge results'})
  write_json(a.out/'resolved-config.json',c);runner=CollectionRunner(a.parent,attempt,c);runner.freeze_collection_plan();write_json(a.out/'budget-before.json',attempt.inspect())
  from dotenv import dotenv_values

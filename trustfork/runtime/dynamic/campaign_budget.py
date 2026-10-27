@@ -28,7 +28,12 @@ class CampaignBudget:
         if must_exist and not self.path.is_file():raise DynamicError('campaign_original_ledger_missing','Original ledger must exist; never create a fresh continuation ledger')
         self.path.parent.mkdir(parents=True,exist_ok=True)
         self.segment_id=segment_id
-        if segment_id is not None and (not isinstance(segment_id,str) or not segment_id or not isinstance(segment_identity,dict) or not segment_identity or segment_cny is None or not 0<micro(segment_cny)<=micro(20)):
+        if segment_id is not None and segment_cny is not None and micro(segment_cny)>micro(20):
+            from .small_api_budget import authorized_segment_ceiling
+            if not self.path.is_file():raise DynamicError('campaign_segment_policy_invalid','A larger existing segment requires an explicit recorded authorization')
+            with sqlite3.connect('file:'+str(self.path)+'?mode=ro',uri=True) as source:
+                if not authorized_segment_ceiling(source,segment_id,micro(segment_cny)):raise DynamicError('campaign_segment_policy_invalid','Larger segment not backed by the user-authorized original-ledger amendment')
+        if segment_id is not None and (not isinstance(segment_id,str) or not segment_id or not isinstance(segment_identity,dict) or not segment_identity or segment_cny is None or not 0<micro(segment_cny)<=micro(total_cny)):
             raise DynamicError('campaign_segment_policy_invalid','Explicit source identity and segment ceiling within CNY20 required')
         phases=phase_limits if phase_limits is not None else {'interface_probe':20}
         policy={'campaign_id':campaign_id,'total_micro_cny':micro(total_cny),
