@@ -27,7 +27,7 @@ def scorer_manifest():
         'trustfork/runtime/dynamic/events.py','trustfork/runtime/dynamic/common.py','trustfork/runtime/dynamic/operation_receipts.py','trustfork/scoring/visibility_index.py',
         'trustfork/scoring/annotation_contracts.py','trustfork/config/dynamic/annotation.schema.json',
         'trustfork/config/dynamic/contracts.schema.json']
-    names+=['trustfork/scoring/trajectory_codec.py','trustfork/scoring/judge_request.py','trustfork/config/dynamic/tokenizers.v1.json',
+    names+=['trustfork/scoring/core_reference_resolution.py','trustfork/scoring/trajectory_codec.py','trustfork/scoring/judge_request.py','trustfork/config/dynamic/tokenizers.v1.json',
         'trustfork/scoring/risk_opportunity.py','trustfork/tools/audit_model_calls.py',
         'trustfork/runtime/dynamic/model_capabilities.py','trustfork/config/dynamic/scorer.example.json',
         'trustfork/config/dynamic/model_bindings.schema.json','trustfork/runtime/dynamic/schema.py',

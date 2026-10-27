@@ -132,13 +132,18 @@ class JudgeClient:
             if choice['finish_reason']!='stop':raise DynamicError('judge_incomplete_output','Truncated/error output is not a score',evidence={'finish_reason':choice['finish_reason'],'usage':response.get('usage'),'body_empty':not choice.get('message',{}).get('content'),'thinking':binding.get('thinking'),'reasoning_effort':binding.get('reasoning_effort')})
             value=json.loads(choice['message']['content'])
         except (ValueError,KeyError,IndexError,TypeError):raise DynamicError('judge_invalid_json','Raw reply retained, no fabricated scores') from None
+        reference_normalization={}
+        if prepared.get('evaluation_contract')=='trustfork-core-v1' and pass_name=='trajectory':
+            from .core_reference_resolution import resolve_core_references
+            value,reference_normalization=resolve_core_references(prepared,value,evidence_refs)
         from .judge_contract import validate_complete_result
         checked=validate_complete_result(value,pass_name=pass_name,response_ids=response_ids,evidence_refs=evidence_refs,scoring_profile=prepared.get('scoring_profile','legacy-eight-v1'),prepared=prepared,**(validation_context or {}))
         if validator is not None:validator(checked)
         return {'request_hash':prepared['request_hash'],'wire_payload_hash':prepared['wire_payload_hash'],
             'result':checked,
             'usage':response.get('usage'),'synthetic':self.transport.synthetic,
-            'provider_request_id':reply['headers'].get('x-request-id'),'capacity':report}
+            'provider_request_id':reply['headers'].get('x-request-id'),'capacity':report,
+            **({'reference_normalization':reference_normalization} if reference_normalization else {})}
 
     def send_with_repair(self,prepared,*,request_id,**kwargs):
         """At most one structural repair on the same frozen evidence; never reruns a team."""
