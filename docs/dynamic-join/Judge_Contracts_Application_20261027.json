@@ -1,0 +1,98 @@
+{
+  "date_asia_shanghai": "2026-10-27T10:07:59.559529+08:00",
+  "repository": "ruihanzhu5-cyber/agent-orchestration-safety",
+  "branch": "fix/judge-contracts-20261027",
+  "package_sha256": "c21d74646cc3f436747490f4992e71c6f14d99c3081c49bcf66a0838350e2a95",
+  "application": {
+    "baseline_sha": "dd4b619caa6779344ddd80c54e0728535867d626",
+    "branch": "fix/judge-contracts-20261027",
+    "patch_sha256": "9375a048f209c7f102100494129388340ed53343744a3c7d8b98335235460276",
+    "applied_commit": "b1780912a597183845a2fb7799038ca591fb8111",
+    "actual_tree": "c848a1ee47f980ad1e6a7722a42985cb79b4669e",
+    "expected_tree": "c848a1ee47f980ad1e6a7722a42985cb79b4669e",
+    "tree_matches": true,
+    "apply_commands": [
+      {
+        "command": "git apply --check judge-contracts.patch",
+        "exit_code": 0
+      },
+      {
+        "command": "git am judge-contracts.patch",
+        "exit_code": 0
+      }
+    ],
+    "ledger_before_sha256": "22c058510ebb25fe322e430958ff0778724575610d8bcdf611198d30d0a6a477",
+    "request_rows_before": 266,
+    "requests_before_sha256": "46c5c53661feccf4ea8f64ac74849a37f04cadbfcd0fb04fc2b631e42fef44ef",
+    "real_api_called": false,
+    "source_status_after_apply": ""
+  },
+  "tests": {
+    "tested_commit": "b1780912a597183845a2fb7799038ca591fb8111",
+    "commands": [
+      {
+        "command": "git diff --check",
+        "log": "git-diff-check.txt",
+        "exit_code": 0,
+        "seconds": 1.2324382830000218,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "command": "git diff --check dd4b619caa6779344ddd80c54e0728535867d626..b1780912a597183845a2fb7799038ca591fb8111",
+        "log": "patch-diff-check.txt",
+        "exit_code": 0,
+        "seconds": 0.08967409499999235,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "command": "/mnt/d/envs/trustfork-linux/bin/python -m pytest -q tests/dynamic/unit",
+        "log": "unit-tests.txt",
+        "exit_code": 0,
+        "seconds": 106.31061566099999,
+        "sha256": "6561732ab1f8e06ec45e0d43fbc6b5cad581e73f7135f87397f0cf11d3d6d6a2"
+      }
+    ],
+    "credential_environment_inherited": false,
+    "offline_guard_enabled": true
+  },
+  "test_summary": "428 passed in 80.77s (0:01:20)",
+  "protected_state": {
+    "ledger_after_sha256": "22c058510ebb25fe322e430958ff0778724575610d8bcdf611198d30d0a6a477",
+    "request_rows_after": 266,
+    "requests_after_sha256": "46c5c53661feccf4ea8f64ac74849a37f04cadbfcd0fb04fc2b631e42fef44ef",
+    "blocked_external_attempts": 0,
+    "git_status_after": "",
+    "tree_after": "c848a1ee47f980ad1e6a7722a42985cb79b4669e",
+    "ledger_unchanged": true
+  },
+  "changed_patch_files": [
+    "docs/dynamic-join/Judge_Architecture_Review_20261027.md",
+    "tests/dynamic/unit/test_cross_judge_binding_review.py",
+    "tests/dynamic/unit/test_effect_contract_review.py",
+    "tests/dynamic/unit/test_formal_judge_followup.py",
+    "tests/dynamic/unit/test_goal_sensor_precedence_review.py",
+    "tests/dynamic/unit/test_homogeneous_metrics.py",
+    "tests/dynamic/unit/test_judge_contract_delivery_review.py",
+    "tests/dynamic/unit/test_judge_review_contract.py",
+    "tests/dynamic/unit/test_judge_semantics_v2_review.py",
+    "tests/dynamic/unit/test_opportunity_contract_review.py",
+    "trustfork/config/dynamic/annotation.schema.json",
+    "trustfork/scoring/annotation_contracts.py",
+    "trustfork/scoring/dynamic_metrics_v2.py",
+    "trustfork/scoring/dynamic_pipeline.py",
+    "trustfork/scoring/formal_judge_fixtures.py",
+    "trustfork/scoring/goal_observer.py",
+    "trustfork/scoring/judge_client.py",
+    "trustfork/scoring/judge_contract.py",
+    "trustfork/scoring/judge_request.py"
+  ],
+  "python": "3.12.13",
+  "pytest": "9.1.1",
+  "dependencies_installed_or_upgraded": false,
+  "real_model_requests_this_round": 0,
+  "real_judge_requests_this_round": 0,
+  "team_reruns": 0,
+  "default_mode": "offline",
+  "default_real_api_enabled": false,
+  "limitations": "Offline contract checks only; no new paid Judge calibration or team execution; package-supplied research review retained without independent redesign"
+}
