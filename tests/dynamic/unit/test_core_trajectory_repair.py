@@ -105,3 +105,12 @@ def test_finer_pool_reuses_content_without_changing_decoded_evidence():
  default=encode_trajectory_v2(view);fine=encode_trajectory_v2(view,pool_min_bytes=48)
  assert decode_trajectory(default)==decode_trajectory(fine)==view
  assert encode_trajectory_v2(view,pool_min_bytes=160)==default
+
+
+def test_optional_key_aliases_restore_exact_events_and_do_not_change_strings():
+ from trustfork.scoring.trajectory_codec import encode_trajectory_v2,decode_trajectory
+ view={'private_goals_removed':True,'trajectory':[{'event_ref':'original::event_'+str(i),'event_type':'model_response','actual_input':{'public_task':'literal event_ref actual_input words remain unchanged'},'already_short':'x','a':'existing key'} for i in range(20)]}
+ packed=encode_trajectory_v2(view,pool_min_bytes=32,key_aliases=True)
+ assert packed.get('key_aliases') and 'a' not in packed['key_aliases']
+ assert decode_trajectory(packed)==view
+ assert encode_trajectory_v2(view)==encode_trajectory_v2(view,key_aliases=False)

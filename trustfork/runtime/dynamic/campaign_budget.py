@@ -124,6 +124,12 @@ class CampaignBudget:
                 limit=db.execute('SELECT ceiling FROM segments WHERE segment_id=?',(self.segment_id,)).fetchone()[0]
                 used=sum(r['settled'] if r['status']=='settled' else 0 if r['status']=='cancelled_before_send' else r['reserved']
                     for r in db.execute('SELECT * FROM requests') if json.loads(r['metadata']).get('segment_id')==self.segment_id)
+                from .small_api_budget import judge_followup_authorization
+                extra=judge_followup_authorization(db)
+                if extra is not None:
+                    owner=metadata.get('execution_attempt_id','');stage=metadata.get('execution_stage_id','')
+                    eligible=(metadata.get('kind')=='judge' and metadata.get('small_api_judge_group_id')=='small-api-collection-20261027' and owner.startswith('small-api-th-tul-frozen-20261027-') and stage.startswith(('calibration/','trajectory/')))
+                    if not eligible:limit=min(limit,extra['previous_ceiling'])
                 if used+amount>limit:raise DynamicError('campaign_segment_cost_exhausted','New segment reservations and settlements exceed its included ceiling')
             if phase in self.policy['phase_limits'] and phase_total+amount>self.policy['phase_limits'][phase]:
                 raise DynamicError('campaign_phase_cost_exhausted','Phase is a subset of campaign total')

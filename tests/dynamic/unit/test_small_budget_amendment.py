@@ -32,3 +32,20 @@ def test_existing_attempt_association_and_attach_follow_authorized_bucket(tmp_pa
  shutil.copy2(p,tmp_path/'campaign-budget.sqlite3')
  config=attach_budget({'campaign_budget':{}},tmp_path)
  assert config['campaign_budget']['segment_cny']==50.5
+
+
+def test_second_authorization_is_judge_only_and_preserves_original_rows(tmp_path):
+ from trustfork.runtime.dynamic.small_api_budget import amend_judge_followup,ROUND
+ p,b,baseline=prepared(tmp_path);amend_original_segment(p,baseline,backup=tmp_path/'first-backup.sqlite3')
+ original=b.rows();receipt=amend_judge_followup(p,backup=tmp_path/'judge-backup.sqlite3')
+ assert receipt['new_segment_ceiling_cny']==60.5 and b.rows()==original
+ assert amend_judge_followup(p,backup=tmp_path/'not-created.sqlite3')['status']=='already_applied'
+ assert not (tmp_path/'not-created.sqlite3').exists()
+ live=CampaignBudget(p,campaign_id='first-api-20261026',segment_id=SEGMENT,segment_cny=60.5,segment_identity={'identity_hash':'old'},must_exist=True)
+ # Consume the previous ceiling with unchanged old-round activity.
+ live.reserve('existing-round',phase='engineering_smoke',reserved_cost_cny=50,metadata={'kind':'model'});live.submitted('existing-round');live.settle('existing-round',settled_cost_cny=50,usage={})
+ with pytest.raises(DynamicError,match='campaign_segment_cost_exhausted'):live.reserve('extra-team',phase='engineering_smoke',reserved_cost_cny=1,metadata={'kind':'model'})
+ metadata={'kind':'judge','small_api_judge_group_id':ROUND,'execution_attempt_id':'small-api-th-tul-frozen-20261027-a6','execution_stage_id':'trajectory/new-S-HP'}
+ live.reserve('authorized-judge',phase='engineering_smoke',reserved_cost_cny=1,metadata=metadata)
+ assert live.summary()['remaining_cny']==48.5
+ with pytest.raises(DynamicError,match='small_api_judge_cost_exhausted'):live.reserve('judge-too-large',phase='engineering_smoke',reserved_cost_cny=10,metadata=metadata)

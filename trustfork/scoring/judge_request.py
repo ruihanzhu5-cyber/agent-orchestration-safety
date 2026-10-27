@@ -46,6 +46,7 @@ def prepare_judge_request(view,*,rubric,format_instructions,output_budget=None,t
     if output_budget is not None:params[output_token_parameter]=output_budget
     system=rubric+'\n\n'+format_instructions+'\nReturn exactly one JSON object, without Markdown fences, introductory text or trailing explanation.'
     if representation in (VERSION,PREFIX_VERSION):system+='\n\n'+(PREFIX_INSTRUCTIONS if representation==PREFIX_VERSION else INSTRUCTIONS)
+    if isinstance(view,dict) and view.get('key_aliases'):system+='\nBefore decoding the expanded v1 DAG, restore object keys using key_aliases (alias -> original key), recursively in root. String values stay unchanged. Aliases use characters absent from original object keys. This is exact shared field-name encoding; event references and all source strings are unchanged. Then apply the unchanged rubric to the recovered evidence.'
     request={'messages':[{'role':'system','content':system},{'role':'user','content':canonical(view).decode()}],
         'tools':tools or [],'parameters':params}
     binding=judge_binding or {}
@@ -169,7 +170,7 @@ def prepare_judge_pass(bundle,pass_name,*,binding,scorer_config,representation=N
         from .core_contract import core_bundle
         bundle=core_bundle(bundle)
     view=bundle['views'][pass_name]
-    if pass_name=='trajectory' and rep in ('trajectory-lossless-v1','trajectory-lossless-v2'):view=encode_trajectory_v2(view,pool_min_bytes=scorer_config.get('trajectory_pool_min_bytes',160)) if rep=='trajectory-lossless-v2' else encode_trajectory(view)
+    if pass_name=='trajectory' and rep in ('trajectory-lossless-v1','trajectory-lossless-v2'):view=encode_trajectory_v2(view,pool_min_bytes=scorer_config.get('trajectory_pool_min_bytes',160),key_aliases=scorer_config.get('trajectory_key_aliases',False)) if rep=='trajectory-lossless-v2' else encode_trajectory(view)
     if pass_name=='response':rep='legacy-full'
     params=dict(scorer_config.get('parameters') or {})
     if scorer_config.get('temperature') is not None:params['temperature']=scorer_config['temperature']

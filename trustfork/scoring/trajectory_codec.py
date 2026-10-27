@@ -95,7 +95,7 @@ PREFIX_INSTRUCTIONS=(INSTRUCTIONS+' For trajectory-lossless-v2 first expand stri
     'recipient and event order. All content is in this request, with no external references. '
     'Encoding reversibility alone does not prove cognitive equivalence.')
 
-def encode_trajectory_v2(view, *, pool_min_bytes=160):
+def encode_trajectory_v2(view, *, pool_min_bytes=160, key_aliases=False):
     """A bounded string-prefix layer over the existing exact-content v1 DAG."""
     import os
     v1=encode_trajectory(view,pool_min_bytes=pool_min_bytes)
@@ -126,9 +126,30 @@ def encode_trajectory_v2(view, *, pool_min_bytes=160):
             return {k:encode(x) for k,x in v.items()}
         if isinstance(v,list):return [encode(x) for x in v]
         return v
-    result={'representation_version':PREFIX_VERSION,'decoded_hash':digest(view),'root':encode(v1),'string_pool':pool,
+    packed_root=encode(v1)
+    aliases={}
+    if key_aliases:
+        import string
+        counts=Counter()
+        def keys(x):
+            if isinstance(x,dict):
+                counts.update(x.keys())
+                for v in x.values():keys(v)
+            elif isinstance(x,list):
+                for v in x:keys(v)
+        keys(packed_root)
+        available=[c for c in string.ascii_letters+string.digits+'!#%&()*+,-./:;<=>?[]^_`{|}~' if c not in counts]
+        candidates=sorted((k for k,n in counts.items() if len(k)>=8 and n>=4 and k not in ('@','@@','$s','$object')),key=lambda k:(-(len(k)-1)*counts[k],k))
+        aliases=dict(zip(available,candidates));reverse={v:k for k,v in aliases.items()}
+        def rename(x):
+            if isinstance(x,dict):return {reverse.get(k,k):rename(v) for k,v in x.items()}
+            if isinstance(x,list):return [rename(v) for v in x]
+            return x
+        packed_root=rename(packed_root)
+    result={'representation_version':PREFIX_VERSION,'decoded_hash':digest(view),'root':packed_root,'string_pool':pool,
         'statistics':{'string_entries':len(pool),'prefix_entries':sum('base' in x for x in pool),'original_v1_bytes':original_v1_bytes,'v1_without_pool_checksums_bytes':len(canonical(v1)),
             'cognitive_equivalence':'requires_real_fixture_check'}}
+    if aliases:result['key_aliases']=aliases
     if decode_trajectory(result)!=view:raise DynamicError('codec_roundtrip_failed','Prefix decoding differs')
     return result
 
@@ -162,6 +183,18 @@ def decode_trajectory(packed):
             return {k:expand(x) for k,x in v.items()}
         if isinstance(v,list):return [expand(x) for x in v]
         return v
-    result=_decode_v1(expand(packed['root']),verify_pool_hashes=False)
+    expanded=expand(packed['root'])
+    aliases=packed.get('key_aliases',{})
+    if aliases:
+        if not isinstance(aliases,dict) or len(set(aliases.values()))!=len(aliases) or any(not isinstance(k,str) or not isinstance(v,str) for k,v in aliases.items()):raise DynamicError('codec_reference','Invalid key aliases')
+        def restore_keys(x):
+            if isinstance(x,dict):
+                pairs=[(aliases.get(k,k),restore_keys(v)) for k,v in x.items()]
+                if len({k for k,v in pairs})!=len(pairs):raise DynamicError('codec_reference','Key alias collision')
+                return dict(pairs)
+            if isinstance(x,list):return [restore_keys(v) for v in x]
+            return x
+        expanded=restore_keys(expanded)
+    result=_decode_v1(expanded,verify_pool_hashes=False)
     if digest(result)!=packed.get('decoded_hash'):raise DynamicError('codec_hash','Prefix decoded root differs')
     return result

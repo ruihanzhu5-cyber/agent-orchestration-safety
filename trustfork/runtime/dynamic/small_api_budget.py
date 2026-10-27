@@ -12,7 +12,11 @@ def authorized_segment_ceiling(db,segment_id,ceiling):
  row=db.execute('SELECT old_ceiling,new_ceiling,baseline_segment_charged,max_new,max_judge,authorization,authorization_hash FROM small_api_budget_amendments WHERE round_id=? AND segment_id=?',(ROUND,SEGMENT)).fetchone()
  if not row:return False
  auth=json.loads(row[5])
- return row[0]==micro(20) and row[1]==ceiling==row[2]+row[3] and row[3]==micro(50) and row[4]==micro(10) and digest(auth)==row[6] and auth.get('max_new_cny')==50 and auth.get('max_judge_cny')==10 and auth.get('original_campaign_cny')==100
+ base_valid=row[0]==micro(20) and row[1]==row[2]+row[3] and row[3]==micro(50) and row[4]==micro(10) and digest(auth)==row[6] and auth.get('max_new_cny')==50 and auth.get('max_judge_cny')==10 and auth.get('original_campaign_cny')==100
+ if not base_valid:return False
+ if ceiling==row[1]:return True
+ extra=judge_followup_authorization(db)
+ return extra is not None and extra['previous_ceiling']==row[1] and ceiling==extra['new_ceiling']
 
 def amend_original_segment(path,baseline,*,backup):
  path,backup=Path(path),Path(backup)
@@ -53,3 +57,35 @@ def amend_original_segment(path,baseline,*,backup):
   raise
  finally:db.close()
  return {'status':'applied','original_segment_ceiling_cny':20,'segment_ceiling_cny':target/1e6,'baseline_segment_charged_cny':baseline_segment/1e6,'baseline_campaign_charged_cny':baseline_total/1e6,'max_new_cny':50,'max_judge_cny':10,'original_campaign_cny':100,'authorization_hash':digest(auth),'backup_sha256':file_hash(backup),'all_existing_request_rows_unchanged':True}
+
+
+JUDGE_FOLLOWUP_AUTH={'authorized_by':'user','date_asia_shanghai':'2026-10-27','max_round_new_cny':60,'max_judge_cny':10,'original_campaign_cny':100,'additional_scope':'Judge TH/TUL calibration and rescoring of existing frozen trajectories only; no team reruns','source':'User explicitly confirmed: 允许提高到60元，仅用于Judge补评'}
+
+def judge_followup_authorization(db):
+ if not db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='small_api_judge_followup_authorizations'").fetchone():return None
+ row=db.execute('SELECT previous_ceiling,new_ceiling,authorization,authorization_hash FROM small_api_judge_followup_authorizations WHERE round_id=?',(ROUND,)).fetchone()
+ if not row:return None
+ auth=json.loads(row[2])
+ if auth!=JUDGE_FOLLOWUP_AUTH or digest(auth)!=row[3] or row[1]!=row[0]+micro(10):return None
+ return {'previous_ceiling':row[0],'new_ceiling':row[1],'authorization':auth,'authorization_hash':row[3]}
+
+def amend_judge_followup(path,*,backup):
+ """Append the second explicit authorization; never rewrite old fees or first authorization."""
+ path,backup=Path(path),Path(backup)
+ with sqlite3.connect('file:'+str(path)+'?mode=ro',uri=True) as source:
+  previous=judge_followup_authorization(source)
+  if previous:return {'status':'already_applied',**previous}
+  old=source.execute('SELECT ceiling FROM segments WHERE segment_id=?',(SEGMENT,)).fetchone()[0]
+  if not authorized_segment_ceiling(source,SEGMENT,old):raise DynamicError('budget_original_authorization_invalid',SEGMENT)
+  if backup.exists():raise DynamicError('budget_backup_exists','Never overwrite backup')
+  backup.parent.mkdir(parents=True,exist_ok=True)
+  with sqlite3.connect(backup) as dest:source.backup(dest)
+ with sqlite3.connect(path) as db:
+  db.execute('BEGIN IMMEDIATE')
+  before=list(db.execute('SELECT * FROM requests ORDER BY request_id'))
+  if db.execute('SELECT ceiling FROM segments WHERE segment_id=?',(SEGMENT,)).fetchone()[0]!=old:raise DynamicError('budget_changed','Concurrent ceiling change')
+  db.execute('CREATE TABLE small_api_judge_followup_authorizations (round_id TEXT PRIMARY KEY,previous_ceiling INTEGER NOT NULL,new_ceiling INTEGER NOT NULL,authorization TEXT NOT NULL,authorization_hash TEXT NOT NULL,at REAL NOT NULL)')
+  db.execute('INSERT INTO small_api_judge_followup_authorizations VALUES (?,?,?,?,?,?)',(ROUND,old,old+micro(10),canonical(JUDGE_FOLLOWUP_AUTH).decode(),digest(JUDGE_FOLLOWUP_AUTH),time.time()))
+  db.execute('UPDATE segments SET ceiling=? WHERE segment_id=?',(old+micro(10),SEGMENT))
+  if list(db.execute('SELECT * FROM requests ORDER BY request_id'))!=before:raise DynamicError('budget_old_fees_changed','No old row may change')
+ return {'status':'applied','previous_segment_ceiling_cny':old/1e6,'new_segment_ceiling_cny':(old+micro(10))/1e6,'round_new_cny':60,'judge_cny':10,'campaign_cny':100,'authorization_hash':digest(JUDGE_FOLLOWUP_AUTH),'all_old_requests_unchanged':True}
