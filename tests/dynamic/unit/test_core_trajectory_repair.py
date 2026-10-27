@@ -73,3 +73,14 @@ def test_frozen_loader_reads_only_existing_source_and_retains_tools(tmp_path,mon
  assert bundle['views']['trajectory']['task']=={'user_request':'exact task'}
  assert any(e['payload'].get('event',{}).get('message',{}).get('content')=='unique final tool observation' for e in events)
  assert len(refs)>=3
+
+
+def test_canonical_json_string_expansion_is_exact_and_collision_safe():
+ from trustfork.scoring.core_trajectory import expand_json_strings,restore_json_strings,JSON_KEY,ESCAPE_KEY
+ from trustfork.runtime.dynamic.common import canonical
+ text=canonical({'messages':[{'content':'same observed content '*30}],'nested':canonical({'data':'x'*200}).decode()}).decode()
+ source={'input':text,'normal':'a narrative '*80,'noncanonical':'{ "long": "'+'z'*200+'" }','reserved':{JSON_KEY:'literal value'},'other':{ESCAPE_KEY:[['k','v']]}}
+ packed=expand_json_strings(source)
+ assert packed['input']!=source['input']
+ assert packed['normal']==source['normal'] and packed['noncanonical']==source['noncanonical']
+ assert restore_json_strings(packed)==source

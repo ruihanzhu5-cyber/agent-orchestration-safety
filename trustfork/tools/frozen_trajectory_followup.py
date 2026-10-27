@@ -124,6 +124,9 @@ class TrajectoryFollowup(SmallScoringRunner):
             artifacts=lambda v:[out/'prepared.json']+list(out.glob('result.json'))+list(out.glob('fact-check.json'))+list(out.glob('error.json')))
     def score(self,plan):
         cal=[]
+        for row in plan['sources']:
+            p=read_json(Path(row['out'])/'prepared.json')
+            JudgeClient(self.transport('preflight/'+row['tag'],Path(row['out']))).preflight(p)
         for row in plan['fixtures']:
             value=self.send_item(row,calibration=True);cal.append({'tag':row['tag'],**value})
             write_json(self.path/'calibration.json',{'rows':cal,'passed':len(cal)==3 and all(v['status']=='completed' for v in cal)})
