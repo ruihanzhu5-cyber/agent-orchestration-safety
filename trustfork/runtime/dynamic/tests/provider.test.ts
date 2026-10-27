@@ -85,3 +85,19 @@ test('DeepSeek high thinking survives serialized session-shaped messages and rep
     return {status:200,headers:{'content-type':'text/event-stream'},body:sse({content:'off'})};
   },()=>{}).result();
 });
+
+test('reasoning replay follows locked Pi eligibility without deleting aborted/error records',async()=>{
+ const deep:ProviderBinding={...binding,provider:'deepseek',model_id:'deepseek-flash',thinking:'enabled',reasoning_effort:'high',compat:{...binding.compat,supportsReasoningEffort:true,requiresReasoningContentOnAssistantMessages:true}};
+ const complete=await providerStream(deep,{messages:[{role:'user',content:'first',timestamp:1}]},100,async()=>({status:200,headers:{'content-type':'text/event-stream'},body:sse({reasoning_content:'complete private reasoning',content:'complete answer'})}),()=>{}).result();
+ const aborted={...JSON.parse(JSON.stringify(complete)),stopReason:'aborted',errorMessage:'Retained interrupted generation',content:[{type:'thinking',thinking:'partial private reasoning',thinkingSignature:'reasoning_content'}]};
+ const errored={...JSON.parse(JSON.stringify(aborted)),stopReason:'error',content:[{type:'thinking',thinking:'errored private reasoning',thinkingSignature:'reasoning_content'}]};
+ const context:any={messages:[{role:'user',content:'first',timestamp:1},JSON.parse(JSON.stringify(complete)),{role:'user',content:'interrupted',timestamp:2},aborted,{role:'user',content:'error',timestamp:3},errored,{role:'user',content:'new task',timestamp:4}]};
+ const original=JSON.stringify(context);let calls=0;
+ const result=await providerStream(deep,context,100,async wire=>{
+  calls++;const p=JSON.parse(wire.body);assert.deepEqual(p.messages.filter((m:any)=>m.role==='assistant'&&m.reasoning_content).map((m:any)=>m.reasoning_content),['complete private reasoning']);
+  assert.ok(!JSON.stringify(p).includes('partial private reasoning'));assert.ok(!JSON.stringify(p).includes('errored private reasoning'));
+  return {status:200,headers:{'content-type':'text/event-stream'},body:sse({reasoning_content:'new private reasoning',content:'new answer'})};
+ },()=>{}).result();
+ assert.equal(result.stopReason,'stop');assert.equal(calls,1);assert.equal(JSON.stringify(context),original);
+ assert.equal(context.messages.filter((m:any)=>m.role==='assistant').length,3);
+});

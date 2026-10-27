@@ -54,7 +54,7 @@ def test_four_behaviors_are_frozen_before_failed_judge_and_fork_isolated(tmp_pat
  # A new engineering attempt inherits compatible completed histories without sending.
  from trustfork.runtime.dynamic.prepared_artifacts import prepare_history
  from trustfork.agents.pi_dynamic import ProviderSource
- child=ExecutionAttempt(budget,tmp_path/'continued',attempt_id='continued',parent_attempt=attempt.attempt_id,identity={'execution_code_sha':'new-engineering-code','history_serialization_retry':{'stage':'history/H2','source_attempt':attempt.attempt_id}})
+ child=ExecutionAttempt(budget,tmp_path/'continued',attempt_id='continued',parent_attempt=attempt.attempt_id,identity={'execution_code_sha':'new-engineering-code','history_serialization_retry':{'stage':'history/H2','source_attempt':attempt.attempt_id},'t3_budget_override':{'request_limit':240,'token_limit':384000,'stage_seconds':3600}})
  resumed=CollectionRunner(tmp_path/'parent',child,cfg,mode='mock',http_factory=lambda stage:mock)
  transport=resumed.transport('history',child.path/'history');runtime=PiDynamic('p001',child.path/'history',provider=transport,team_model='deepseekflash');runtime.execution_attempt=child
  before=len(mock.seen);inherited=prepare_history(runtime,ProviderSource(),child.path/'history/history-bundle.json')
@@ -63,3 +63,13 @@ def test_four_behaviors_are_frozen_before_failed_judge_and_fork_isolated(tmp_pat
  with budget.tx() as db:
   transitions=list(db.execute("SELECT stage_id FROM execution_transitions WHERE attempt_id='continued' AND state='inherited_compatible_parent'"))
  assert {v[0] for v in transitions}=={'history/H1','history/H2'}
+
+ # The unchanged saved S prefix can be inherited without repeating model work.
+ from trustfork.runtime.dynamic.prepared_artifacts import load_history,load_prefix
+ original_history=runner.path/'deepseek/history/history-bundle.json';ptransport=resumed.transport('prefix/S',child.path/'prefix-S')
+ prefix_runtime=PiDynamic('p001',child.path/'prefix-S',provider=ptransport,team_model='deepseekflash',protocol='S');load_history(prefix_runtime,original_history);resumed.apply_t3_budget(prefix_runtime)
+ prefix_identity={'history_bundle_id':read_json(original_history)['bundle_id'],'prefix_identity':prefix_runtime.prefix_identity()}
+ assert child.reuse_parent_stage('prefix/S',prefix_identity)
+ before=len(mock.seen);saved=child.run('prefix/S',prefix_identity,lambda:(_ for _ in ()).throw(AssertionError('Prefix must not regenerate')))
+ restored=load_prefix(prefix_runtime,Path(saved['path']))
+ assert len(mock.seen)==before and ptransport.count==0 and restored['checkpoint']['checkpoint_id']==result['results'][0]['checkpoint_id']

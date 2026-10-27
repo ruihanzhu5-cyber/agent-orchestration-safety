@@ -1,4 +1,5 @@
 /** Pi 0.84.1 owns conversion, stream parsing and tool calls. Only HTTP is relayed. */
+import {transformMessages} from '@earendil-works/pi-ai/api/transform-messages';
 import {stream, type OpenAICompletionsOptions} from '@earendil-works/pi-ai/api/openai-completions';
 import type {Model,Context,OpenAICompletionsCompat} from '@earendil-works/pi-ai';
 
@@ -51,8 +52,9 @@ export function providerStream(binding:ProviderBinding,context:Context,maxTokens
         if(p.thinking?.type!==binding.thinking || (enabled&&p.reasoning_effort!==binding.reasoning_effort))
           throw Error('Pi did not emit bound DeepSeek thinking mode/effort');
         if(enabled && 'temperature' in p)throw Error('Thinking temperature must not claim sampling effect');
-        const expected=context.messages.filter(m=>m.role==='assistant'&&m.content.some(b=>b.type==='thinking'&&b.thinking.length))
-          .map(m=>(m.content as any[]).filter(b=>b.type==='thinking'&&b.thinking.trim()).map(b=>b.thinking).join('\n'));
+        // Eligibility is Pi's own conversion rule; raw aborted/error records remain in sessions.
+        const expected=transformMessages(context.messages,model).filter(m=>m.role==='assistant'&&m.content.some(b=>b.type==='thinking'&&b.thinking.length))
+          .map(m=>(m.content as any[]).filter(b=>b.type==='thinking'&&b.thinking.length).map(b=>b.thinking).join('\n'));
         const replay=p.messages.filter((m:any)=>m.role==='assistant'&&m.reasoning_content).map((m:any)=>m.reasoning_content);
         if(enabled&&JSON.stringify(expected)!==JSON.stringify(replay))throw Error('Incomplete private reasoning replay');
       }else if('thinking' in p || 'reasoning_effort' in p)throw Error('GPT route received DeepSeek-only parameters');
