@@ -86,6 +86,21 @@ class CampaignBudget:
             if old:
                 if old['fingerprint']!=fingerprint:raise DynamicError('campaign_request_identity_mismatch',request_id)
                 return dict(old)
+            if metadata.get('small_api_judge_group_id') is not None:
+                group=metadata['small_api_judge_group_id']
+                if group!='small-api-collection-20261027' or metadata.get('kind')!='judge':raise DynamicError('small_api_judge_policy_invalid','Only the fixed round Judge scope may use this sublimit')
+                group_rows=[r for r in db.execute('SELECT * FROM requests') if json.loads(r['metadata']).get('small_api_judge_group_id')==group and r['status']!='cancelled_before_send']
+                if len(group_rows)>=48:raise DynamicError('small_api_judge_request_limit','48 includes calibration, repairs and unknown submissions')
+                group_cost=sum((r['settled'] or 0) if r['status']=='settled' else r['reserved'] for r in group_rows)
+                limit=micro(2)
+                if db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='small_api_budget_amendments'").fetchone():
+                    amendment=db.execute('SELECT max_judge FROM small_api_budget_amendments WHERE round_id=?',(group,)).fetchone()
+                    if amendment:
+                        from .small_api_budget import authorized_segment_ceiling
+                        segment=db.execute('SELECT ceiling FROM segments WHERE segment_id=?',(self.segment_id,)).fetchone()
+                        if not segment or not authorized_segment_ceiling(db,self.segment_id,segment[0]):raise DynamicError('small_api_judge_policy_invalid','Judge increase requires the verified user authorization and original segment')
+                        limit=amendment[0]
+                if group_cost+amount>limit:raise DynamicError('small_api_judge_cost_exhausted','Cumulative explicitly authorized Judge sublimit; original campaign and segment also apply')
             if metadata.get('model_generation_group_id') is not None:
                 owner=metadata.get('execution_attempt_id')
                 if not owner:raise DynamicError('model_generation_identity_required','Fixed preparation must bind an execution attempt')

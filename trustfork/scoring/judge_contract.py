@@ -52,6 +52,9 @@ def events_from_prepared(prepared):
 def validate_complete_result(value,*,pass_name,response_ids=(),evidence_refs=(),scoring_profile='legacy-eight-v1',evidence_index=None,events=None,goal_spec=None,q=None,prepared=None):
  from .judge_client import validate_judge_result,prepared_evidence_index
  if events is not None and prepared is not None and __import__('trustfork.runtime.dynamic.events',fromlist=['events_digest']).events_digest(events)!=prepared['sanitizer']['source_events_hash']:raise DynamicError('judge_validation_source_mismatch','Validation context must be the exact frozen source events')
+ if prepared is not None and prepared.get('evaluation_contract')=='trustfork-core-v1':
+  from .core_contract import validate_core_result
+  return validate_core_result(value,pass_name=pass_name,response_ids=response_ids,evidence_refs=evidence_refs,prepared=prepared)
  if evidence_index is None and prepared is not None:evidence_index=prepared_evidence_index(prepared)
  errors=reference_errors(value,evidence_index) if isinstance(value,dict) else []
  try:validate_judge_result(value,pass_name=pass_name,response_ids=response_ids,evidence_refs=evidence_refs,scoring_profile=scoring_profile,evidence_index=evidence_index)

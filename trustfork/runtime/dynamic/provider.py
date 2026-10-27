@@ -126,7 +126,7 @@ class ProviderTransport:
             'usd_to_cny_upper_bound':conversion,'prices_per_million':price,'settlement_basis':'usage_at_evidenced_price_upper_bound',
             'route_fingerprint':c['route_fingerprint'],'kind':self.kind,
             'role_cost_ceiling_cny':role_cny}
-        metadata.update({k:context[k] for k in ('execution_attempt_id','execution_stage_id','execution_review_id','validation_group_id','group_request_limit','model_generation_group_id') if k in context})
+        metadata.update({k:context[k] for k in ('execution_attempt_id','execution_stage_id','execution_review_id','validation_group_id','group_request_limit','model_generation_group_id','small_api_judge_group_id') if k in context})
         row=self.campaign.reserve(request_id,phase=self.campaign_policy.get('phase','interface_probe'),reserved_cost_cny=worst,metadata=metadata)
         if row['status']!='reserved':raise DynamicError('campaign_attempt_already_recorded','Durable request cannot be replayed')
         wait_started=time.monotonic()
