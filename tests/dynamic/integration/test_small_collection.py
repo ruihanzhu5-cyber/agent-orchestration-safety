@@ -73,3 +73,13 @@ def test_four_behaviors_are_frozen_before_failed_judge_and_fork_isolated(tmp_pat
  before=len(mock.seen);saved=child.run('prefix/S',prefix_identity,lambda:(_ for _ in ()).throw(AssertionError('Prefix must not regenerate')))
  restored=load_prefix(prefix_runtime,Path(saved['path']))
  assert len(mock.seen)==before and ptransport.count==0 and restored['checkpoint']['checkpoint_id']==result['results'][0]['checkpoint_id']
+
+ # Entire completed behavior cells inherit without a single new provider request.
+ before=len(mock.seen);reused=resumed.collect(runtime_factory=IsolationRuntime,history_candidates=[original_history])
+ assert reused['status']=='completed' and len(mock.seen)==before
+ for row in reused['results']:
+  assert row['inherited_completed_behavior'] and row['new_provider_requests_this_attempt']==0
+  assert row['behavior_execution_sha']=='synthetic-offline' and row['source_execution_attempt']=='collection-mock'
+ assert reused['collection_controller_sha']=='new-engineering-code'
+ assert reused['behavior_execution_shas']==['synthetic-offline']
+ assert hashes=={p:file_hash(p) for p in hashes}

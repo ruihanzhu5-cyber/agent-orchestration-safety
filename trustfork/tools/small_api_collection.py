@@ -42,6 +42,43 @@ def verified_h2_serialization_retry(budget,parent_attempt):
    if not safe:raise DynamicError('history_retry_limit','The one engineering H2 continuation already exists')
   return retry
 
+
+def stage_execution_origin(budget,attempt_id,stage):
+ """Follow immutable inheritance transitions, not the current controller SHA."""
+ seen=set()
+ with budget.tx() as db:
+  while attempt_id not in seen:
+   seen.add(attempt_id);row=db.execute('SELECT identity FROM execution_attempts WHERE attempt_id=?',(attempt_id,)).fetchone()
+   if not row:raise DynamicError('behavior_origin_missing','No recorded source execution identity')
+   inherited=db.execute('SELECT detail FROM execution_transitions WHERE attempt_id=? AND stage_id=? AND state=? ORDER BY sequence DESC LIMIT 1',(attempt_id,stage,'inherited_compatible_parent')).fetchone()
+   if not inherited:return {'attempt_id':attempt_id,'code_sha':json.loads(row['identity'])['execution_code_sha']}
+   attempt_id=json.loads(inherited['detail'])['parent_attempt']
+ raise DynamicError('behavior_origin_cycle','Invalid inherited execution provenance')
+
+def verified_network_restart(budget,source_attempt):
+ """User explicitly allowed restarting only the interrupted second S/HA cell."""
+ with budget.tx() as db:
+  hp=db.execute('SELECT * FROM execution_stages WHERE attempt_id=? AND stage_id=?',(source_attempt,'t3/S/HP')).fetchone()
+  ha=db.execute('SELECT * FROM execution_stages WHERE attempt_id=? AND stage_id=?',(source_attempt,'t3/S/HA')).fetchone()
+  prefix=db.execute('SELECT * FROM execution_stages WHERE attempt_id=? AND stage_id=?',(source_attempt,'prefix/S')).fetchone()
+  if not hp or hp['state']!='completed' or not prefix or prefix['state']!='completed' or not ha or ha['state']!='failed' or not ha['error']:raise DynamicError('network_restart_not_verified','Preserve completed HP and require the interrupted second cell')
+  error=json.loads(ha['error'])
+  if error.get('code')!='provider_transport_unknown':raise DynamicError('network_restart_not_verified','Only the reported network/transport interruption is authorized here')
+  for row in (hp,prefix):
+   for name,hashed in json.loads(row['artifacts']).items():
+    if file_hash(Path(name))!=hashed:raise DynamicError('network_restart_source_changed','Completed first cell or prefix changed')
+  ppath=Path(json.loads(prefix['result'])['path']);hpath=ppath.parent.parent.parent/'history/history-bundle.json'
+  # The inherited prefix may live in its original parent attempt, while HA is in source_attempt.
+  hp_path=Path(json.loads(hp['result'])['path']);root=hp_path.parents[5]
+  failed=root/'deepseek/blocks/S/HA/attempt-0';run=read_json(failed/'run.json');part=read_json(failed/'partial-state.json');transport=read_json(failed/'control/transport-metrics.json')
+  if run['run_status'] in ('valid_behavior','resource_ended') or part['errors'] or part.get('quiesce',{}).get('status')!='quiesced' or part['quiesce']['active_at_deadline'] or part.get('freeze',{}).get('status')!='frozen':raise DynamicError('network_restart_not_verified','No valid outcome resampling or overlap with live work')
+  if transport['bridge_exit_code']!=0 or transport['transport_failure'] is not None or transport['reader_alive'] or transport['processor_alive'] or transport['unpersisted_tail_bytes'] or transport['unprocessed_tail_bytes'] or not transport['reader_closed']:raise DynamicError('network_restart_not_verified','Old bridge must be completely stopped and drained')
+  requests=[dict(v) for v in db.execute('SELECT * FROM requests') if json.loads(v['metadata']).get('execution_attempt_id')==source_attempt and json.loads(v['metadata']).get('execution_stage_id')=='t3/S/HA']
+  if not requests or any(v['status'] not in ('settled','charge_unknown','cancelled_before_send') for v in requests):raise DynamicError('network_restart_request_live','Reconcile live requests first; unknown charges remain reserved')
+  for row in db.execute('SELECT identity FROM execution_attempts'):
+   if (json.loads(row['identity']).get('network_restart') or {}).get('source_attempt')==source_attempt:raise DynamicError('network_restart_limit','This explicit second-cell restart has already been registered')
+ return {'version':'user-authorized-network-restart-v1','source_attempt':source_attempt,'authorization':'2026-10-27 user explicitly said: 重新跑第二组也可以','only_restarted_cell':'S/HA','completed_HP_preserved':True,'history_bundle':str(hpath),'history_bundle_hash':file_hash(hpath),'source_prefix':str(ppath),'source_prefix_hash':file_hash(ppath),'failed_run':str(failed/'run.json'),'failed_run_hash':file_hash(failed/'run.json'),'stopped_bridge_hash':file_hash(failed/'control/transport-metrics.json'),'unknown_charge_requests_retained':[v['request_id'] for v in requests if v['status']=='charge_unknown'],'retry_is_new_isolated_branch_from_original_prefix':True,'original_raw_records_unchanged':True}
+
 class CollectionRunner(ReviewRunner):
  def apply_t3_budget(self,runtime):
   override=self.attempt.identity.get('t3_budget_override')
@@ -57,12 +94,13 @@ class CollectionRunner(ReviewRunner):
   retry=self.attempt.identity.get('history_serialization_retry')
   t.execution_context['execution_review_id']=ROUND_ID+('/serialization-repair/'+retry['source_attempt'] if retry and stage=='history' else '')
   if kind=='model':
+   restart=self.attempt.identity.get('network_restart')
    repair=self.attempt.identity.get('provider_replay_continuation')
-   t.execution_context['model_generation_group_id']=ROUND_ID+('/provider-replay-fix/'+repair['source_attempt'] if repair and stage=='t3/S/HP' else '')+'/'+stage
+   t.execution_context['model_generation_group_id']=ROUND_ID+('/provider-replay-fix/'+repair['source_attempt'] if repair and stage=='t3/S/HP' else '/network-restart/'+restart['source_attempt'] if restart and stage=='t3/S/HA' else '')+'/'+stage
   return t
  def freeze_collection_plan(self):
   from trustfork.runtime.dynamic.case_loader import load_case
-  plan={'version':PLAN_VERSION,'round_id':ROUND_ID,'behavior_execution_sha':self.code,'config_hash':digest(self.config),'matrix':fixed_matrix(),'history_tasks':['p002','p007'],'collection_order':['S/HP','S/HA','F/HP','F/HA'],'source_asset_hashes':{c:load_case(c)['deployed_asset_hash'] for c in ('p001','p002','p007')},'collection_depends_on_judge':False,'original_campaign_cny':100,'original_segment_cny':20,'authorized_segment_cny':self.config['campaign_budget']['segment_cny'],'round_new_cost_ceiling_cny':50,'new_judge_cost_ceiling_cny':10,'new_judge_request_limit':48,'per_scoring_item_max_requests':2,'planned_core_contract':'trustfork-core-v1','planned_extended_representation':'trajectory-lossless-v2','team_runtime_budgets':self.config.get('runtime_budgets'),'t3_budget_override':self.attempt.identity.get('t3_budget_override'),'retained_deadline_history':self.attempt.identity.get('history_deadline_continuation'),'provider_replay_continuation':self.attempt.identity.get('provider_replay_continuation'),'model_transport_request_limit':(self.attempt.identity.get('t3_budget_override') or {}).get('request_limit',120),'source_parent_seal':digest(self.seal)}
+  plan={'version':PLAN_VERSION,'round_id':ROUND_ID,'behavior_execution_sha':self.code,'config_hash':digest(self.config),'matrix':fixed_matrix(),'history_tasks':['p002','p007'],'collection_order':['S/HP','S/HA','F/HP','F/HA'],'source_asset_hashes':{c:load_case(c)['deployed_asset_hash'] for c in ('p001','p002','p007')},'collection_depends_on_judge':False,'original_campaign_cny':100,'original_segment_cny':20,'authorized_segment_cny':self.config['campaign_budget']['segment_cny'],'round_new_cost_ceiling_cny':50,'new_judge_cost_ceiling_cny':10,'new_judge_request_limit':48,'per_scoring_item_max_requests':2,'planned_core_contract':'trustfork-core-v1','planned_extended_representation':'trajectory-lossless-v2','team_runtime_budgets':self.config.get('runtime_budgets'),'t3_budget_override':self.attempt.identity.get('t3_budget_override'),'retained_deadline_history':self.attempt.identity.get('history_deadline_continuation'),'provider_replay_continuation':self.attempt.identity.get('provider_replay_continuation'),'network_restart':self.attempt.identity.get('network_restart'),'model_transport_request_limit':(self.attempt.identity.get('t3_budget_override') or {}).get('request_limit',120),'source_parent_seal':digest(self.seal)}
   p=self.path/'plan.json'
   if p.exists() and read_json(p)!=plan:raise DynamicError('collection_plan_changed','Frozen matrix/config/code cannot change')
   if not p.exists():atomic_json(p,plan)
@@ -73,7 +111,7 @@ class CollectionRunner(ReviewRunner):
   runtime_factory=runtime_factory or PiDynamic;source_factory=source_factory or ProviderSource
   rows=[{**v,'behavior_status':'not_started','core_scoring_status':'not_started','extended_scoring_status':'not_started','overall_status':'partial','behavior_execution_sha':self.code,'scoring_execution_sha':None,'reason':'awaiting_collection'} for v in fixed_matrix()]
   def save(phase):
-   value={'phase':phase,'status':'completed' if all(v['behavior_status'] in ('valid_behavior','resource_ended') for v in rows) else 'partial','results':rows,'behavior_execution_sha':self.code,'collection_independent_of_judge':True}
+   value={'phase':phase,'status':'completed' if all(v['behavior_status'] in ('valid_behavior','resource_ended') for v in rows) else 'partial','results':rows,'behavior_execution_sha':self.code,'collection_independent_of_judge':True,'collection_controller_sha':self.code,'behavior_execution_shas':sorted({v['behavior_execution_sha'] for v in rows if v.get('path')})}
    atomic_json(self.path/'behavior-results.json',value);return value
   save('history');root=self.path/'deepseek';hout=root/'history';t=self.transport('history',hout,limit=240)
   runtime=runtime_factory('p001',hout,provider=t,team_model='deepseekflash');runtime.execution_attempt=self.attempt
@@ -128,15 +166,19 @@ class CollectionRunner(ReviewRunner):
       raise DynamicError('behavior_infrastructure_failure','Runtime did not produce a complete frozen branch',evidence={'run_status':run['run_status'],'path':str(path)})
      frozen=read_json(path)
      if frozen['run_manifest_hash']!=digest(read_json(path.parent/frozen['run_manifest_path'])):raise DynamicError('run_manifest_hash_mismatch','Freeze must finish before behavior stage registration')
-     return {'status':run['run_status'],'run_id':run['run_id'],'path':str(path),'termination_reason':run.get('termination_reason'),'source_manifest_hash':run['run_manifest_hash'],'checkpoint_id':prefix['checkpoint']['checkpoint_id'],'new_provider_requests':t.count}
+     return {'status':run['run_status'],'run_id':run['run_id'],'path':str(path),'termination_reason':run.get('termination_reason'),'source_manifest_hash':run['run_manifest_hash'],'checkpoint_id':prefix['checkpoint']['checkpoint_id'],'new_provider_requests':t.count,'behavior_execution_sha':self.code,'source_execution_attempt':self.attempt.attempt_id}
     try:
-     saved=self.attempt.run(stage,{'checkpoint':prefix['checkpoint']['checkpoint_id'],'condition':condition,'protocol_identity':runtime.prefix_identity()},branch_once,artifacts=lambda v:[Path(v['path']),Path(v['path']).parent/'run_manifest.json',Path(v['path']).parent/'events.jsonl',Path(v['path']).parent/'prefix-events.json'])
+     branch_identity={'checkpoint':prefix['checkpoint']['checkpoint_id'],'condition':condition,'protocol_identity':runtime.prefix_identity()}
+     inherited=self.attempt.reuse_parent_stage(stage,branch_identity)
+     saved=self.attempt.run(stage,branch_identity,branch_once,artifacts=lambda v:[Path(v['path']),Path(v['path']).parent/'run_manifest.json',Path(v['path']).parent/'events.jsonl',Path(v['path']).parent/'prefix-events.json'])
      admitted=[]
      with (Path(saved['path']).parent/'events.jsonl').open() as stream:
       for line in stream:
        event=json.loads(line)
        if event['event_type']=='members_admitted':admitted+=event['payload']['actor_ids']
+     origin=stage_execution_origin(self.attempt.budget,self.attempt.attempt_id,stage)
      row.update({k:v for k,v in saved.items() if k!='status'},behavior_status=saved['status'],admitted_new_members=sorted(set(admitted)&{'C','D'}),reason=None)
+     row.update(behavior_execution_sha=saved.get('behavior_execution_sha',origin['code_sha']),source_execution_attempt=saved.get('source_execution_attempt',origin['attempt_id']),inherited_completed_behavior=origin['attempt_id']!=self.attempt.attempt_id,new_provider_requests_this_attempt=t.count)
     except (DynamicError,OSError,TimeoutError) as e:
      shared_stop=getattr(e,'code',type(e).__name__);row.update(behavior_status='blocked',reason=shared_stop,failure_phase='branch')
      write_json(out/condition/'collection-error.json',e.record() if isinstance(e,DynamicError) else {'code':type(e).__name__,'reason':str(e)})
@@ -148,7 +190,7 @@ class CollectionRunner(ReviewRunner):
   self.verify_parent();return save('collection_stopped')
 
 def main():
- p=argparse.ArgumentParser(description=__doc__);p.add_argument('operation',choices=('collect',));p.add_argument('--parent',type=Path,required=True);p.add_argument('--out',type=Path,required=True);p.add_argument('--attempt-id',required=True);p.add_argument('--bindings',type=Path,required=True);p.add_argument('--env-file',type=Path,required=True);p.add_argument('--allow-real-api',action='store_true');p.add_argument('--retry-h2-from-attempt');p.add_argument('--continue-deadline-history-from-attempt');p.add_argument('--extended-t3-budget',action='store_true');p.add_argument('--continue-provider-replay-from-attempt');a=p.parse_args()
+ p=argparse.ArgumentParser(description=__doc__);p.add_argument('operation',choices=('collect',));p.add_argument('--parent',type=Path,required=True);p.add_argument('--out',type=Path,required=True);p.add_argument('--attempt-id',required=True);p.add_argument('--bindings',type=Path,required=True);p.add_argument('--env-file',type=Path,required=True);p.add_argument('--allow-real-api',action='store_true');p.add_argument('--retry-h2-from-attempt');p.add_argument('--continue-deadline-history-from-attempt');p.add_argument('--extended-t3-budget',action='store_true');p.add_argument('--continue-provider-replay-from-attempt');p.add_argument('--restart-interrupted-second-from-attempt');a=p.parse_args()
  if not a.allow_real_api:p.error('This collection mode requires the explicit authorized API flag')
  code=subprocess.check_output(['git','rev-parse','HEAD'],cwd=repo_root(),text=True).strip()
  if subprocess.run(['git','merge-base','--is-ancestor',BASELINE,code],cwd=repo_root()).returncode:raise DynamicError('collection_baseline_mismatch','Use the designated baseline successor')
@@ -162,12 +204,13 @@ def main():
  budget=CampaignBudget(a.parent/'campaign-budget.sqlite3',campaign_id='first-api-20261026',must_exist=True,segment_id=SEGMENT_ID,segment_cny=dry['segment_ceiling_micro_cny']/1e6,segment_identity=dry['segment_identity'])
  from trustfork.runtime.dynamic.retained_history_deadline import inspect_retained_deadline,register_deadline_carry
  from trustfork.runtime.dynamic.provider_replay_continuation import verified_replay_parent
+ network=verified_network_restart(budget,a.restart_interrupted_second_from_attempt) if a.restart_interrupted_second_from_attempt else None
  replay=verified_replay_parent(budget,a.continue_provider_replay_from_attempt) if a.continue_provider_replay_from_attempt else None
- if replay and not a.extended_t3_budget:raise DynamicError('replay_budget_mismatch','Preserve the frozen uniform T3 budget of the saved prefix')
- if sum(bool(v) for v in (a.retry_h2_from_attempt,a.continue_deadline_history_from_attempt,a.continue_provider_replay_from_attempt))>1:raise DynamicError('history_continuation_ambiguous','Choose only one explicit retained source')
+ if (replay or network) and not a.extended_t3_budget:raise DynamicError('replay_budget_mismatch','Preserve the frozen uniform T3 budget of the saved prefix')
+ if sum(bool(v) for v in (a.retry_h2_from_attempt,a.continue_deadline_history_from_attempt,a.continue_provider_replay_from_attempt,a.restart_interrupted_second_from_attempt))>1:raise DynamicError('history_continuation_ambiguous','Choose only one explicit retained source')
  retained=inspect_retained_deadline(budget,c,a.continue_deadline_history_from_attempt) if a.continue_deadline_history_from_attempt else None
  retry=verified_h2_serialization_retry(budget,a.retry_h2_from_attempt) if a.retry_h2_from_attempt else None
- attempt=ExecutionAttempt(budget,a.out,attempt_id=a.attempt_id,parent_attempt=a.continue_provider_replay_from_attempt or a.continue_deadline_history_from_attempt or a.retry_h2_from_attempt or 'runtime-review-20261027-a1',identity={'execution_code_sha':code,'config_hash':digest(c),'allowed_actions':['fixed-behavior-collection-only'],'history_serialization_retry':retry,'history_deadline_continuation':retained['proof'] if retained else None,'provider_replay_continuation':replay,'t3_budget_override':{'request_limit':240,'token_limit':384000,'stage_seconds':3600} if a.extended_t3_budget else None,'retry_reason':'Explicit authorized collection-first plan; never gated by Judge results'})
+ attempt=ExecutionAttempt(budget,a.out,attempt_id=a.attempt_id,parent_attempt=a.restart_interrupted_second_from_attempt or a.continue_provider_replay_from_attempt or a.continue_deadline_history_from_attempt or a.retry_h2_from_attempt or 'runtime-review-20261027-a1',identity={'execution_code_sha':code,'config_hash':digest(c),'allowed_actions':['fixed-behavior-collection-only'],'history_serialization_retry':retry,'history_deadline_continuation':retained['proof'] if retained else None,'provider_replay_continuation':replay,'network_restart':network,'t3_budget_override':{'request_limit':240,'token_limit':384000,'stage_seconds':3600} if a.extended_t3_budget else None,'retry_reason':'Explicit authorized collection-first plan; never gated by Judge results'})
  if retained:register_deadline_carry(attempt,retained)
  write_json(a.out/'resolved-config.json',c);runner=CollectionRunner(a.parent,attempt,c);runner.freeze_collection_plan();write_json(a.out/'budget-before.json',attempt.inspect())
  from dotenv import dotenv_values
@@ -175,7 +218,7 @@ def main():
  if not key:raise DynamicError('missing_provider_credential','Existing official DeepSeek key unavailable')
  os.environ[binding['key_env']]=key
  try:
-  runner.collect(history_candidates=([Path(replay['history_bundle'])] if replay else [])+[a.parent.parent/'follow-ups/plan-judge-followup-20261026/deepseek/history/history-bundle.json',a.parent.parent/'follow-ups/runtime-judge-review-20261026/real-attempt-20261027-a1/deepseek/history/history-bundle.json'])
+  runner.collect(history_candidates=([Path(network['history_bundle'])] if network else [Path(replay['history_bundle'])] if replay else [])+[a.parent.parent/'follow-ups/plan-judge-followup-20261026/deepseek/history/history-bundle.json',a.parent.parent/'follow-ups/runtime-judge-review-20261026/real-attempt-20261027-a1/deepseek/history/history-bundle.json'])
  finally:
   runner.verify_parent();write_json(a.out/'budget-summary.json',attempt.inspect())
 if __name__=='__main__':main()
