@@ -63,7 +63,7 @@ class FollowupSegment:
     "budget_after":self.budget.summary(),"segment_after":self.budget.segment_summary()})
    self.verify_parent();return result
 
-def _copy_frozen_run(source,destination):
+def _copy_frozen_run(source,destination,*,behavior_execution_sha=None):
  """Copy exact raw records and old score versions; new scoring never edits the parent."""
  source=Path(source);dest=Path(destination)
  if dest.exists():raise DynamicError("followup_clone_exists","Reuse via recorded action state, never overwrite")
@@ -85,19 +85,20 @@ def _copy_frozen_run(source,destination):
   (dest/name).parent.mkdir(parents=True,exist_ok=True)
   shutil.copyfile(source.parent/name,dest/name)
   if file_hash(dest/name)!=support[name]:raise DynamicError("followup_clone_identity_mismatch","Scoring metadata copy differs")
- shutil.copytree(source.parent/"scoring",dest/"scoring")
+ if (source.parent/"scoring").is_dir():shutil.copytree(source.parent/"scoring",dest/"scoring")
  if frozen_identity(dest/"run.json")!=before:raise DynamicError("followup_clone_identity_mismatch","Copied raw record differs")
- atomic_json(dest/"origin.json",{"source_run":str(source),"source_frozen_identity":before,"run_id":run["run_id"],"behavior_execution_sha":EXECUTION,"new_behavior_requests":0,"support_file_hashes":support})
+ atomic_json(dest/"origin.json",{"source_run":str(source),"source_frozen_identity":before,"run_id":run["run_id"],"behavior_execution_sha":behavior_execution_sha or EXECUTION,"new_behavior_requests":0,"support_file_hashes":support})
  if any(file_hash(source.parent/name)!=h for name,h in support.items()):raise DynamicError("followup_parent_changed","Original scoring metadata changed")
  if frozen_identity(source)!=before:raise DynamicError("followup_parent_changed","Source changed while copying")
  return dest/"run.json"
 
 
-def clone_frozen_run(source,destination):
+def clone_frozen_run(source,destination,*,behavior_execution_sha=None):
  """Verified temporary copy becomes a source only after atomic rename."""
  source=Path(source);dest=Path(destination);before=frozen_identity(source)
  if dest.exists():
   manifest=read_json(dest/'copy-manifest.json') if (dest/'copy-manifest.json').is_file() else None
+  if behavior_execution_sha is not None and read_json(dest/'origin.json').get('behavior_execution_sha')!=behavior_execution_sha:raise DynamicError('followup_behavior_sha_mismatch','Existing copy belongs to a different behavior code')
   if not manifest or manifest.get('source_frozen_identity')!=before:raise DynamicError('followup_clone_incomplete','No complete compatible copy manifest')
   for name,hashed in manifest['immutable_files'].items():
    if not (dest/name).is_file() or file_hash(dest/name)!=hashed:raise DynamicError('followup_clone_identity_mismatch','Frozen copy file changed')
@@ -106,7 +107,7 @@ def clone_frozen_run(source,destination):
  dest.parent.mkdir(parents=True,exist_ok=True)
  temporary=dest.with_name('.'+dest.name+'.copy-'+uuid.uuid4().hex)
  try:
-  _copy_frozen_run(source,temporary)
+  _copy_frozen_run(source,temporary,behavior_execution_sha=behavior_execution_sha)
   files={p.relative_to(temporary).as_posix():file_hash(p) for p in temporary.rglob('*') if p.is_file()}
   immutable={k:v for k,v in files.items() if not k.startswith('scoring/')}
   atomic_json(temporary/'copy-manifest.json',{'version':'atomic-frozen-copy-v1','source_frozen_identity':before,'copied_files':files,'immutable_files':immutable,'status':'complete','mutable_derived_scoring':'New scoring versions may change scoring mirrors; raw files and metadata remain exact.'})

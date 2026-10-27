@@ -33,7 +33,7 @@ def scorer_manifest():
         'trustfork/config/dynamic/model_bindings.schema.json','trustfork/runtime/dynamic/schema.py',
         'trustfork/scoring/scoring_versions.py','trustfork/scoring/judge_contract.py','trustfork/scoring/judge_client.py','trustfork/tools/judge_dynamic.py',
         'trustfork/config/dynamic/metrics.v2.schema.json','trustfork/config/dynamic/metrics.v2.json','trustfork/config/dynamic/opportunity_rubric.v2.json',
-        'trustfork/scoring/metric_registry.py','trustfork/scoring/dynamic_metrics_v2.py','trustfork/scoring/aggregate_dynamic_v2.py','trustfork/runtime/dynamic/token_accounting.py']
+        'trustfork/scoring/core_contract.py','trustfork/scoring/metric_registry.py','trustfork/scoring/dynamic_metrics_v2.py','trustfork/scoring/aggregate_dynamic_v2.py','trustfork/runtime/dynamic/token_accounting.py']
     files={name:file_hash(repo_root()/name) for name in names}
     return {'version':'dynamic-scoring-analysis-v4','file_hashes':files,'manifest_hash':digest(files),
         'judge_binding_ref':None,'precise_judge_binding':None,'network_sender_present':True,'network_sender_default_enabled':False}
@@ -93,13 +93,21 @@ def freeze_scoring_version(output,identity):
 
 def _validate_judgements(value,refs,deliverables):
     strict_keys(value,{'response_judgements','trajectory_judgements','scorer_manifest_hash'},
-        {'semantic_metrics','goal_attempted','adoptions','claim_annotations','action_annotations','goal_state_annotations','annotation_version','synthetic','judge_passes','scoring_profile','claim_lineage','lineage_version','risk_coverage','event_ledger_complete','unsafe_attempt_annotations','attempt_coverage_complete','opportunity_annotations'})
+        {'semantic_metrics','goal_attempted','adoptions','claim_annotations','action_annotations','goal_state_annotations','annotation_version','synthetic','judge_passes','scoring_profile','claim_lineage','lineage_version','risk_coverage','event_ledger_complete','unsafe_attempt_annotations','attempt_coverage_complete','opportunity_annotations','evaluation_contract'})
     expected={x['deliverable_id'] for x in deliverables}
     if set(value['response_judgements'])-expected:raise DynamicError('unknown_judged_response','Unexpected deliverable ID')
     for item in list(value['response_judgements'].values())+list(value['trajectory_judgements'].values()):
         if not isinstance(item,dict):raise DynamicError('unversioned_judge_anchor','Formal anchor must carry status and evidence')
         if item.get('status')=='complete' and not item.get('evidence_refs'):raise DynamicError('missing_judge_evidence','Complete anchor requires evidence')
         if set(item.get('evidence_refs',[]))-refs:raise DynamicError('unknown_judge_evidence','Judge cites inaccessible evidence')
+    if value.get('evaluation_contract') is not None:
+        from .core_contract import CORE,validate_core_result
+        if value['evaluation_contract']!=CORE:raise DynamicError('unknown_evaluation_contract',str(value['evaluation_contract']))
+        for name,key in (('response','response_judgements'),('trajectory','trajectory_judgements')):
+            if not value.get(key):continue
+            metadata=value.get('judge_passes',{}).get(name)
+            if not metadata:raise DynamicError('core_contract_binding_mismatch','Core anchors require their independent prepared/result source')
+            validate_core_result({key:value[key]},pass_name=name,response_ids=expected,evidence_refs=refs,prepared=metadata['prepared'])
     return value
 
 
@@ -291,6 +299,7 @@ def _score_run(path,*,mode='formal',output_override=None,rescore=None,frozen_ide
     profile=scoring_profile
     config=read_json(repo_root()/'trustfork/config/dynamic/scorer.example.json')
     config['scoring_profile']=profile
+    if annotations.get('evaluation_contract'):config['evaluation_contract']=annotations['evaluation_contract']
     bound=manifest.get('resolved_api_bindings') or {}
     judge_alias=bound.get('judge_binding',run.get('judge_binding','gpt4o'))
     judge_binding=bound.get('logical_bindings',{}).get(judge_alias,{})
@@ -352,7 +361,7 @@ def _score_run(path,*,mode='formal',output_override=None,rescore=None,frozen_ide
     calls=audit_request_events(events)
     summary={**run,'automatic_metrics':auto,'semantic_metrics':semantic,'goal_observations':goal,
         'scores':scores['scores'],'scorer_manifest_hash':score_manifest['manifest_hash'],'score_input_refs':input_refs,
-        'process_annotation_status':assessment,'scoring_mode':mode,'synthetic':bool(run['synthetic'] or mode=='test-fixtures'),
+        'process_annotation_status':assessment,'evaluation_contract':annotations.get('evaluation_contract','dynamic-extended-v2'),'scoring_mode':mode,'synthetic':bool(run['synthetic'] or mode=='test-fixtures'),
         'request_billing':request_billing,
         'observation_complete':observation_complete,'engineering_smoke':mode=='engineering-smoke',
         'numeric_fixtures_are_behavior_judgments':False if mode=='test-fixtures' else None,
@@ -362,7 +371,7 @@ def _score_run(path,*,mode='formal',output_override=None,rescore=None,frozen_ide
         'real_model_requests':calls['real_model_calls_in_observed_scope']}
     write_json(output/'run_summary.json',summary)
     identity={'scorer_manifest_hash':score_manifest['manifest_hash'],'run_manifest_hash':run['run_manifest_hash'],
-        'annotations_hash':digest(annotations),'mode':mode,
+        'annotations_hash':digest(annotations),'mode':mode,'evaluation_contract':annotations.get('evaluation_contract','dynamic-extended-v2' if scoring_profile=='dynamic-homogeneous-v2' else 'legacy-eight-v1'),
         'frozen_identity':frozen_identity,
         'judge_request_hashes':{k:v['request_hash'] for k,v in prepared.items()}}
     if rescore:identity['rescore']=rescore

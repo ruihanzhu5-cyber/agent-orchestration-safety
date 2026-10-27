@@ -43,6 +43,7 @@ def run_judge_attempt(run_path,out,config,*,mode,scorer_config,semantic_goals=Fa
  client=JudgeClient(transport);scorer_hash=scorer_manifest()['manifest_hash']
  source_hash=digest({'run':file_hash(run_path),'events':events_digest(events),'states':digest(states),'view':digest(trajectory)})
  annotation={'response_judgements':{},'trajectory_judgements':{},'scorer_manifest_hash':scorer_hash,'synthetic':transport.synthetic,'scoring_profile':profile,'judge_passes':{}}
+ if scorer_config.get('evaluation_contract')=='trustfork-core-v1':annotation['evaluation_contract']='trustfork-core-v1'
  statuses={};estimate_errors={}
  for key,value in prepared.items():
   write_json(out/(key+'-prepared.json'),value)
@@ -54,6 +55,7 @@ def run_judge_attempt(run_path,out,config,*,mode,scorer_config,semantic_goals=Fa
   identity={'source_hash':source_hash,'run_id':run['run_id'],'request_hash':value['request_hash'],'wire_payload_hash':value['wire_payload_hash'],
    'scorer_config_hash':digest({'profile':profile,'execution_scope':scorer_config.get('execution_scope','formal'),
     'parameters':value['request']['parameters'],'representation':value['representation']}),'scorer_manifest_hash':scorer_hash,'binding_hash':digest(binding),'synthetic':transport.synthetic}
+  if scorer_config.get('evaluation_contract'):identity['evaluation_contract']=scorer_config['evaluation_contract']
   statuses[key]={'status':'pending','reason':'not_selected' if key not in passes else 'not_started','identity':identity,'judge_binding':config['judge_binding'],'source_run_id':run['run_id']}
  # Validate every explicitly requested reuse before sending anything. Other pending/failed passes need no prior.
  reuse={}
@@ -69,6 +71,7 @@ def run_judge_attempt(run_path,out,config,*,mode,scorer_config,semantic_goals=Fa
    validate_complete_result(saved['result'],pass_name=key,response_ids=ids,evidence_refs=refs,scoring_profile=profile,evidence_index=prepared_evidence_index(value),events=events,goal_spec=goal,q=run['q'],prepared=value)
    reuse[key]=saved
  def consume(candidate):
+  if scorer_config.get('evaluation_contract')=='trustfork-core-v1':return {'status':'core_only','extended':'not_requested'}
   consumed=apply_annotations(analyze_trajectory(events),candidate,events,goal_spec=goal,evidence_refs=refs,q=run['q'])
   if profile!='dynamic-homogeneous-v2':return None
   process,opportunities=evaluate_process(events,consumed['trajectory'],candidate,run['q'])

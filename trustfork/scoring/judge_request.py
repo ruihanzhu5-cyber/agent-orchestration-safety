@@ -165,6 +165,9 @@ def prepare_judge_pass(bundle,pass_name,*,binding,scorer_config,representation=N
     if pass_name not in ('response','trajectory'):raise DynamicError('unknown_judge_pass',pass_name)
     rep=representation or scorer_config.get('trajectory_representation','trajectory-lossless-v1')
     if rep not in ('legacy-full','trajectory-lossless-v1','trajectory-lossless-v2'):raise DynamicError('unknown_trajectory_representation',rep)
+    if scorer_config.get('evaluation_contract')=='trustfork-core-v1' and bundle.get('evaluation_contract')!='trustfork-core-v1':
+        from .core_contract import core_bundle
+        bundle=core_bundle(bundle)
     view=bundle['views'][pass_name]
     if pass_name=='trajectory' and rep in ('trajectory-lossless-v1','trajectory-lossless-v2'):view=encode_trajectory_v2(view) if rep=='trajectory-lossless-v2' else encode_trajectory(view)
     if pass_name=='response':rep='legacy-full'
@@ -180,12 +183,13 @@ def prepare_judge_pass(bundle,pass_name,*,binding,scorer_config,representation=N
     prepared['judge_binding_ref']=scorer_config.get('judge_binding')
     return {**prepared,'builder_version':bundle['builder_version'],'scoring_profile':bundle['scoring_profile'],
         'scorer_config':scorer_config,'scorer_config_hash':digest(scorer_config),'sanitizer':bundle['sanitizer'],
-        'pass_name':pass_name,'not_applicable':pass_name=='response' and not bundle['response_ids']}
+        'pass_name':pass_name,'not_applicable':pass_name=='response' and not bundle['response_ids'],**({'evaluation_contract':bundle['evaluation_contract']} if bundle.get('evaluation_contract') else {})}
 
 def annotation_output_estimate(prepared,binding):
     """Schema-valid full candidate/occurrence template, not a predicted score."""
     from .judge_client import prepared_evidence_index
     from trustfork.runtime.dynamic.token_accounting import engineering_counting_policy
+    if prepared.get('evaluation_contract')=='trustfork-core-v1':return {'status':'not_applicable','reason':'Core output does not request extension annotations','estimated_json_tokens':0}
     index=prepared_evidence_index(prepared)
     if index is None:return {'status':'not_applicable','estimated_json_tokens':0}
     common={'status':'unknown','value':None,'evidence_refs':[],'annotator_version':'output-size-template-v1'}

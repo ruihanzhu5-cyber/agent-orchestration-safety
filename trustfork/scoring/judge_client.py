@@ -166,6 +166,7 @@ class JudgeClient:
                 try:return {**self.send(prepared,request_id=request_id,**kwargs),'structure_attempts':1,'calibration_attempts':1,'original_request_hash':original['request_hash']}
                 except DynamicError as calibrated_error:
                     if calibrated_error.code not in structural:raise
+                    if prepared.get('scorer_config',{}).get('max_total_attempts')==2:raise
                     error=calibrated_error
             elif error.code not in structural:raise
             first_error=error.record()

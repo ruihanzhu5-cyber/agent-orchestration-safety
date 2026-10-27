@@ -22,8 +22,9 @@ def attach_budget(config,parent):
  cfg=copy.deepcopy(config);path=Path(parent)/'campaign-budget.sqlite3'
  with sqlite3.connect('file:'+str(path)+'?mode=ro',uri=True) as db:
   row=db.execute('SELECT ceiling,identity FROM segments WHERE segment_id=?',(SEGMENT_ID,)).fetchone()
- if row is None or row[0]!=20000000:raise DynamicError('execution_segment_bucket_mismatch','Existing CNY20 bucket missing or changed')
- cfg['campaign_budget'].update(path=str(path),campaign_id='first-api-20261026',must_exist=True,segment_id=SEGMENT_ID,segment_cny=20,segment_identity=json.loads(row[1]))
+ from trustfork.runtime.dynamic.small_api_budget import authorized_segment_ceiling
+ if row is None or not authorized_segment_ceiling(db,SEGMENT_ID,row[0]):raise DynamicError('execution_segment_bucket_mismatch','Original segment or explicit user amendment missing')
+ cfg['campaign_budget'].update(path=str(path),campaign_id='first-api-20261026',must_exist=True,segment_id=SEGMENT_ID,segment_cny=row[0]/1e6,segment_identity=json.loads(row[1]))
  return cfg
 
 class ReviewRunner:

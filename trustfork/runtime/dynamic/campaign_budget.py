@@ -28,7 +28,12 @@ class CampaignBudget:
         if must_exist and not self.path.is_file():raise DynamicError('campaign_original_ledger_missing','Original ledger must exist; never create a fresh continuation ledger')
         self.path.parent.mkdir(parents=True,exist_ok=True)
         self.segment_id=segment_id
-        if segment_id is not None and (not isinstance(segment_id,str) or not segment_id or not isinstance(segment_identity,dict) or not segment_identity or segment_cny is None or not 0<micro(segment_cny)<=micro(20)):
+        if segment_id is not None and segment_cny is not None and micro(segment_cny)>micro(20):
+            from .small_api_budget import authorized_segment_ceiling
+            if not self.path.is_file():raise DynamicError('campaign_segment_policy_invalid','A larger existing segment requires an explicit recorded authorization')
+            with sqlite3.connect('file:'+str(self.path)+'?mode=ro',uri=True) as source:
+                if not authorized_segment_ceiling(source,segment_id,micro(segment_cny)):raise DynamicError('campaign_segment_policy_invalid','Larger segment not backed by the user-authorized original-ledger amendment')
+        if segment_id is not None and (not isinstance(segment_id,str) or not segment_id or not isinstance(segment_identity,dict) or not segment_identity or segment_cny is None or not 0<micro(segment_cny)<=micro(total_cny)):
             raise DynamicError('campaign_segment_policy_invalid','Explicit source identity and segment ceiling within CNY20 required')
         phases=phase_limits if phase_limits is not None else {'interface_probe':20}
         policy={'campaign_id':campaign_id,'total_micro_cny':micro(total_cny),
@@ -81,6 +86,21 @@ class CampaignBudget:
             if old:
                 if old['fingerprint']!=fingerprint:raise DynamicError('campaign_request_identity_mismatch',request_id)
                 return dict(old)
+            if metadata.get('small_api_judge_group_id') is not None:
+                group=metadata['small_api_judge_group_id']
+                if group!='small-api-collection-20261027' or metadata.get('kind')!='judge':raise DynamicError('small_api_judge_policy_invalid','Only the fixed round Judge scope may use this sublimit')
+                group_rows=[r for r in db.execute('SELECT * FROM requests') if json.loads(r['metadata']).get('small_api_judge_group_id')==group and r['status']!='cancelled_before_send']
+                if len(group_rows)>=48:raise DynamicError('small_api_judge_request_limit','48 includes calibration, repairs and unknown submissions')
+                group_cost=sum((r['settled'] or 0) if r['status']=='settled' else r['reserved'] for r in group_rows)
+                limit=micro(2)
+                if db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='small_api_budget_amendments'").fetchone():
+                    amendment=db.execute('SELECT max_judge FROM small_api_budget_amendments WHERE round_id=?',(group,)).fetchone()
+                    if amendment:
+                        from .small_api_budget import authorized_segment_ceiling
+                        segment=db.execute('SELECT ceiling FROM segments WHERE segment_id=?',(self.segment_id,)).fetchone()
+                        if not segment or not authorized_segment_ceiling(db,self.segment_id,segment[0]):raise DynamicError('small_api_judge_policy_invalid','Judge increase requires the verified user authorization and original segment')
+                        limit=amendment[0]
+                if group_cost+amount>limit:raise DynamicError('small_api_judge_cost_exhausted','Cumulative explicitly authorized Judge sublimit; original campaign and segment also apply')
             if metadata.get('model_generation_group_id') is not None:
                 owner=metadata.get('execution_attempt_id')
                 if not owner:raise DynamicError('model_generation_identity_required','Fixed preparation must bind an execution attempt')
