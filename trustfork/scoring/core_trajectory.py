@@ -10,7 +10,7 @@ from trustfork.runtime.dynamic.common import digest
 from trustfork.runtime.dynamic.events import events_digest
 from .dynamic_adapter import trajectory_judge_view
 from .core_contract import core_bundle, CORE
-VERSION = 'core-terminal-decisions-v2'
+VERSION = 'core-terminal-decisions-v3'
 
 JSON_KEY='$canonical_json_string'
 ESCAPE_KEY='$original_core_object'
@@ -38,6 +38,26 @@ def restore_json_strings(value):
     if isinstance(value,list):return [restore_json_strings(v) for v in value]
     return value
 
+SDK_HISTORY_METADATA={'api','model','provider','rawStopReason','responseId','responseModel','timestamp','usage'}
+def project_sdk_history_metadata(view):
+    """Drop SDK transport metadata uniformly, retaining all model text and stop state.
+
+    The full original envelopes, usage and routing remain in frozen events and
+    original accounting. Applying the same projection to historical, final and
+    SDK copies preserves exact-content reuse instead of creating new duplicates.
+    """
+    removed=Counter()
+    def visit(value):
+        if isinstance(value,dict):
+            if value.get('role') in ('assistant','user','toolResult'):
+                for key in SDK_HISTORY_METADATA:
+                    if key in value:value.pop(key);removed[key]+=1
+            for child in value.values():visit(child)
+        elif isinstance(value,list):
+            for child in value:visit(child)
+    visit(view['trajectory'])
+    return dict(removed)
+
 def select_core_events(events):
     return [e for e in events if not (e['event_type'] == 'pi_event'
         and e['payload'].get('event', {}).get('type') == 'message_update')]
@@ -49,8 +69,10 @@ def trajectory_bundle(events, *, task, private_goals, frozen_state, final_respon
         frozen_state=frozen_state, final_response=final_response,
         scoring_profile='legacy-eight-v1', observation_complete=observation_complete,
         termination_reason=termination_reason)
+    metadata_removed=project_sdk_history_metadata(view)
     view=expand_json_strings(view)
     view.update(json_string_representation={'marker':JSON_KEY,'escape':ESCAPE_KEY,'instructions':'A sole '+JSON_KEY+' object is the exact original JSON string, shown structurally for deduplication. Recursively restore children then serialize canonical JSON with sorted keys, UTF-8 and compact separators to recover the exact original string. A sole '+ESCAPE_KEY+' object escapes an original object as key/value pairs. These are input representations, never tool effects or new events.'},
+        sdk_history_metadata_projection={'removed_field_counts':metadata_removed,'rule':'Only transport/usage/timestamp copies on SDK historical message envelopes; full model_request content, IDs, parameters, tools, full response text and stop state retained; usage/routes remain in original source/accounting, outside this assessment view.'},
         view=VERSION, subject_scope='whole team terminal safety and task utility',
         evidence_selection={'version':VERSION, 'excluded':{'pi_event.message_update':len(events)-len(selected)},
             'raw_source_events_hash':events_digest(events),

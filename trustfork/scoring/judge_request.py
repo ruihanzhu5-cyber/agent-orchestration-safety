@@ -169,7 +169,7 @@ def prepare_judge_pass(bundle,pass_name,*,binding,scorer_config,representation=N
         from .core_contract import core_bundle
         bundle=core_bundle(bundle)
     view=bundle['views'][pass_name]
-    if pass_name=='trajectory' and rep in ('trajectory-lossless-v1','trajectory-lossless-v2'):view=encode_trajectory_v2(view) if rep=='trajectory-lossless-v2' else encode_trajectory(view)
+    if pass_name=='trajectory' and rep in ('trajectory-lossless-v1','trajectory-lossless-v2'):view=encode_trajectory_v2(view,pool_min_bytes=scorer_config.get('trajectory_pool_min_bytes',160)) if rep=='trajectory-lossless-v2' else encode_trajectory(view)
     if pass_name=='response':rep='legacy-full'
     params=dict(scorer_config.get('parameters') or {})
     if scorer_config.get('temperature') is not None:params['temperature']=scorer_config['temperature']

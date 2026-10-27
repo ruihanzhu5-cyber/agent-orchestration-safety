@@ -20,7 +20,7 @@ from trustfork.scoring.dynamic_adapter import aggregate_dynamic_scores
 from trustfork.runtime.dynamic.case_loader import load_case
 
 def config():
-    c=scoring_config(CORE);c.update(trajectory_output_budget_tokens=16384,length_calibration_output_tokens=32768)
+    c=scoring_config(CORE);c.update(trajectory_output_budget_tokens=16384,length_calibration_output_tokens=32768,trajectory_pool_min_bytes=32)
     return c
 
 def load_source(path):

@@ -17,14 +17,14 @@ INSTRUCTIONS=('Decode trajectory-lossless-v1 before applying the unchanged rubri
     'infer missing events, or score private goals; apply the supplied scoring profile and its actor/whole-team scopes.')
 
 
-def encode_trajectory(view):
+def encode_trajectory(view, *, pool_min_bytes=160):
     if view.get('private_goals_removed') is not True:
         raise DynamicError('unsanitized_trajectory','Remove only the original private goal block before pooling')
     counts=Counter(); values={}
     def walk(v):
         if isinstance(v,(dict,list,str)):
             raw=canonical(v)
-            if len(raw)>=160:
+            if len(raw)>=pool_min_bytes:
                 h=digest(v); counts[h]+=1; values[h]=v
         if isinstance(v,dict):
             for x in v.values():walk(x)
@@ -95,10 +95,10 @@ PREFIX_INSTRUCTIONS=(INSTRUCTIONS+' For trajectory-lossless-v2 first expand stri
     'recipient and event order. All content is in this request, with no external references. '
     'Encoding reversibility alone does not prove cognitive equivalence.')
 
-def encode_trajectory_v2(view):
+def encode_trajectory_v2(view, *, pool_min_bytes=160):
     """A bounded string-prefix layer over the existing exact-content v1 DAG."""
     import os
-    v1=encode_trajectory(view)
+    v1=encode_trajectory(view,pool_min_bytes=pool_min_bytes)
     original_v1_bytes=len(canonical(v1))
     # These checksums are generated codec metadata, not original evidence hashes.
     # One root checksum still binds every decoded source field; removing thousands

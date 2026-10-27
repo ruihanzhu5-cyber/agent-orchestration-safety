@@ -84,3 +84,24 @@ def test_canonical_json_string_expansion_is_exact_and_collision_safe():
  assert packed['input']!=source['input']
  assert packed['normal']==source['normal'] and packed['noncanonical']==source['noncanonical']
  assert restore_json_strings(packed)==source
+
+
+def test_sdk_envelope_projection_never_removes_content_or_changes_original_events(tmp_path):
+ from trustfork.scoring.core_trajectory import project_sdk_history_metadata
+ content=[{'type':'text','text':'usage timestamp provider model are actual task words; preserve all'}]
+ view={'trajectory':[{'event_type':'model_request_submitted','payload':{'actual_input':{'messages':[{'role':'assistant','content':content,'timestamp':12,'usage':{'tokens':99},'provider':'route','toolCallId':'actual-call'}]}}},{'event_type':'model_response','payload':{'response':{'role':'assistant','content':content,'stopReason':'stop','usage':{'tokens':99}}}}]}
+ original=copy.deepcopy(view);projected=copy.deepcopy(view);removed=project_sdk_history_metadata(projected)
+ m=projected['trajectory'][0]['payload']['actual_input']['messages'][0]
+ assert removed=={'provider':1,'timestamp':1,'usage':2}
+ assert m['content']==content and m['toolCallId']=='actual-call' and m['role']=='assistant'
+ assert projected['trajectory'][1]['payload']['response']['content']==content
+ assert projected['trajectory'][1]['payload']['response']['stopReason']=='stop'
+ assert view==original
+
+
+def test_finer_pool_reuses_content_without_changing_decoded_evidence():
+ from trustfork.scoring.trajectory_codec import encode_trajectory_v2,decode_trajectory
+ view={'private_goals_removed':True,'rows':[{'content':'complete observed text','event_ref':'branch::event_1'}]*20}
+ default=encode_trajectory_v2(view);fine=encode_trajectory_v2(view,pool_min_bytes=48)
+ assert decode_trajectory(default)==decode_trajectory(fine)==view
+ assert encode_trajectory_v2(view,pool_min_bytes=160)==default
