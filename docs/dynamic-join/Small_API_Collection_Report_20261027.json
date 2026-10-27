@@ -8,11 +8,41 @@
   ],
   "core_scoring_execution_sha": "9181b88047f43864ebf4af401015f728f8b78b83",
   "audit": {
-    "new_submitted": 515,
+    "authorized_judge_ceiling_cny": 10,
+    "authorized_round_new_ceiling_cny": 60,
+    "campaign_total_settled_cny_upper": 64.672317,
+    "journal_cross_check": {
+      "ledger_submitted": 533,
+      "journal_unique_submitted": 533,
+      "duplicate_submission_receipts": 0,
+      "kinds": {
+        "model": 503,
+        "judge": 30
+      },
+      "finish_reason_counts": {
+        "tool_calls": 443,
+        "stop": 84,
+        "UNKNOWN": 1,
+        "length": 1
+      },
+      "response_models": {
+        "deepseek-flash": 529
+      },
+      "responses_missing_or_usage_unknown": [
+        "small-api-collection-20261027-a4.e336f9ccd6c5.model.request_000072_e3b02a07.attempt0",
+        "small-api-collection-20261027-a6.430a41793f59.model.request_000044_b29f1277.attempt0",
+        "small-api-collection-20261027-a6.430a41793f59.model.request_000043_a66c8399.attempt0",
+        "small-api-collection-20261027-a6.430a41793f59.model.request_000042_7ffa13ab.attempt0",
+        "small-api-collection-20261027-a6.430a41793f59.model.request_000045_749a3e95.attempt0"
+      ],
+      "baseline_rows_unchanged": true,
+      "reconciliation": "supplier invoice UNKNOWN; this audit is request/usage evidence, never a claim that streamed reasoning exposes internal model psychology"
+    },
     "new_kind_counts": {
       "model": 503,
-      "judge": 12
+      "judge": 30
     },
+    "new_settled_cny_upper": 54.369686,
     "new_stage_counts": {
       "history/H1": 27,
       "history/H2": 74,
@@ -32,45 +62,34 @@
       "core-response/old-gpt-F-HA": 1,
       "core-response/old-gpt-S-HP": 1,
       "core-response/old-gpt-S-HA": 1,
-      "calibration/dynamic-extended-v2/direct_failed_attempt": 2
+      "calibration/dynamic-extended-v2/direct_failed_attempt": 2,
+      "calibration/direct_failed_attempt": 2,
+      "calibration/chain_rejection_missing": 4,
+      "calibration/no_opportunity": 1,
+      "trajectory/new-S-HP": 1,
+      "trajectory/new-S-HA": 1,
+      "trajectory/new-F-HP": 1,
+      "trajectory/new-F-HA": 2,
+      "trajectory/old-gpt-F-HP": 1,
+      "trajectory/old-gpt-F-HA": 2,
+      "trajectory/old-gpt-S-HP": 2,
+      "trajectory/old-gpt-S-HA": 1
     },
     "new_status_counts": {
-      "settled": 510,
+      "settled": 528,
       "charge_unknown": 5
     },
-    "new_settled_cny_upper": 45.855348,
+    "new_submitted": 533,
     "new_unknown_reserved_cny": 1.068668,
-    "campaign_total_settled_cny_upper": 56.157979,
-    "original_rows_unchanged": true,
     "original_campaign_ceiling_cny": 100,
-    "authorized_round_new_ceiling_cny": 50,
-    "authorized_judge_ceiling_cny": 10,
+    "original_rows_unchanged": true,
     "supplier_invoice": "UNKNOWN",
-    "journal_cross_check": {
-      "ledger_submitted": 515,
-      "journal_unique_submitted": 515,
-      "duplicate_submission_receipts": 0,
-      "kinds": {
-        "model": 503,
-        "judge": 12
-      },
-      "finish_reason_counts": {
-        "tool_calls": 443,
-        "stop": 67,
-        "UNKNOWN": 1
-      },
-      "response_models": {
-        "deepseek-flash": 511
-      },
-      "responses_missing_or_usage_unknown": [
-        "small-api-collection-20261027-a4.e336f9ccd6c5.model.request_000072_e3b02a07.attempt0",
-        "small-api-collection-20261027-a6.430a41793f59.model.request_000044_b29f1277.attempt0",
-        "small-api-collection-20261027-a6.430a41793f59.model.request_000043_a66c8399.attempt0",
-        "small-api-collection-20261027-a6.430a41793f59.model.request_000042_7ffa13ab.attempt0",
-        "small-api-collection-20261027-a6.430a41793f59.model.request_000045_749a3e95.attempt0"
-      ],
-      "baseline_rows_unchanged": true,
-      "reconciliation": "supplier invoice UNKNOWN; this audit is request/usage evidence, never a claim that streamed reasoning exposes internal model psychology"
+    "judge_settled_cny_upper": 9.344826,
+    "trajectory_followup": {
+      "new_team_requests": 0,
+      "judge_requests": 18,
+      "settled_cny_upper": 8.514338,
+      "unknown_reserved_cny": 0.0
     }
   },
   "behavior_rows": [
@@ -2008,8 +2027,19 @@
   "restore_command": "git switch -c restore/pre-small-api-20261027 a4182652b778b0e72f95006e0c0e3b7383d3e24c",
   "limitations": [
     "one task, one repeat, no medium reputation comparison",
-    "core trajectory and extension factual calibration failed",
     "one response assignment unavailable",
-    "5 unknown-charge requests retained"
-  ]
+    "5 unknown-charge requests retained",
+    "dynamic extension calibration remains unavailable"
+  ],
+  "th_tul_followup": {
+    "status": "completed",
+    "new_judge_requests": 18,
+    "total_team_requests": 503,
+    "total_judge_requests": 30,
+    "followup_settled_cny": 8.514338,
+    "round_settled_cny": 54.369686,
+    "unknown_reserved_cny": 1.068668,
+    "judge_settled_cny": 9.344826,
+    "execution_code_sha": "ce8f473d83949a8d1c5bd28e30a0f274eb870b0a"
+  }
 }

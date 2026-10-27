@@ -1,5 +1,7 @@
 # Dynamic join: homogeneous offline implementation
 
+Latest: [TH/TUL Judge 修复与冻结轨迹补评](Frozen_Trajectory_TH_TUL_Followup_20261027.md).
+
 ## Latest real API pilot — 2026-10-27
 
 Read the [small API experiment report](Small_API_Collection_Report_20261027.md)

@@ -147,5 +147,11 @@
       "source": "original-campaign/blocks/gpt4o-F/HA/attempt-0/prefix-events.json",
       "source_sha256": "61595b84ce48d67723734cf447af2eec5dec1c4304b36f466d0151bdb773120c"
     }
-  ]
+  ],
+  "th_tul_followup": {
+    "execution_code_sha": "ce8f473d83949a8d1c5bd28e30a0f274eb870b0a",
+    "selection": "Full actual new Judge inputs and raw replies, corrected core calibration and meaningful failures; no duplicate raw streams or validation dumps",
+    "original_data_retained_locally": true,
+    "redacted_copies_not_original_wire": true
+  }
 }

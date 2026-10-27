@@ -483,9 +483,9 @@
     },
     {
       "path": "core-metrics.csv",
-      "purpose": "Eight independent result sets; complete/partial/unknown/null and diagnostic subsets distinguished",
-      "size": 73385,
-      "sha256": "b1e0355f27d773aaf57ad2232728ddbe15499ae96ba7b8ca33e4b04016f0ee3f"
+      "purpose": "Core table with only TH/TUL supplemented; RTF/RSR and denominators unchanged",
+      "size": 75444,
+      "sha256": "12922311052a1be361847337e8d815827b4f6eb31080c4f2eab0fdf018ff39e8"
     },
     {
       "path": "extended-metrics.csv",
@@ -495,15 +495,15 @@
     },
     {
       "path": "costs.csv",
-      "purpose": "All actual round request rows including failures and unknown-charge holds",
-      "size": 223930,
-      "sha256": "823e979cb41e904a0458c35d96f3567f5f800a619599242065050dc97f6c6926"
+      "purpose": "All actual paid requests, including original five unknown charges",
+      "size": 231690,
+      "sha256": "7f3abefbd24d4721baf9424432c5ca831bfe0ed12bba3cd534d0819fccb6747c"
     },
     {
       "path": "accounting.json",
-      "purpose": "Original-ledger baseline-ID difference and actual journal cross-check",
-      "size": 2223,
-      "sha256": "f88dabb0b73b333ca83886567b5c8717b724bf6335771288c0bf974efb4c1c58"
+      "purpose": "Original ledger cumulative accounting, failed calibration charges and user-approved Judge-only extension retained",
+      "size": 2349,
+      "sha256": "745589bff75721242e58b9d8f174535eb29433144b983d67add1a9a6f8172c47"
     },
     {
       "path": "plan.json",
@@ -573,15 +573,15 @@
     },
     {
       "path": "source-index.json",
-      "purpose": "Traceability without uploading redundant streaming logs",
-      "size": 7608,
-      "sha256": "292f6b8b63edaa1bb69ccd8580de44c0d761f0de8233ebc24ed80a89d4edf8d5"
+      "purpose": "Original evidence and follow-up provenance",
+      "size": 7959,
+      "sha256": "80e6f952b9fb4a4fd0d2d90169265d3d8be37aa4ec43f4d77ad80eb569c870d3"
     },
     {
       "path": "README.md",
-      "purpose": "Logical entry point and evidence navigation",
-      "size": 2147,
-      "sha256": "f856dbd8216361123b847ff5cdca379911b9aec67fae753de48d673a3b31dcb9"
+      "purpose": "Curated evidence navigation",
+      "size": 2292,
+      "sha256": "af615880d40f8601d3378f9732fdb6ae8a4e66fa987c47eeae0bea924c458243"
     },
     {
       "path": ".gitattributes",
@@ -666,10 +666,527 @@
       "purpose": "Minimal offline recomputation recipe; no extra framework",
       "size": 1135,
       "sha256": "b19af053b07154a55e7b4c0dff9b1ec893309482cc9b1759257ff0f3f4c731a1"
+    },
+    {
+      "path": "trajectory-followup/scoring/new-S-HP/result.json",
+      "purpose": "Actual terminal score, frozen source identity or unchanged-response combined aggregate",
+      "size": 1345,
+      "sha256": "f557d5f8916564005f1491e8b2314c603366d2ead51f88a33afd14776569fe18"
+    },
+    {
+      "path": "trajectory-followup/scoring/new-S-HP/source.json",
+      "purpose": "Actual terminal score, frozen source identity or unchanged-response combined aggregate",
+      "size": 1879,
+      "sha256": "557804b92d7990e19d1543d7bb5d90fce645a3e3ddd508f8309152faafbd4afd"
+    },
+    {
+      "path": "trajectory-followup/scoring/new-S-HP/combined-core-metrics.json",
+      "purpose": "Actual terminal score, frozen source identity or unchanged-response combined aggregate",
+      "size": 82553,
+      "sha256": "e96a7e61707141057f2006828d752752d62037770790c152577dd65a2f4d3078"
+    },
+    {
+      "path": "trajectory-followup/scoring/new-S-HP/prepared.json.gz",
+      "purpose": "Actual prepared request; publication redactions may invalidate original checksums, original hashes retained",
+      "size": 826068,
+      "sha256": "f2a1ecc18106d2880af00f8663ad8e1ff1d83d3532c3197a559c7b304d8bdd8e"
+    },
+    {
+      "path": "trajectory-followup/scoring/new-S-HP/view.json.gz",
+      "purpose": "Full decoded selected evidence, not a summary; local paths redacted",
+      "size": 4306147,
+      "sha256": "3eb1d82f640322a434fda6e25e15947667ff6d3bca761559cf999b6b55691262"
+    },
+    {
+      "path": "trajectory-followup/scoring/new-S-HP/judge-journal.json.gz",
+      "purpose": "Actual complete submissions and raw replies with usage/finish",
+      "size": 1251372,
+      "sha256": "9448599b768a7919f81c91f6050eaef80ed9511dc03b484779d3de5a4f7e1947"
+    },
+    {
+      "path": "trajectory-followup/scoring/new-S-HA/result.json",
+      "purpose": "Actual terminal score, frozen source identity or unchanged-response combined aggregate",
+      "size": 1261,
+      "sha256": "7c3a2377eba997da4e85468526cd6dd314d2e60b0b60df45417cd31dac8d63dd"
+    },
+    {
+      "path": "trajectory-followup/scoring/new-S-HA/source.json",
+      "purpose": "Actual terminal score, frozen source identity or unchanged-response combined aggregate",
+      "size": 1878,
+      "sha256": "58a12f65723edea8e9c3d1a8ae70e6a1a34324e7735fc0ba81c3261e30e55577"
+    },
+    {
+      "path": "trajectory-followup/scoring/new-S-HA/combined-core-metrics.json",
+      "purpose": "Actual terminal score, frozen source identity or unchanged-response combined aggregate",
+      "size": 69520,
+      "sha256": "a4ff70d045d258e961133cb86b29886719a66466dc8212479a6e586f8786b627"
+    },
+    {
+      "path": "trajectory-followup/scoring/new-S-HA/prepared.json.gz",
+      "purpose": "Actual prepared request; publication redactions may invalidate original checksums, original hashes retained",
+      "size": 642964,
+      "sha256": "ac2bdf80d954e76a380249a0563c1fa1daa4c450b27bb05df9a78846187c3f4b"
+    },
+    {
+      "path": "trajectory-followup/scoring/new-S-HA/view.json.gz",
+      "purpose": "Full decoded selected evidence, not a summary; local paths redacted",
+      "size": 2668774,
+      "sha256": "282dfb4a86386c2f9a1c12256898c437e802cc18dadafefdad4a32292ddf8296"
+    },
+    {
+      "path": "trajectory-followup/scoring/new-S-HA/judge-journal.json.gz",
+      "purpose": "Actual complete submissions and raw replies with usage/finish",
+      "size": 981211,
+      "sha256": "9c5db795588dd46209a9a1ba83ac5a557b0262f64d3fe883428682770de0239e"
+    },
+    {
+      "path": "trajectory-followup/scoring/new-F-HP/result.json",
+      "purpose": "Actual terminal score, frozen source identity or unchanged-response combined aggregate",
+      "size": 1295,
+      "sha256": "208edf3ba4bd98cbb8a2d138a4addc36e3a91265896f4254e6345d53cb2985e6"
+    },
+    {
+      "path": "trajectory-followup/scoring/new-F-HP/source.json",
+      "purpose": "Actual terminal score, frozen source identity or unchanged-response combined aggregate",
+      "size": 1878,
+      "sha256": "f6dc288865e71bc3a76d2056fadde5d8a22654c1734e35a419555b681038d8e2"
+    },
+    {
+      "path": "trajectory-followup/scoring/new-F-HP/combined-core-metrics.json",
+      "purpose": "Actual terminal score, frozen source identity or unchanged-response combined aggregate",
+      "size": 37501,
+      "sha256": "a585fb0499df395bbfc7b0f8b504a0a98206df1213064c0bbb7381ea183e694c"
+    },
+    {
+      "path": "trajectory-followup/scoring/new-F-HP/prepared.json.gz",
+      "purpose": "Actual prepared request; publication redactions may invalidate original checksums, original hashes retained",
+      "size": 476774,
+      "sha256": "e3e976e3b479f9dd52ec5f711325b69d7ac520e9b1b48b8833a3cf26b4f6f154"
+    },
+    {
+      "path": "trajectory-followup/scoring/new-F-HP/view.json.gz",
+      "purpose": "Full decoded selected evidence, not a summary; local paths redacted",
+      "size": 2094096,
+      "sha256": "5bb243453c6ff7fa082a3a9f0eecfc8d8a8d067697e8a4dbcc895f99e2a6145a"
+    },
+    {
+      "path": "trajectory-followup/scoring/new-F-HP/judge-journal.json.gz",
+      "purpose": "Actual complete submissions and raw replies with usage/finish",
+      "size": 741135,
+      "sha256": "bfdd7a50770d4e027ab8fb2c45f859278f3aaa034f4f22e9652eeff1f6cb82f3"
+    },
+    {
+      "path": "trajectory-followup/scoring/new-F-HA/result.json",
+      "purpose": "Actual terminal score, frozen source identity or unchanged-response combined aggregate",
+      "size": 2147,
+      "sha256": "55f38543c6e04f42585c0d5e890fab50ef8d02868070199a0ded067a003b7ed5"
+    },
+    {
+      "path": "trajectory-followup/scoring/new-F-HA/source.json",
+      "purpose": "Actual terminal score, frozen source identity or unchanged-response combined aggregate",
+      "size": 1873,
+      "sha256": "16250acf6ea58c17e4a2f686ecc9587009b1bd53a6fb79b2bdaacbebfdf99664"
+    },
+    {
+      "path": "trajectory-followup/scoring/new-F-HA/combined-core-metrics.json",
+      "purpose": "Actual terminal score, frozen source identity or unchanged-response combined aggregate",
+      "size": 138648,
+      "sha256": "5a54ea5580e958a45cfea12df43cc4de018ddce44113f3792d965fd3e913a68e"
+    },
+    {
+      "path": "trajectory-followup/scoring/new-F-HA/prepared.json.gz",
+      "purpose": "Actual prepared request; publication redactions may invalidate original checksums, original hashes retained",
+      "size": 1007254,
+      "sha256": "582891be3754394a124be09a9f1c2e70c201d095d97c18f08306734cd62b3ca0"
+    },
+    {
+      "path": "trajectory-followup/scoring/new-F-HA/view.json.gz",
+      "purpose": "Full decoded selected evidence, not a summary; local paths redacted",
+      "size": 7872389,
+      "sha256": "6110e6df962bdcbb2b85f2aafa0e183a15767238942ca293eec043a9d995b563"
+    },
+    {
+      "path": "trajectory-followup/scoring/new-F-HA/judge-journal.json.gz",
+      "purpose": "Actual complete submissions and raw replies with usage/finish",
+      "size": 3044566,
+      "sha256": "defa9773e1c735d9a4b9755686fa50755e873ad9b7a865f597d3116ac1a0677f"
+    },
+    {
+      "path": "trajectory-followup/scoring/new-F-HA/judge-structure-repairs.jsonl",
+      "purpose": "Single bounded correction evidence",
+      "size": 5101518,
+      "sha256": "3a4d34923f999a2ab0cbc3a96cb62a5f4d09933340afaaa91281462566012f31"
+    },
+    {
+      "path": "trajectory-followup/scoring/old-gpt-F-HP/result.json",
+      "purpose": "Actual terminal score, frozen source identity or unchanged-response combined aggregate",
+      "size": 1256,
+      "sha256": "4cc53733199ca6220d9f214720163e6063981be8542892abdb0105622a0d8ecb"
+    },
+    {
+      "path": "trajectory-followup/scoring/old-gpt-F-HP/source.json",
+      "purpose": "Actual terminal score, frozen source identity or unchanged-response combined aggregate",
+      "size": 1868,
+      "sha256": "e055cee88d208e66f9e573440d2cee096dcfffe60ad6918984b601d49d7868a3"
+    },
+    {
+      "path": "trajectory-followup/scoring/old-gpt-F-HP/combined-core-metrics.json",
+      "purpose": "Actual terminal score, frozen source identity or unchanged-response combined aggregate",
+      "size": 4836,
+      "sha256": "20884c7677bf8bf00a05deec388ff9f6ca8e294884a43fb61ea3fcd91a37077b"
+    },
+    {
+      "path": "trajectory-followup/scoring/old-gpt-F-HP/prepared.json.gz",
+      "purpose": "Actual prepared request; publication redactions may invalidate original checksums, original hashes retained",
+      "size": 81650,
+      "sha256": "f4db64d41890e0a51b9ac6561d9c1b2877d60a0097653d6ac8f33ba6ddc4bdc5"
+    },
+    {
+      "path": "trajectory-followup/scoring/old-gpt-F-HP/view.json.gz",
+      "purpose": "Full decoded selected evidence, not a summary; local paths redacted",
+      "size": 75309,
+      "sha256": "9c80d7e4a85dcbdc6e3641257d6cf0d0a58725ca71564b110d74858552435d9a"
+    },
+    {
+      "path": "trajectory-followup/scoring/old-gpt-F-HP/judge-journal.json.gz",
+      "purpose": "Actual complete submissions and raw replies with usage/finish",
+      "size": 137478,
+      "sha256": "3b795c0a51bc89932d1f5da731d46768f089572b2c129b060568fb23872a1ca3"
+    },
+    {
+      "path": "trajectory-followup/scoring/old-gpt-F-HA/result.json",
+      "purpose": "Actual terminal score, frozen source identity or unchanged-response combined aggregate",
+      "size": 1535,
+      "sha256": "d1183f3c957443bee8a9578ca310094f9803f796c1137480d4c105b43a8b60eb"
+    },
+    {
+      "path": "trajectory-followup/scoring/old-gpt-F-HA/source.json",
+      "purpose": "Actual terminal score, frozen source identity or unchanged-response combined aggregate",
+      "size": 1868,
+      "sha256": "dd0039348a786c460e0b3c3ba2d5395b4f716ebb983e7734329a87c09ac01c3f"
+    },
+    {
+      "path": "trajectory-followup/scoring/old-gpt-F-HA/combined-core-metrics.json",
+      "purpose": "Actual terminal score, frozen source identity or unchanged-response combined aggregate",
+      "size": 7804,
+      "sha256": "a02cb368ef865d725f668d6605510ea67923e5053674acb1461de03b8afcea40"
+    },
+    {
+      "path": "trajectory-followup/scoring/old-gpt-F-HA/prepared.json.gz",
+      "purpose": "Actual prepared request; publication redactions may invalidate original checksums, original hashes retained",
+      "size": 85954,
+      "sha256": "16cd007a07d5ab966e4ab9c65edf83e82f6af55738b0f7e215ec0d3a92969149"
+    },
+    {
+      "path": "trajectory-followup/scoring/old-gpt-F-HA/view.json.gz",
+      "purpose": "Full decoded selected evidence, not a summary; local paths redacted",
+      "size": 71780,
+      "sha256": "d64c8cb78313c8bc32fb84e331c5f22d4e50528d2ebba7be5e43ccde2da52e67"
+    },
+    {
+      "path": "trajectory-followup/scoring/old-gpt-F-HA/judge-journal.json.gz",
+      "purpose": "Actual complete submissions and raw replies with usage/finish",
+      "size": 311116,
+      "sha256": "7379cd0183f94a968dfdbad7b8fb5f0c887083a2965ce69ff17e26ef472eefd0"
+    },
+    {
+      "path": "trajectory-followup/scoring/old-gpt-F-HA/judge-structure-repairs.jsonl",
+      "purpose": "Single bounded correction evidence",
+      "size": 492331,
+      "sha256": "ceed7a25af770815d556b77f9e5bf2815c42485093b6ad12738fed4a4745d8af"
+    },
+    {
+      "path": "trajectory-followup/scoring/old-gpt-S-HP/result.json",
+      "purpose": "Actual terminal score, frozen source identity or unchanged-response combined aggregate",
+      "size": 1496,
+      "sha256": "0ff8f29546af560dd9be7ed2c4675117b8500125ee932d3bae40a79455edcf5d"
+    },
+    {
+      "path": "trajectory-followup/scoring/old-gpt-S-HP/source.json",
+      "purpose": "Actual terminal score, frozen source identity or unchanged-response combined aggregate",
+      "size": 1863,
+      "sha256": "22671f3b7971b76171689a153830a028cd623e0b0b541b623fde0e4d4b289955"
+    },
+    {
+      "path": "trajectory-followup/scoring/old-gpt-S-HP/combined-core-metrics.json",
+      "purpose": "Actual terminal score, frozen source identity or unchanged-response combined aggregate",
+      "size": 6378,
+      "sha256": "3bce6d39813b1c5c9d1d99362d316d835c8c1c591545c898915f68c8a785bee5"
+    },
+    {
+      "path": "trajectory-followup/scoring/old-gpt-S-HP/prepared.json.gz",
+      "purpose": "Actual prepared request; publication redactions may invalidate original checksums, original hashes retained",
+      "size": 112074,
+      "sha256": "7b8297ca5b08b6da3b84657e13ba940cf4a3ea9de3d60e96bb7eef63bdcc30d8"
+    },
+    {
+      "path": "trajectory-followup/scoring/old-gpt-S-HP/view.json.gz",
+      "purpose": "Full decoded selected evidence, not a summary; local paths redacted",
+      "size": 122251,
+      "sha256": "fe856fb0b9384471a5644136c123743a24b2039bf5ebb4e17fa325c4d551b359"
+    },
+    {
+      "path": "trajectory-followup/scoring/old-gpt-S-HP/judge-journal.json.gz",
+      "purpose": "Actual complete submissions and raw replies with usage/finish",
+      "size": 384173,
+      "sha256": "65113d211f42e1eae8bce3175e929966c8d0c1b8357dbf9b1b20ca68370e8608"
+    },
+    {
+      "path": "trajectory-followup/scoring/old-gpt-S-HP/judge-capacity-calibrations.jsonl",
+      "purpose": "Single bounded correction evidence",
+      "size": 609188,
+      "sha256": "6a1c43698887385daa66b9a8dc523a051d4a425fa2ce3dc70901eddbd53ed20e"
+    },
+    {
+      "path": "trajectory-followup/scoring/old-gpt-S-HA/result.json",
+      "purpose": "Actual terminal score, frozen source identity or unchanged-response combined aggregate",
+      "size": 1231,
+      "sha256": "dcb271ce05bd707c8e1fb8f276949d570f1793ef3b3e8d12958d12cbf529417e"
+    },
+    {
+      "path": "trajectory-followup/scoring/old-gpt-S-HA/source.json",
+      "purpose": "Actual terminal score, frozen source identity or unchanged-response combined aggregate",
+      "size": 1869,
+      "sha256": "72064768d2cae85ee234f772b35e58832980727271ef6e84986d477ae79f7923"
+    },
+    {
+      "path": "trajectory-followup/scoring/old-gpt-S-HA/combined-core-metrics.json",
+      "purpose": "Actual terminal score, frozen source identity or unchanged-response combined aggregate",
+      "size": 7718,
+      "sha256": "575ded4fe9d7c9da9af26fee423a081930752edddfb24cd8e5d5a12d30091130"
+    },
+    {
+      "path": "trajectory-followup/scoring/old-gpt-S-HA/prepared.json.gz",
+      "purpose": "Actual prepared request; publication redactions may invalidate original checksums, original hashes retained",
+      "size": 107185,
+      "sha256": "de89bc5673da78a7509faab09f3ee6fc7ebbfa01ee4491171f5e45d3b2de121a"
+    },
+    {
+      "path": "trajectory-followup/scoring/old-gpt-S-HA/view.json.gz",
+      "purpose": "Full decoded selected evidence, not a summary; local paths redacted",
+      "size": 111940,
+      "sha256": "8c54166f2c4e7ad9b8aad9847eeadd7451c8c762409eb9ff5e4077846501d780"
+    },
+    {
+      "path": "trajectory-followup/scoring/old-gpt-S-HA/judge-journal.json.gz",
+      "purpose": "Actual complete submissions and raw replies with usage/finish",
+      "size": 179771,
+      "sha256": "39de0e91d10cb44c04d519a793697e577916cda33042c1132829fe108872223f"
+    },
+    {
+      "path": "trajectory-followup/calibration/direct_failed_attempt/source.json",
+      "purpose": "Independent calibration with fixed oracle stored outside Judge-visible evidence",
+      "size": 50558,
+      "sha256": "802772dd833c676bdf60c74767b8afa936a158d0531cf60874dbf0204ccb565a"
+    },
+    {
+      "path": "trajectory-followup/calibration/direct_failed_attempt/result.json",
+      "purpose": "Independent calibration with fixed oracle stored outside Judge-visible evidence",
+      "size": 1246,
+      "sha256": "8120fa23132cb5ca9584c87e81fdd24af01439bfcfc538159ac79e0eee5a7f22"
+    },
+    {
+      "path": "trajectory-followup/calibration/direct_failed_attempt/fact-check.json",
+      "purpose": "Independent calibration with fixed oracle stored outside Judge-visible evidence",
+      "size": 248,
+      "sha256": "d59fc207b112b842212bb7c6462f3c974a8badfc4e623f953984a21b34f14ef7"
+    },
+    {
+      "path": "trajectory-followup/calibration/direct_failed_attempt/prepared.json.gz",
+      "purpose": "Frozen calibration request",
+      "size": 6413,
+      "sha256": "a4e30d70c61417d5f62b2d58e71e6ef02b577167a45209481fcc9cd12851a572"
+    },
+    {
+      "path": "trajectory-followup/calibration/direct_failed_attempt/judge-journal.json.gz",
+      "purpose": "Original actual calibration request/reply, including reused passing direct calibration",
+      "size": 10329,
+      "sha256": "8496c6833445cad2b951e5d5d20f5a743dc1b2c36c29b6dd647a2fe248a10688"
+    },
+    {
+      "path": "trajectory-followup/calibration/chain_rejection_missing/source.json",
+      "purpose": "Independent calibration with fixed oracle stored outside Judge-visible evidence",
+      "size": 51650,
+      "sha256": "68cf843cb6feaab6dcdc595598797dc8e03dbce21357a803b9b3f02d8637361b"
+    },
+    {
+      "path": "trajectory-followup/calibration/chain_rejection_missing/result.json",
+      "purpose": "Independent calibration with fixed oracle stored outside Judge-visible evidence",
+      "size": 1117,
+      "sha256": "01a7ee69de01a4bfbebecf18809225909176d358912667664cb777971be078c7"
+    },
+    {
+      "path": "trajectory-followup/calibration/chain_rejection_missing/fact-check.json",
+      "purpose": "Independent calibration with fixed oracle stored outside Judge-visible evidence",
+      "size": 70,
+      "sha256": "dee64381fbc29928bc7bc259192b500bc0f4ccfed114d44eace77e8a51a5ce16"
+    },
+    {
+      "path": "trajectory-followup/calibration/chain_rejection_missing/prepared.json.gz",
+      "purpose": "Frozen calibration request",
+      "size": 6369,
+      "sha256": "34ce4e07bb4bb98d101b75be98be7a58395bf9bbf76523b1d99173d2ec229e89"
+    },
+    {
+      "path": "trajectory-followup/calibration/chain_rejection_missing/judge-journal.json.gz",
+      "purpose": "Original actual calibration request/reply, including reused passing direct calibration",
+      "size": 9377,
+      "sha256": "d362b1d9697ba5c0353ef1d5e9bd4d50b1b08cf9fc0e74872da9a54550718da7"
+    },
+    {
+      "path": "trajectory-followup/calibration/no_opportunity/source.json",
+      "purpose": "Independent calibration with fixed oracle stored outside Judge-visible evidence",
+      "size": 31373,
+      "sha256": "f2bc344c4c02948bb8a6d46bc9b962705d4c5fa7272fe81317097fb72ba01c4b"
+    },
+    {
+      "path": "trajectory-followup/calibration/no_opportunity/result.json",
+      "purpose": "Independent calibration with fixed oracle stored outside Judge-visible evidence",
+      "size": 1086,
+      "sha256": "5d6698f7705810e480a4d60105e3600371464162351b689845e6001c050c759b"
+    },
+    {
+      "path": "trajectory-followup/calibration/no_opportunity/fact-check.json",
+      "purpose": "Independent calibration with fixed oracle stored outside Judge-visible evidence",
+      "size": 70,
+      "sha256": "dee64381fbc29928bc7bc259192b500bc0f4ccfed114d44eace77e8a51a5ce16"
+    },
+    {
+      "path": "trajectory-followup/calibration/no_opportunity/prepared.json.gz",
+      "purpose": "Frozen calibration request",
+      "size": 5075,
+      "sha256": "311b064d74bbf7a1abecd955640dc40bd5228bfce72a6e722ffe44f940c058f8"
+    },
+    {
+      "path": "trajectory-followup/calibration/no_opportunity/judge-journal.json.gz",
+      "purpose": "Original actual calibration request/reply, including reused passing direct calibration",
+      "size": 6088,
+      "sha256": "41365e9797e25b6ea01c175747ee6f3906528753a241c8e02d95fa7cbcf77cba"
+    },
+    {
+      "path": "trajectory-followup/scoring/new-F-HA/normalization-receipt.json",
+      "purpose": "Deterministic exact reference expansion; Judge anchors unchanged, zero new API calls",
+      "size": 791,
+      "sha256": "d68ba4b87bae63b72e1f6c02eeb1da2939463e7f48c27bd19cc411d36fd0b54d"
+    },
+    {
+      "path": "trajectory-followup/scoring/new-F-HA/original-judge-result.json",
+      "purpose": "Deterministic exact reference expansion; Judge anchors unchanged, zero new API calls",
+      "size": 217,
+      "sha256": "4c515d9ee593c8ca280c3e145fe00bf744227b93fe555ade8ea97c346a6e5afc"
+    },
+    {
+      "path": "trajectory-followup/prior-calibration/a4/direct_failed_attempt/result.json",
+      "purpose": "Prior outcome retained; no unchanged factual resampling",
+      "size": 1340,
+      "sha256": "6e3a619fc93852af4cce8a971da81a762f749caeffa8b400703165f497384037"
+    },
+    {
+      "path": "trajectory-followup/prior-calibration/a4/direct_failed_attempt/fact-check.json",
+      "purpose": "Prior outcome retained; no unchanged factual resampling",
+      "size": 70,
+      "sha256": "dee64381fbc29928bc7bc259192b500bc0f4ccfed114d44eace77e8a51a5ce16"
+    },
+    {
+      "path": "trajectory-followup/prior-calibration/a4/direct_failed_attempt/journal.json.gz",
+      "purpose": "Retained paid failure evidence",
+      "size": 7184,
+      "sha256": "931fa36d98a74c0a42587bae783c7f9480c31cd25751ecfba6acf630f75a4b05"
+    },
+    {
+      "path": "trajectory-followup/prior-calibration/a4/chain_rejection_missing/error.json",
+      "purpose": "Prior outcome retained; no unchanged factual resampling",
+      "size": 115,
+      "sha256": "2ae987d5d608894d511c9eaac7d28ad81ab4c255a14d29b9b683299752aedb4d"
+    },
+    {
+      "path": "trajectory-followup/prior-calibration/a4/chain_rejection_missing/journal.json.gz",
+      "purpose": "Retained paid failure evidence",
+      "size": 63597,
+      "sha256": "de727b157a14467fa4159418e68aa4cf9baa7e68d4bf5cd842e759ba25cb8c29"
+    },
+    {
+      "path": "trajectory-followup/prior-calibration/a6/direct_failed_attempt/result.json",
+      "purpose": "Prior outcome retained; no unchanged factual resampling",
+      "size": 1246,
+      "sha256": "8120fa23132cb5ca9584c87e81fdd24af01439bfcfc538159ac79e0eee5a7f22"
+    },
+    {
+      "path": "trajectory-followup/prior-calibration/a6/direct_failed_attempt/fact-check.json",
+      "purpose": "Prior outcome retained; no unchanged factual resampling",
+      "size": 70,
+      "sha256": "dee64381fbc29928bc7bc259192b500bc0f4ccfed114d44eace77e8a51a5ce16"
+    },
+    {
+      "path": "trajectory-followup/prior-calibration/a6/direct_failed_attempt/journal.json.gz",
+      "purpose": "Retained paid failure evidence",
+      "size": 10329,
+      "sha256": "8496c6833445cad2b951e5d5d20f5a743dc1b2c36c29b6dd647a2fe248a10688"
+    },
+    {
+      "path": "trajectory-followup/prior-calibration/a6/chain_rejection_missing/result.json",
+      "purpose": "Prior outcome retained; no unchanged factual resampling",
+      "size": 1069,
+      "sha256": "09ded8bb654b370baf17a62b5a227218daf8a8745dfb5530409b0c8f61f7cfc7"
+    },
+    {
+      "path": "trajectory-followup/prior-calibration/a6/chain_rejection_missing/fact-check.json",
+      "purpose": "Prior outcome retained; no unchanged factual resampling",
+      "size": 72,
+      "sha256": "8131dd98c18daa32cf04520918581ef810b2111dee449cb72d2688bdb6e8714c"
+    },
+    {
+      "path": "trajectory-followup/prior-calibration/a6/chain_rejection_missing/journal.json.gz",
+      "purpose": "Retained paid failure evidence",
+      "size": 19946,
+      "sha256": "e3d8183834b51e4f13201378c75a9645d939b67ed66468026cecddde30b71248"
+    },
+    {
+      "path": "trajectory-followup/execution-version.json",
+      "purpose": "Actual execution/version, prior focused tests or user budget authorization",
+      "size": 247,
+      "sha256": "509f607e11449b0500356b535066ce7d8386edfae522b2e4adcab8f159dfb25b"
+    },
+    {
+      "path": "trajectory-followup/prior-focused-tests.json",
+      "purpose": "Actual execution/version, prior focused tests or user budget authorization",
+      "size": 201,
+      "sha256": "7c73831db8ef518b3ac4cccda0199a034cb421bb8d0a6eb82370b3823d36aca7"
+    },
+    {
+      "path": "trajectory-followup/budget-authorization.json",
+      "purpose": "Actual execution/version, prior focused tests or user budget authorization",
+      "size": 273,
+      "sha256": "7e276b32c1d1c187aa6bc87ef7a12bc666a8563b407dfcbb35d4dab8a12e0b04"
+    },
+    {
+      "path": "trajectory-followup/process-receipt.json",
+      "purpose": "Actual execution/version, prior focused tests or user budget authorization",
+      "size": 119,
+      "sha256": "fd9c17d56078caafcdc9216f7720b1229e2c4b01538b218e6bd8eb7ddf5a870a"
+    },
+    {
+      "path": "trajectory-followup/calibration.json",
+      "purpose": "Actual execution/version, prior focused tests or user budget authorization",
+      "size": 1103,
+      "sha256": "2081d9f1a4d8e2202f255e453912882eeb60b5f3b0f6da9df1057d3e1d38a073"
+    },
+    {
+      "path": "trajectory-followup/results.json",
+      "purpose": "Eight frozen-trajectory terminal results with retained response scores",
+      "size": 356253,
+      "sha256": "1e8fcf40a20a62fd1e0ec2ff229d3cba4cf2b4a21f1c5e88eeadd3fb9f382f66"
+    },
+    {
+      "path": "trajectory-followup/README.md",
+      "purpose": "Evidence navigation and publication-vs-original distinction",
+      "size": 593,
+      "sha256": "095af41f9e414040169e6f0b006da23ba3fdf2499d4cecd55f9f86677bf67cf5"
     }
   ],
-  "stored_bytes": 38343956,
+  "stored_bytes": 73278269,
   "selection": "User requested useful evidence only; full raw logs retained locally",
   "core_scoring_code_sha": "9181b88047f43864ebf4af401015f728f8b78b83",
-  "source_index": "source-index.json"
+  "source_index": "source-index.json",
+  "terminal_scoring_code_sha": "ce8f473d83949a8d1c5bd28e30a0f274eb870b0a"
 }

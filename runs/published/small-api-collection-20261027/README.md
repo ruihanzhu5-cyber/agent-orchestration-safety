@@ -1,5 +1,7 @@
 # Small API experiment — 2026-10-27
 
+Latest: [completed TH/TUL repair and frozen-trajectory scoring](trajectory-followup/README.md). Core CSV and accounting include this follow-up.
+
 Four new DeepSeek T3 behaviors completed and frozen; old GPT behavior is rescored only. Main/A/B/C/D bindings and original p001/p002/p007 tasks are retained. The primary behavior matrix has one sample per cell. Two additional infrastructure-failed partial T3 attempts are disclosed separately.
 
 ## Read in this order
