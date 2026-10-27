@@ -5,6 +5,9 @@ from .trajectory_codec import decode_trajectory
 def resolve_core_references(prepared,value,allowed_refs):
     allowed=set(allowed_refs)
     rows=value.get('trajectory_judgements',{}) if isinstance(value,dict) else {}
+    if not isinstance(rows,dict):return value,{}
+    for row in rows.values():
+        if not isinstance(row,dict) or not isinstance(row.get('evidence_refs',[]),list) or any(not isinstance(r,str) for r in row.get('evidence_refs',[])):return value,{}
     refs=[r for row in rows.values() if isinstance(row,dict) for r in row.get('evidence_refs',[])]
     if not any(isinstance(r,str) and r not in allowed for r in refs):return value,{}
     packed=json.loads(prepared['wire_payload']['messages'][1]['content'])
