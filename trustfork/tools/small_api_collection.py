@@ -13,6 +13,27 @@ PLAN_VERSION='small-api-collection-plan-v1'
 def fixed_matrix():
  return [{'case_id':'p001','team_model':'deepseekflash','protocol':p,'condition':c,'repeat_id':0} for p in ('S','F') for c in ('HP','HA')]
 
+
+def verified_h2_serialization_retry(budget,parent_attempt):
+ """One explicit engineering retry; never reuse or improve a research outcome."""
+ with budget.tx() as db:
+  parent=db.execute('SELECT * FROM execution_attempts WHERE attempt_id=?',(parent_attempt,)).fetchone()
+  stage=db.execute('SELECT * FROM execution_stages WHERE attempt_id=? AND stage_id=?',(parent_attempt,'history/H2')).fetchone()
+  if not parent or not stage or stage['state']!='failed' or not stage['result']:raise DynamicError('history_retry_not_verified','Only a fully recorded failed H2 planning stage may continue')
+  identity=json.loads(parent['identity'])
+  if identity.get('history_serialization_retry'):raise DynamicError('history_retry_limit','No recursive preparation retries')
+  result=json.loads(stage['result']);path=Path(result['path'])
+  for file,hashed in json.loads(stage['artifacts']).items():
+   if file_hash(Path(file))!=hashed:raise DynamicError('history_retry_source_changed','Retained failed artifacts changed')
+  task=read_json(path);record=task['record']
+  if result['status']!='failed_history_retained' or record['task_id']!='p007' or record['termination_reason']!='invalid_fields':raise DynamicError('history_retry_not_verified','Retry is only for the observed extra root-field serialization failure')
+  rows=[v for v in db.execute('SELECT * FROM requests') if json.loads(v['metadata']).get('execution_attempt_id')==parent_attempt and json.loads(v['metadata']).get('execution_stage_id')=='history/H2']
+  if not rows or any(v['status']!='settled' for v in rows):raise DynamicError('history_retry_unknown_requests','Reconcile every original H2 request before a new preparation attempt')
+  retry={'stage':'history/H2','source_attempt':parent_attempt,'source_hash':file_hash(path),'reason':'invalid_fields; explicit field-only format repair; retained failure, no task-outcome selection'}
+  for child in db.execute('SELECT identity FROM execution_attempts'):
+   if json.loads(child['identity']).get('history_serialization_retry',{}).get('source_attempt')==parent_attempt:raise DynamicError('history_retry_limit','The one engineering continuation already exists')
+  return retry
+
 class CollectionRunner(ReviewRunner):
  def transport(self,stage,out,*,kind='model',limit=120,formal=False):
   t=super().transport(stage,out,kind=kind,limit=limit,formal=False)
@@ -104,7 +125,7 @@ class CollectionRunner(ReviewRunner):
   self.verify_parent();return save('collection_stopped')
 
 def main():
- p=argparse.ArgumentParser(description=__doc__);p.add_argument('operation',choices=('collect',));p.add_argument('--parent',type=Path,required=True);p.add_argument('--out',type=Path,required=True);p.add_argument('--attempt-id',required=True);p.add_argument('--bindings',type=Path,required=True);p.add_argument('--env-file',type=Path,required=True);p.add_argument('--allow-real-api',action='store_true');a=p.parse_args()
+ p=argparse.ArgumentParser(description=__doc__);p.add_argument('operation',choices=('collect',));p.add_argument('--parent',type=Path,required=True);p.add_argument('--out',type=Path,required=True);p.add_argument('--attempt-id',required=True);p.add_argument('--bindings',type=Path,required=True);p.add_argument('--env-file',type=Path,required=True);p.add_argument('--allow-real-api',action='store_true');p.add_argument('--retry-h2-from-attempt');a=p.parse_args()
  if not a.allow_real_api:p.error('This collection mode requires the explicit authorized API flag')
  code=subprocess.check_output(['git','rev-parse','HEAD'],cwd=repo_root(),text=True).strip()
  if subprocess.run(['git','merge-base','--is-ancestor',BASELINE,code],cwd=repo_root()).returncode:raise DynamicError('collection_baseline_mismatch','Use the designated baseline successor')
@@ -116,7 +137,8 @@ def main():
  dry=migrate_attempts(a.parent/'campaign-budget.sqlite3',apply=False)
  if dry['needs_migration']:raise DynamicError('execution_migration_required','Original association tables must already exist')
  budget=CampaignBudget(a.parent/'campaign-budget.sqlite3',campaign_id='first-api-20261026',must_exist=True,segment_id=SEGMENT_ID,segment_cny=dry['segment_ceiling_micro_cny']/1e6,segment_identity=dry['segment_identity'])
- attempt=ExecutionAttempt(budget,a.out,attempt_id=a.attempt_id,parent_attempt='runtime-review-20261027-a1',identity={'execution_code_sha':code,'config_hash':digest(c),'allowed_actions':['fixed-behavior-collection-only'],'retry_reason':'Explicit authorized collection-first plan; never gated by Judge results'})
+ retry=verified_h2_serialization_retry(budget,a.retry_h2_from_attempt) if a.retry_h2_from_attempt else None
+ attempt=ExecutionAttempt(budget,a.out,attempt_id=a.attempt_id,parent_attempt=a.retry_h2_from_attempt or 'runtime-review-20261027-a1',identity={'execution_code_sha':code,'config_hash':digest(c),'allowed_actions':['fixed-behavior-collection-only'],'history_serialization_retry':retry,'retry_reason':'Explicit authorized collection-first plan; never gated by Judge results'})
  write_json(a.out/'resolved-config.json',c);runner=CollectionRunner(a.parent,attempt,c);runner.freeze_collection_plan();write_json(a.out/'budget-before.json',attempt.inspect())
  from dotenv import dotenv_values
  values=dotenv_values(a.env_file);binding=c['logical_bindings']['deepseekflash'];key=values.get(binding['key_env']) or os.environ.get(binding['key_env'])

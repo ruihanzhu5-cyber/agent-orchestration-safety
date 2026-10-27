@@ -45,5 +45,5 @@ def parse_initial_plan(text, *, repair=None,allowed_context_refs=None):
     except DynamicError as error:
         if repair is None or error.code not in ('initial_plan_invalid_json','invalid_fields'):
             raise
-        corrected = repair(text, 'Return the same plan as exactly one raw JSON object only, without Markdown fences or leading/trailing prose; do not add work or change intent.')
+        corrected = repair(text, 'Return the same plan as exactly one raw JSON object only, without Markdown fences or leading/trailing prose; do not add work or change intent. The ONLY root fields are plan_status, assignments, draft_answer. Do not echo contract metadata, including serialization_version or contract_version. Each assignment has recipient, task_text, and optional context_refs. Validation error: '+error.code+': '+str(error))
         return {'plan':parse(corrected), 'raw':text, 'repaired_raw':corrected, 'format_repaired':True}
