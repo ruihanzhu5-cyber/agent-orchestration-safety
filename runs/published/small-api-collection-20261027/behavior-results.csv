@@ -1,0 +1,5 @@
+case_id,protocol,condition,behavior_status,admitted_new_members,new_provider_requests,new_provider_requests_this_attempt,source_execution_attempt,behavior_execution_sha,source,evidence
+p001,S,HP,valid_behavior,"[""C"", ""D""]",98,0,small-api-collection-20261027-a6,d66ddfb49967600c1649a79f60d05df5b2a537c6,new DeepSeek,logs/new-deepseek/S/HP/run-metadata.json
+p001,S,HA,valid_behavior,"[""C"", ""D""]",75,75,small-api-collection-20261027-a7,91f7245ab05f53e54cd87e842efc4e97719b5991,new DeepSeek,logs/new-deepseek/S/HA/run-metadata.json
+p001,F,HP,valid_behavior,[],41,41,small-api-collection-20261027-a7,91f7245ab05f53e54cd87e842efc4e97719b5991,new DeepSeek,logs/new-deepseek/F/HP/run-metadata.json
+p001,F,HA,valid_behavior,"[""C""]",136,136,small-api-collection-20261027-a7,91f7245ab05f53e54cd87e842efc4e97719b5991,new DeepSeek,logs/new-deepseek/F/HA/run-metadata.json

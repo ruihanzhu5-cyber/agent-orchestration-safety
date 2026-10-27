@@ -1,0 +1,142 @@
+{
+  "authorization": {
+    "all_existing_request_rows_unchanged": true,
+    "authorization_hash": "c8a651db7e1d52a0cb5d6a8ce8084aa194274ef5581f283c2e3403ec3e026a03",
+    "backup_sha256": "f82b1f5ebb213854f8ce4704b4bad857f7618444a3af9720bea2ca5d7be463ac",
+    "baseline_campaign_charged_cny": 10.302631,
+    "baseline_segment_charged_cny": 7.301734,
+    "max_judge_cny": 10,
+    "max_new_cny": 50,
+    "original_campaign_cny": 100,
+    "original_segment_ceiling_cny": 20,
+    "segment_ceiling_cny": 57.301734,
+    "status": "applied"
+  },
+  "behavior": {
+    "authorized_segment_cny": 57.301734,
+    "behavior_execution_sha": "91f7245ab05f53e54cd87e842efc4e97719b5991",
+    "collection_depends_on_judge": false,
+    "collection_order": [
+      "S/HP",
+      "S/HA",
+      "F/HP",
+      "F/HA"
+    ],
+    "config_hash": "17e487844f5c8d8a0a67f69d58881f1ff7557df56e72970b211b1037c3c13cad",
+    "history_tasks": [
+      "p002",
+      "p007"
+    ],
+    "matrix": [
+      {
+        "case_id": "p001",
+        "condition": "HP",
+        "protocol": "S",
+        "repeat_id": 0,
+        "team_model": "deepseekflash"
+      },
+      {
+        "case_id": "p001",
+        "condition": "HA",
+        "protocol": "S",
+        "repeat_id": 0,
+        "team_model": "deepseekflash"
+      },
+      {
+        "case_id": "p001",
+        "condition": "HP",
+        "protocol": "F",
+        "repeat_id": 0,
+        "team_model": "deepseekflash"
+      },
+      {
+        "case_id": "p001",
+        "condition": "HA",
+        "protocol": "F",
+        "repeat_id": 0,
+        "team_model": "deepseekflash"
+      }
+    ],
+    "model_transport_request_limit": 240,
+    "network_restart": {
+      "authorization": "2026-10-27 user explicitly said: 重新跑第二组也可以",
+      "completed_HP_preserved": true,
+      "failed_run": "[LOCAL_PRIVATE_PATH_007]/research/trustfork-artifacts/follow-ups/small-api-collection-20261027/behavior-attempt-a6/deepseek/blocks/S/HA/attempt-0/run.json",
+      "failed_run_hash": "b12e08bac38823def0bbfc859b97e74a4d35c6528cdfd565a2715e9d145572f0",
+      "history_bundle": "[LOCAL_PRIVATE_PATH_007]/research/trustfork-artifacts/follow-ups/small-api-collection-20261027/behavior-attempt-a5/deepseek/history/history-bundle.json",
+      "history_bundle_hash": "4c678f69625fa3466c898fd51f2caf5fdb4e39e88e2ae6030cd490c7f8760616",
+      "only_restarted_cell": "S/HA",
+      "original_raw_records_unchanged": true,
+      "retry_is_new_isolated_branch_from_original_prefix": true,
+      "source_attempt": "small-api-collection-20261027-a6",
+      "source_prefix": "[LOCAL_PRIVATE_PATH_007]/research/trustfork-artifacts/follow-ups/small-api-collection-20261027/behavior-attempt-a5/deepseek/blocks/S/prepared-prefix.json",
+      "source_prefix_hash": "a5913ce38168927c695935a98e7fc47475840df323ec45d31ad5b4437d352f47",
+      "stopped_bridge_hash": "b76a52648d7f2ddc501fba6089e0a4a87a07636f7936c3ec4a0076a85921b64c",
+      "unknown_charge_requests_retained": [
+        "small-api-collection-20261027-a6.430a41793f59.model.request_000044_b29f1277.attempt0",
+        "small-api-collection-20261027-a6.430a41793f59.model.request_000043_a66c8399.attempt0",
+        "small-api-collection-20261027-a6.430a41793f59.model.request_000042_7ffa13ab.attempt0",
+        "small-api-collection-20261027-a6.430a41793f59.model.request_000045_749a3e95.attempt0"
+      ],
+      "version": "user-authorized-network-restart-v1"
+    },
+    "new_judge_cost_ceiling_cny": 10,
+    "new_judge_request_limit": 48,
+    "original_campaign_cny": 100,
+    "original_segment_cny": 20,
+    "per_scoring_item_max_requests": 2,
+    "planned_core_contract": "trustfork-core-v1",
+    "planned_extended_representation": "trajectory-lossless-v2",
+    "provider_replay_continuation": null,
+    "retained_deadline_history": null,
+    "round_id": "small-api-collection-20261027",
+    "round_new_cost_ceiling_cny": 50,
+    "source_asset_hashes": {
+      "p001": "0f1669d170f08e4ceeb80c8b2a9b41f838fb098a09c28161e4fe5114700ae643",
+      "p002": "287f21be558751b721e6075dbf8ca0969d496804923ce6f7764d55f68c426b89",
+      "p007": "45bf1e8cd4940d1fb48ec9140d2a76fee6129af67f463dc0198bfe37a1fe323a"
+    },
+    "source_parent_seal": "37df0814bcf892de5bc2c4996250522bd00ed87178d8d8af37fbf26206c0b897",
+    "t3_budget_override": {
+      "request_limit": 240,
+      "stage_seconds": 3600,
+      "token_limit": 384000
+    },
+    "team_runtime_budgets": {
+      "deepseekflash": {
+        "http_timeout_seconds": 180,
+        "per_request": 16384,
+        "request_limit": 120,
+        "stage_seconds": 1200,
+        "token_limit": 192000
+      },
+      "gpt4o": {
+        "http_timeout_seconds": 180,
+        "per_request": 8192,
+        "request_limit": 120,
+        "stage_seconds": 1200,
+        "token_limit": 192000
+      }
+    },
+    "version": "small-api-collection-plan-v1"
+  },
+  "core": {
+    "aggregation": "original aggregate_dynamic_scores",
+    "behavior_execution_shas": [
+      "91f7245ab05f53e54cd87e842efc4e97719b5991",
+      "d66ddfb49967600c1649a79f60d05df5b2a537c6"
+    ],
+    "calibration_reused_without_resampling": true,
+    "calibration_source_hash": "6943640d69cd67ee6ccea7ef54e1b58002bee5a1514c32c04b9e529f8e356a42",
+    "core_contract": "trustfork-core-v1",
+    "dynamic_extensions": "deferred until core table is available",
+    "judge_cny_limit": 10,
+    "judge_limit": 48,
+    "original_campaign_cny_limit": 100,
+    "response_view": "original response_judge_view",
+    "round_cny_limit": 50,
+    "scoring_execution_sha": "9181b88047f43864ebf4af401015f728f8b78b83",
+    "trajectory_gate": false,
+    "version": "core-priority-v1"
+  }
+}

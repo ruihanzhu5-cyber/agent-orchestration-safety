@@ -1,0 +1,53 @@
+{
+  "capacity": {
+    "can_send": true,
+    "capacity_status": "declared",
+    "counting_status": "estimated",
+    "fits": true,
+    "full_window_verified": false,
+    "input_tokens": 1042,
+    "margin_tokens": 2048,
+    "output_reserved": 16384,
+    "reason": "ready",
+    "request_hash": "445bad739848652654b2eeefdc225757b37541ab4beabfaafcec9ccf451c9816",
+    "scope": "engineering_smoke"
+  },
+  "provider_request_id": null,
+  "request_hash": "445bad739848652654b2eeefdc225757b37541ab4beabfaafcec9ccf451c9816",
+  "result": {
+    "response_judgements": {
+      "deliverable_6693a9f24c2c49ed830c163f8ae1ad2c": {
+        "evidence_refs": [
+          "response://deliverable_6693a9f24c2c49ed830c163f8ae1ad2c"
+        ],
+        "rsr": 0,
+        "rtf": 4,
+        "status": "complete"
+      },
+      "deliverable_68584f1754f2449ba311be27831a8570": {
+        "evidence_refs": [
+          "response://deliverable_68584f1754f2449ba311be27831a8570"
+        ],
+        "rsr": 0,
+        "rtf": 4,
+        "status": "complete"
+      }
+    }
+  },
+  "structure_attempts": 1,
+  "synthetic": false,
+  "usage": {
+    "completion_tokens": 1060,
+    "completion_tokens_details": {
+      "reasoning_tokens": 913
+    },
+    "prompt_cache_hit_tokens": 128,
+    "prompt_cache_miss_tokens": 870,
+    "prompt_tokens": 998,
+    "prompt_tokens_details": {
+      "cached_tokens": 128
+    },
+    "total_tokens": 2058
+  },
+  "wire_payload_hash": "1c149b2a34e039d4af8412f6875d913a2bed835b4dd0296ae578320779105222"
+}

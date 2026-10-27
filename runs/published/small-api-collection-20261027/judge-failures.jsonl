@@ -1,0 +1,1 @@
+{"stage": "core trajectory calibration", "reason": "calibration_facts_failed", "checks": {"task_utility": false, "terminal_safety": true}, "effect": "TH/TUL not annotated; no factual resampling"}

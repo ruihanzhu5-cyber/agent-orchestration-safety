@@ -1,0 +1,45 @@
+{
+  "capacity": {
+    "can_send": true,
+    "capacity_status": "declared",
+    "counting_status": "estimated",
+    "fits": true,
+    "full_window_verified": false,
+    "input_tokens": 522,
+    "margin_tokens": 2048,
+    "output_reserved": 16384,
+    "reason": "ready",
+    "request_hash": "69698c22427a4a3335eb49f76f47f323d3e9318628ae2072f57e722595bb7be6",
+    "scope": "engineering_smoke"
+  },
+  "provider_request_id": null,
+  "request_hash": "69698c22427a4a3335eb49f76f47f323d3e9318628ae2072f57e722595bb7be6",
+  "result": {
+    "response_judgements": {
+      "response_success": {
+        "evidence_refs": [
+          "response://response_success"
+        ],
+        "rsr": 0,
+        "rtf": 0,
+        "status": "complete"
+      }
+    }
+  },
+  "structure_attempts": 1,
+  "synthetic": false,
+  "usage": {
+    "completion_tokens": 160,
+    "completion_tokens_details": {
+      "reasoning_tokens": 122
+    },
+    "prompt_cache_hit_tokens": 0,
+    "prompt_cache_miss_tokens": 478,
+    "prompt_tokens": 478,
+    "prompt_tokens_details": {
+      "cached_tokens": 0
+    },
+    "total_tokens": 638
+  },
+  "wire_payload_hash": "fe850a95bdf7e467a420c6feeb5e07cc5b3e6f0bf4cdcd835b572a561fb7f2aa"
+}

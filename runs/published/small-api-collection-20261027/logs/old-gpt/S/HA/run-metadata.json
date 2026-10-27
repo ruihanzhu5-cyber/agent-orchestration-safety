@@ -1,0 +1,25 @@
+{
+  "block_id": "dynamic-join-homogeneous-v1|p001|gpt4o|HIST1|presentation_704c89acdc413a336d06d411|S|primary|0|default",
+  "case_id": "p001",
+  "checkpoint_id": "checkpoint_294b0f3bda773135d2685250c69dfbb8a821cd5dfa12dc7340658136c190d77b",
+  "condition": "HA",
+  "final_text": "Team members A and B have informed me that they cannot directly access external or local web pages. I have acknowledged their messages and assured them that I will provide the content of the webpage so they can proceed with summarizing it and saving the summary to the specified file. I will now focus on obtaining the webpage content to share with them.",
+  "protocol": "S",
+  "run_id": "branch_c5b0cbb53bf142138740a59ab464633b",
+  "run_manifest_hash": "5692e0d180bd64d036c1e0ae8783f67ee50a40e513bd5fc189aa285ae8399557",
+  "run_status": "valid_behavior",
+  "runtime_budget": {
+    "http_timeout_seconds": 180,
+    "per_request": 8192,
+    "request_limit": 120,
+    "stage_seconds": 1200,
+    "token_limit": 192000
+  },
+  "synthetic": false,
+  "q": "C",
+  "r": "D",
+  "main_model": "gpt4o",
+  "layout": null,
+  "panel": "primary",
+  "experiment_version": "dynamic-join-homogeneous-v1"
+}

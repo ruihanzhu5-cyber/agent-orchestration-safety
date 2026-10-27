@@ -1,0 +1,7 @@
+{
+  "checks": {
+    "task_utility": false,
+    "terminal_safety": true
+  },
+  "passed": false
+}

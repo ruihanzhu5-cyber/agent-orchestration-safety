@@ -1,0 +1,151 @@
+{
+  "full_raw_logs": "retained locally unchanged; not uploaded wholesale",
+  "redaction": "Credentials and personal filesystem paths removed; selected evidence text otherwise retained in full",
+  "selection_rule": "All non-stream branch events plus complete final tool results; model requests/responses/accounting separated; token/draft delta events and duplicate assistant snapshots omitted",
+  "source_files": [
+    {
+      "omitted": "Token/draft streaming events and duplicate assistant snapshots; original full log retained locally, not deleted",
+      "raw_bytes": 831342376,
+      "record_counts": {
+        "actions-and-messages": 1133,
+        "model-exchanges": 294,
+        "omitted_stream_or_duplicate_pi": 75284
+      },
+      "selected_under": "logs/new-deepseek/S/HP",
+      "source": "round/behavior-attempt-a6/deepseek/blocks/S/HP/attempt-0/events.jsonl",
+      "source_sha256": "8af9e8b91a6690cd9fde330414ffc8613e2c2685df5e42aa7cbf93a3afa06193"
+    },
+    {
+      "purpose": "Complete original shared prefix retained locally; actual model input history remains in selected model-exchanges",
+      "raw_bytes": 17791343,
+      "source": "round/behavior-attempt-a6/deepseek/blocks/S/HP/attempt-0/prefix-events.json",
+      "source_sha256": "fde92cd39087957ca513e1032ecd1a6b17fd08a1671f16b0e12c87b41629dda6"
+    },
+    {
+      "omitted": "Token/draft streaming events and duplicate assistant snapshots; original full log retained locally, not deleted",
+      "raw_bytes": 573292965,
+      "record_counts": {
+        "actions-and-messages": 886,
+        "model-exchanges": 225,
+        "omitted_stream_or_duplicate_pi": 49667
+      },
+      "selected_under": "logs/new-deepseek/S/HA",
+      "source": "round/behavior-attempt-a7/deepseek/blocks/S/HA/attempt-0/events.jsonl",
+      "source_sha256": "fad4bfcb296706fa268ea793b56a8f2601f6651946c4cf63510f80561da3bcfb"
+    },
+    {
+      "purpose": "Complete original shared prefix retained locally; actual model input history remains in selected model-exchanges",
+      "raw_bytes": 17791343,
+      "source": "round/behavior-attempt-a7/deepseek/blocks/S/HA/attempt-0/prefix-events.json",
+      "source_sha256": "fde92cd39087957ca513e1032ecd1a6b17fd08a1671f16b0e12c87b41629dda6"
+    },
+    {
+      "omitted": "Token/draft streaming events and duplicate assistant snapshots; original full log retained locally, not deleted",
+      "raw_bytes": 358847130,
+      "record_counts": {
+        "actions-and-messages": 467,
+        "model-exchanges": 123,
+        "omitted_stream_or_duplicate_pi": 33254
+      },
+      "selected_under": "logs/new-deepseek/F/HP",
+      "source": "round/behavior-attempt-a7/deepseek/blocks/F/HP/attempt-0/events.jsonl",
+      "source_sha256": "ac44b6f088f238893964fe962a04aab5929378900471237872ce554d9d3ea8b7"
+    },
+    {
+      "purpose": "Complete original shared prefix retained locally; actual model input history remains in selected model-exchanges",
+      "raw_bytes": 14967906,
+      "source": "round/behavior-attempt-a7/deepseek/blocks/F/HP/attempt-0/prefix-events.json",
+      "source_sha256": "d98fb576a60a61693ece81c22032eab82b194fbb54be3396caa295af5210a502"
+    },
+    {
+      "omitted": "Token/draft streaming events and duplicate assistant snapshots; original full log retained locally, not deleted",
+      "raw_bytes": 1459945531,
+      "record_counts": {
+        "actions-and-messages": 1525,
+        "model-exchanges": 408,
+        "omitted_stream_or_duplicate_pi": 118171
+      },
+      "selected_under": "logs/new-deepseek/F/HA",
+      "source": "round/behavior-attempt-a7/deepseek/blocks/F/HA/attempt-0/events.jsonl",
+      "source_sha256": "7e0cfc8898f542951099ba063e804f645789724e2ee60e29029046103f036e3d"
+    },
+    {
+      "purpose": "Complete original shared prefix retained locally; actual model input history remains in selected model-exchanges",
+      "raw_bytes": 14967906,
+      "source": "round/behavior-attempt-a7/deepseek/blocks/F/HA/attempt-0/prefix-events.json",
+      "source_sha256": "d98fb576a60a61693ece81c22032eab82b194fbb54be3396caa295af5210a502"
+    },
+    {
+      "omitted": "Token/draft streaming events and duplicate assistant snapshots; original full log retained locally, not deleted",
+      "raw_bytes": 5581108,
+      "record_counts": {
+        "actions-and-messages": 237,
+        "model-exchanges": 60,
+        "omitted_stream_or_duplicate_pi": 1711
+      },
+      "selected_under": "logs/old-gpt/S/HP",
+      "source": "original-campaign/blocks/gpt4o-S/HP/attempt-0/events.jsonl",
+      "source_sha256": "d4766a4b073b292dcf02a7a68bc09dfebb67e5ea5f022d69c37631dc6489d81c"
+    },
+    {
+      "purpose": "Complete original shared prefix retained locally; actual model input history remains in selected model-exchanges",
+      "raw_bytes": 802502,
+      "source": "original-campaign/blocks/gpt4o-S/HP/attempt-0/prefix-events.json",
+      "source_sha256": "6aef6fe531851659080bc2c34d2f7b3bab58f1427b16a29f1fe666f7cde47947"
+    },
+    {
+      "omitted": "Token/draft streaming events and duplicate assistant snapshots; original full log retained locally, not deleted",
+      "raw_bytes": 4950003,
+      "record_counts": {
+        "actions-and-messages": 204,
+        "model-exchanges": 51,
+        "omitted_stream_or_duplicate_pi": 1557
+      },
+      "selected_under": "logs/old-gpt/S/HA",
+      "source": "original-campaign/blocks/gpt4o-S/HA/attempt-0/events.jsonl",
+      "source_sha256": "43eacb823b198392eeff018193ed536838086b704b02edcd664e07fafc7476ea"
+    },
+    {
+      "purpose": "Complete original shared prefix retained locally; actual model input history remains in selected model-exchanges",
+      "raw_bytes": 802502,
+      "source": "original-campaign/blocks/gpt4o-S/HA/attempt-0/prefix-events.json",
+      "source_sha256": "6aef6fe531851659080bc2c34d2f7b3bab58f1427b16a29f1fe666f7cde47947"
+    },
+    {
+      "omitted": "Token/draft streaming events and duplicate assistant snapshots; original full log retained locally, not deleted",
+      "raw_bytes": 1708451,
+      "record_counts": {
+        "actions-and-messages": 112,
+        "model-exchanges": 30,
+        "omitted_stream_or_duplicate_pi": 513
+      },
+      "selected_under": "logs/old-gpt/F/HP",
+      "source": "original-campaign/blocks/gpt4o-F/HP/attempt-0/events.jsonl",
+      "source_sha256": "28b4160544915c98e83f0095491ca05bd212574bfed6b0e72516fa9ee281f9a3"
+    },
+    {
+      "purpose": "Complete original shared prefix retained locally; actual model input history remains in selected model-exchanges",
+      "raw_bytes": 802882,
+      "source": "original-campaign/blocks/gpt4o-F/HP/attempt-0/prefix-events.json",
+      "source_sha256": "61595b84ce48d67723734cf447af2eec5dec1c4304b36f466d0151bdb773120c"
+    },
+    {
+      "omitted": "Token/draft streaming events and duplicate assistant snapshots; original full log retained locally, not deleted",
+      "raw_bytes": 2348973,
+      "record_counts": {
+        "actions-and-messages": 122,
+        "model-exchanges": 33,
+        "omitted_stream_or_duplicate_pi": 768
+      },
+      "selected_under": "logs/old-gpt/F/HA",
+      "source": "original-campaign/blocks/gpt4o-F/HA/attempt-0/events.jsonl",
+      "source_sha256": "7cc72f2a42a585f7e8d176161590e02b1dd3208b6ae24fa05ae82d81a415070b"
+    },
+    {
+      "purpose": "Complete original shared prefix retained locally; actual model input history remains in selected model-exchanges",
+      "raw_bytes": 802882,
+      "source": "original-campaign/blocks/gpt4o-F/HA/attempt-0/prefix-events.json",
+      "source_sha256": "61595b84ce48d67723734cf447af2eec5dec1c4304b36f466d0151bdb773120c"
+    }
+  ]
+}

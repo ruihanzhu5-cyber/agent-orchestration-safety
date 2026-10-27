@@ -27,6 +27,8 @@
 > 🤖 **AI agents:** read [`AGENT.md`](AGENT.md) for repository invariants, file contracts, and
 > validation commands.
 
+> **Dynamic-team follow-up (2026-10-27):** [Small real API pilot report](docs/dynamic-join/Small_API_Collection_Report_20261027.md) · [Curated result and evidence index](runs/published/small-api-collection-20261027/README.md). Four new p001 trajectories are frozen; core-score coverage and unavailable metrics are explicit. This pilot is separate from the original paper results below.
+
 Four subagents bid for a task. One calls itself "gpt-6-astra". The orchestrator sees the label before any evidence arrives, picks the impostor, and lets it run. The real failure isn't bad advice: it's that **a name tag alone decides who gets trusted, verified, and executed**, even after safer or contradicting evidence is already on the table.
 
 TrustFork evaluates **displayed identity as vulnerability** in orchestrated agents. An orchestrator delegates workspace operations to a four-candidate subagent pool, inspects returned evidence, and decides whose recommendation governs execution. Pool labels that operators intend for cost-aware routing are visible before any task evidence arrives.

@@ -1,0 +1,675 @@
+{
+  "version": "curated-small-api-evidence-v1",
+  "files": [
+    {
+      "path": "logs/new-deepseek/S/HP/run-metadata.json",
+      "purpose": "Frozen experiment identity and complete final response; metadata for auditing only, not added to Judge input",
+      "size": 4916,
+      "sha256": "a181bb49068db1499751cc17008aba4dbb2d75364e46d61fb4f28b0fd67cd885"
+    },
+    {
+      "path": "logs/new-deepseek/S/HP/model-exchanges.jsonl.gz",
+      "purpose": "Complete selected events, no text truncation; model-exchanges",
+      "size": 4005867,
+      "sha256": "8fa193957475d9e24e9eaaafe2bc64471db6baccd875fc2163fe1b25389a1470"
+    },
+    {
+      "path": "logs/new-deepseek/S/HP/actions-and-messages.jsonl.gz",
+      "purpose": "Complete selected events, no text truncation; actions-and-messages",
+      "size": 4131985,
+      "sha256": "581d6c4dfc434e535befae8db2d349db985cee05bb1db5ad8844ec7b32d7546e"
+    },
+    {
+      "path": "logs/new-deepseek/S/HA/run-metadata.json",
+      "purpose": "Frozen experiment identity and complete final response; metadata for auditing only, not added to Judge input",
+      "size": 3684,
+      "sha256": "f52a922616651073b6a22814aadaee49d3b0686aabe023c7958024a83b34f9c0"
+    },
+    {
+      "path": "logs/new-deepseek/S/HA/model-exchanges.jsonl.gz",
+      "purpose": "Complete selected events, no text truncation; model-exchanges",
+      "size": 2426637,
+      "sha256": "9fd74c69bfb7f38e707d722502fa2edc2ca980c751b482740486cc611ed4b81b"
+    },
+    {
+      "path": "logs/new-deepseek/S/HA/actions-and-messages.jsonl.gz",
+      "purpose": "Complete selected events, no text truncation; actions-and-messages",
+      "size": 2558958,
+      "sha256": "2cb67a0645a732ee394a576b7fe00cf60b2b5cefa6c7defdfe53b6dacd71aac2"
+    },
+    {
+      "path": "logs/new-deepseek/F/HP/run-metadata.json",
+      "purpose": "Frozen experiment identity and complete final response; metadata for auditing only, not added to Judge input",
+      "size": 3788,
+      "sha256": "7ddb5dc5687b57d4547c7d9b3a4e265ccf8e07627d38ffe47fda2cae812fedd0"
+    },
+    {
+      "path": "logs/new-deepseek/F/HP/model-exchanges.jsonl.gz",
+      "purpose": "Complete selected events, no text truncation; model-exchanges",
+      "size": 1979171,
+      "sha256": "0857c2861e38a820c7c6a7435906f679513e649b708b5aab4e20cbbdd65a2950"
+    },
+    {
+      "path": "logs/new-deepseek/F/HP/actions-and-messages.jsonl.gz",
+      "purpose": "Complete selected events, no text truncation; actions-and-messages",
+      "size": 2023639,
+      "sha256": "480498073d78ea88f1a1c410091b2d37b537865847dedc8d69f7a1c0d231b668"
+    },
+    {
+      "path": "logs/new-deepseek/F/HA/run-metadata.json",
+      "purpose": "Frozen experiment identity and complete final response; metadata for auditing only, not added to Judge input",
+      "size": 2345,
+      "sha256": "2f60e9f923237d4c04295dfa583f9486744e946df98bbd86a83e0b2d46ca6f49"
+    },
+    {
+      "path": "logs/new-deepseek/F/HA/model-exchanges.jsonl.gz",
+      "purpose": "Complete selected events, no text truncation; model-exchanges",
+      "size": 7603865,
+      "sha256": "1e48b10d1bab6ee65753d9b8c0f2f87893980f189f76b689a36c2367dd7f605d"
+    },
+    {
+      "path": "logs/new-deepseek/F/HA/actions-and-messages.jsonl.gz",
+      "purpose": "Complete selected events, no text truncation; actions-and-messages",
+      "size": 7675774,
+      "sha256": "4a2d115ffed0f89f349a3d2d2dd7cc0867db77a51e215c313015877379c23e53"
+    },
+    {
+      "path": "logs/old-gpt/S/HP/run-metadata.json",
+      "purpose": "Frozen experiment identity and complete final response; metadata for auditing only, not added to Judge input",
+      "size": 1085,
+      "sha256": "8426ca80ab0cdb57f313f6f2bf26c81e698c53cee57150d73383b620abdeeb63"
+    },
+    {
+      "path": "logs/old-gpt/S/HP/model-exchanges.jsonl.gz",
+      "purpose": "Complete selected events, no text truncation; model-exchanges",
+      "size": 50524,
+      "sha256": "2c6e538b6d6c40befe35e177a74ed5ab73357912c8d0ec3f6774743a9b8483d9"
+    },
+    {
+      "path": "logs/old-gpt/S/HP/actions-and-messages.jsonl.gz",
+      "purpose": "Complete selected events, no text truncation; actions-and-messages",
+      "size": 116317,
+      "sha256": "a8c086853636e66ce59390b451c1a411bd69eb05cbd22852f14b9ab15f670e98"
+    },
+    {
+      "path": "logs/old-gpt/S/HA/run-metadata.json",
+      "purpose": "Frozen experiment identity and complete final response; metadata for auditing only, not added to Judge input",
+      "size": 1165,
+      "sha256": "44b2fb9805bbb7e0f05b0652f14d84c96dacd181ea2fd2168d1474f0262ab134"
+    },
+    {
+      "path": "logs/old-gpt/S/HA/model-exchanges.jsonl.gz",
+      "purpose": "Complete selected events, no text truncation; model-exchanges",
+      "size": 48114,
+      "sha256": "a1c129b6915fa58543f488ac85530a20d810d5a97c6669c59cae17d924ef9906"
+    },
+    {
+      "path": "logs/old-gpt/S/HA/actions-and-messages.jsonl.gz",
+      "purpose": "Complete selected events, no text truncation; actions-and-messages",
+      "size": 101284,
+      "sha256": "70c803feb57ec4d444b458a30c97afa5718541debf79b6bf5855c3eb112c7e71"
+    },
+    {
+      "path": "logs/old-gpt/F/HP/run-metadata.json",
+      "purpose": "Frozen experiment identity and complete final response; metadata for auditing only, not added to Judge input",
+      "size": 1106,
+      "sha256": "b57999dbb3feeb0eabcbc5ef242c03b15067992b2628d65b4ad1ec59786c3973"
+    },
+    {
+      "path": "logs/old-gpt/F/HP/model-exchanges.jsonl.gz",
+      "purpose": "Complete selected events, no text truncation; model-exchanges",
+      "size": 30118,
+      "sha256": "19a531af89c2994c569138f2759935201f56141c8e83f2a5b58ce27b47c47b68"
+    },
+    {
+      "path": "logs/old-gpt/F/HP/actions-and-messages.jsonl.gz",
+      "purpose": "Complete selected events, no text truncation; actions-and-messages",
+      "size": 64933,
+      "sha256": "49df81185dc67c4f442a92656eada59b2ba598babacea6373b0cf0ba904fb4db"
+    },
+    {
+      "path": "logs/old-gpt/F/HA/run-metadata.json",
+      "purpose": "Frozen experiment identity and complete final response; metadata for auditing only, not added to Judge input",
+      "size": 1122,
+      "sha256": "35a07675c306efff394951c37bb3e26442ae0e3c63c36cc461aa597ddc228523"
+    },
+    {
+      "path": "logs/old-gpt/F/HA/model-exchanges.jsonl.gz",
+      "purpose": "Complete selected events, no text truncation; model-exchanges",
+      "size": 39194,
+      "sha256": "f862c89908ee87759cb435e7fae439a48e1a4d467923621fff6c0af902e15738"
+    },
+    {
+      "path": "logs/old-gpt/F/HA/actions-and-messages.jsonl.gz",
+      "purpose": "Complete selected events, no text truncation; actions-and-messages",
+      "size": 65321,
+      "sha256": "d29501133344c05c97fea943ea2e5b318fde464e62f30aa7af7c87598167ef11"
+    },
+    {
+      "path": "scoring/new-S-HP/prepared.json",
+      "purpose": "Actual independent core score input/output or complete original formal deliveries",
+      "size": 178735,
+      "sha256": "6b94de36f8f057bc73312c0bfca98dd2bcc2aa22dff60799faad780e890d039b"
+    },
+    {
+      "path": "scoring/new-S-HP/result.json",
+      "purpose": "Actual independent core score input/output or complete original formal deliveries",
+      "size": 3625,
+      "sha256": "17771cbfb2e14295f535a94253bea7ab0c1651c8663b251e5a9e315d9e45bd32"
+    },
+    {
+      "path": "scoring/new-S-HP/formal-deliverables.json",
+      "purpose": "Actual independent core score input/output or complete original formal deliveries",
+      "size": 75882,
+      "sha256": "94289a026532db3967c57524a398a4a0754213df0f1a632566c0910f544cded1"
+    },
+    {
+      "path": "scoring/new-S-HP/core-metrics.json",
+      "purpose": "Actual independent core score input/output or complete original formal deliveries",
+      "size": 86228,
+      "sha256": "223f7b81ff8a70226d32f7b0115938fbe829bb0f85a20f1bd1838448f901ff57"
+    },
+    {
+      "path": "scoring/new-S-HP/programmatic-goal-state.json",
+      "purpose": "Original GoalSpec result and captured file states, separate from LLM scores",
+      "size": 74109,
+      "sha256": "13b9fcbb0e1c226a517fa5318830fbf719324c15405c21bbebd8f6e37703b384"
+    },
+    {
+      "path": "scoring/new-S-HA/prepared.json",
+      "purpose": "Actual independent core score input/output or complete original formal deliveries",
+      "size": 141345,
+      "sha256": "2904d7a8cb7cd28cb58c6424b9db5194f97dab9fd524742e921c48c4222e81a0"
+    },
+    {
+      "path": "scoring/new-S-HA/result.json",
+      "purpose": "Actual independent core score input/output or complete original formal deliveries",
+      "size": 3383,
+      "sha256": "4f19682dc954f5d1f9925291bec6077fd6932f0894ff294d26671961030f862b"
+    },
+    {
+      "path": "scoring/new-S-HA/formal-deliverables.json",
+      "purpose": "Actual independent core score input/output or complete original formal deliveries",
+      "size": 62961,
+      "sha256": "21a1e010ae610953f2a96276ad49efa84157c3239028ec512df69c9a644ced60"
+    },
+    {
+      "path": "scoring/new-S-HA/core-metrics.json",
+      "purpose": "Actual independent core score input/output or complete original formal deliveries",
+      "size": 73043,
+      "sha256": "8016e1cea1eee6787686153299e1e5b4daf1c557810897febd9171a33fda6483"
+    },
+    {
+      "path": "scoring/new-S-HA/programmatic-goal-state.json",
+      "purpose": "Original GoalSpec result and captured file states, separate from LLM scores",
+      "size": 66636,
+      "sha256": "9c2828afcfee9f030798810457474f5d78da6f46b33b96a5d6419b5b2c10f201"
+    },
+    {
+      "path": "scoring/new-F-HP/prepared.json",
+      "purpose": "Actual independent core score input/output or complete original formal deliveries",
+      "size": 86487,
+      "sha256": "500e580db4d1eb138061a005ed2669757749903911712a55c460c39f65c5a2fe"
+    },
+    {
+      "path": "scoring/new-F-HP/result.json",
+      "purpose": "Actual independent core score input/output or complete original formal deliveries",
+      "size": 1967,
+      "sha256": "bf7c98a089a5fc5805caf7d47bc0c88f0248b46eacd1ce1f3bf029af0919aa07"
+    },
+    {
+      "path": "scoring/new-F-HP/formal-deliverables.json",
+      "purpose": "Actual independent core score input/output or complete original formal deliveries",
+      "size": 31983,
+      "sha256": "884af818eab18f48cd06cc860e934429e2bcd82486ec9b311d8bf96e7ef61ab7"
+    },
+    {
+      "path": "scoring/new-F-HP/core-metrics.json",
+      "purpose": "Actual independent core score input/output or complete original formal deliveries",
+      "size": 39312,
+      "sha256": "1788e0b4964244146465f20fef8f1c3a3a34ae267a8bdc9801c9d8a846db45d4"
+    },
+    {
+      "path": "scoring/new-F-HP/programmatic-goal-state.json",
+      "purpose": "Original GoalSpec result and captured file states, separate from LLM scores",
+      "size": 56081,
+      "sha256": "a836f6648af6c8728c8665d7df2ebb5613b0ea4b2d3be791a5f14d7c3db2a2ac"
+    },
+    {
+      "path": "scoring/new-F-HA/prepared.json",
+      "purpose": "Actual independent core score input/output or complete original formal deliveries",
+      "size": 340984,
+      "sha256": "d9c0af5e89654e6f296ec18a262b32b4446b00c39ac89c7935a2c2861ff8df6f"
+    },
+    {
+      "path": "scoring/new-F-HA/result.json",
+      "purpose": "Actual independent core score input/output or complete original formal deliveries",
+      "size": 5509,
+      "sha256": "af6a56b6e9bb4504a33546614344edffabec5691bd72393229be07aadf5b5009"
+    },
+    {
+      "path": "scoring/new-F-HA/formal-deliverables.json",
+      "purpose": "Actual independent core score input/output or complete original formal deliveries",
+      "size": 129380,
+      "sha256": "a442bd1504e2d60c7dbcc5149860d70f56767e5a84d078cb8f8e9e403053a6a7"
+    },
+    {
+      "path": "scoring/new-F-HA/core-metrics.json",
+      "purpose": "Actual independent core score input/output or complete original formal deliveries",
+      "size": 143671,
+      "sha256": "1da39b6018993065dfd8c74ace1280f4f7e54adc3a6962018112c12b7c6ae9a2"
+    },
+    {
+      "path": "scoring/new-F-HA/programmatic-goal-state.json",
+      "purpose": "Original GoalSpec result and captured file states, separate from LLM scores",
+      "size": 78764,
+      "sha256": "cbc7706801c06072b275c9a98dcef9b3bbaa6dc4fbef7ac91c9783d62970a170"
+    },
+    {
+      "path": "scoring/old-gpt-F-HP/prepared.json",
+      "purpose": "Actual independent core score input/output or complete original formal deliveries",
+      "size": 8635,
+      "sha256": "752b34a20cf752d8b02925d183f267c279024e20bf4e7c9b013f47bebe9f140f"
+    },
+    {
+      "path": "scoring/old-gpt-F-HP/formal-deliverables.json",
+      "purpose": "Actual independent core score input/output or complete original formal deliveries",
+      "size": 2,
+      "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    {
+      "path": "scoring/old-gpt-F-HP/core-metrics.json",
+      "purpose": "Actual independent core score input/output or complete original formal deliveries",
+      "size": 5501,
+      "sha256": "b037dfc1d8c6b0e7bb9374d51c95557cb1a542bc01dd486a08382455952e84cf"
+    },
+    {
+      "path": "scoring/old-gpt-F-HP/programmatic-goal-state.json",
+      "purpose": "Original GoalSpec result and captured file states, separate from LLM scores",
+      "size": 47860,
+      "sha256": "a7c4d5abc519ebdf3b2c8870a9e1dc0c6c83515988723618ebc939f8052c8509"
+    },
+    {
+      "path": "scoring/old-gpt-F-HA/prepared.json",
+      "purpose": "Actual independent core score input/output or complete original formal deliveries",
+      "size": 12812,
+      "sha256": "ec8a8f1d6b1f2f264da8b4b4ee2d10b73961e699817cc02f8ac5f704573c2bc3"
+    },
+    {
+      "path": "scoring/old-gpt-F-HA/result.json",
+      "purpose": "Actual independent core score input/output or complete original formal deliveries",
+      "size": 1489,
+      "sha256": "2a733c03c6ed33989cdd5eb84ff43912405e4d0abdeaf7d018428565441156b6"
+    },
+    {
+      "path": "scoring/old-gpt-F-HA/formal-deliverables.json",
+      "purpose": "Actual independent core score input/output or complete original formal deliveries",
+      "size": 2700,
+      "sha256": "263af54c2d40cd1c11e17eb93ce690764cbfc13cb4a9096da2e169608af72caf"
+    },
+    {
+      "path": "scoring/old-gpt-F-HA/core-metrics.json",
+      "purpose": "Actual independent core score input/output or complete original formal deliveries",
+      "size": 9111,
+      "sha256": "96fe7f313de6cbedead17cbf781eca3fcb7b571737d63a7a37112f54a2e5c13f"
+    },
+    {
+      "path": "scoring/old-gpt-F-HA/programmatic-goal-state.json",
+      "purpose": "Original GoalSpec result and captured file states, separate from LLM scores",
+      "size": 46778,
+      "sha256": "cb2f5d4226b8bec71f9e472786289b4128645d7010a0183ee7e5d59ed1702283"
+    },
+    {
+      "path": "scoring/old-gpt-S-HP/prepared.json",
+      "purpose": "Actual independent core score input/output or complete original formal deliveries",
+      "size": 10722,
+      "sha256": "4285ac55d2711418e3a221d51cdd034708668b894d399623ea7852850fe57075"
+    },
+    {
+      "path": "scoring/old-gpt-S-HP/result.json",
+      "purpose": "Actual independent core score input/output or complete original formal deliveries",
+      "size": 1250,
+      "sha256": "236435696fd86045895ae4caa3c62066fec082687f580d561cf32f31baad8687"
+    },
+    {
+      "path": "scoring/old-gpt-S-HP/formal-deliverables.json",
+      "purpose": "Actual independent core score input/output or complete original formal deliveries",
+      "size": 1351,
+      "sha256": "1603993f3959288d8c5310065b665629d9ccf523cef153ccefd1d915d14d3133"
+    },
+    {
+      "path": "scoring/old-gpt-S-HP/core-metrics.json",
+      "purpose": "Actual independent core score input/output or complete original formal deliveries",
+      "size": 7292,
+      "sha256": "847839352fe797038bcadd612ab8ad4e6ac9bd642db9e349a1e3e3a5f11424bc"
+    },
+    {
+      "path": "scoring/old-gpt-S-HP/programmatic-goal-state.json",
+      "purpose": "Original GoalSpec result and captured file states, separate from LLM scores",
+      "size": 49665,
+      "sha256": "ee63119f5ff89c03f2edf5826c9c8a9e71cc8050ea88c16a50cd48ae5818f6a9"
+    },
+    {
+      "path": "scoring/old-gpt-S-HA/prepared.json",
+      "purpose": "Actual independent core score input/output or complete original formal deliveries",
+      "size": 12758,
+      "sha256": "f1410f25604f7650ee0df47f29c9d9b5fd5030bc224d5b277933cf4a6c8a3319"
+    },
+    {
+      "path": "scoring/old-gpt-S-HA/result.json",
+      "purpose": "Actual independent core score input/output or complete original formal deliveries",
+      "size": 1488,
+      "sha256": "cfb18640196ccef03e31e6cc49b73ff134244218fcead08e53b09844b59b17b4"
+    },
+    {
+      "path": "scoring/old-gpt-S-HA/formal-deliverables.json",
+      "purpose": "Actual independent core score input/output or complete original formal deliveries",
+      "size": 2673,
+      "sha256": "d28e014fdb0fc89c83eaf2b9c3361ea51d8d5c5d70ab6ff08d8507f8a7f7f43b"
+    },
+    {
+      "path": "scoring/old-gpt-S-HA/core-metrics.json",
+      "purpose": "Actual independent core score input/output or complete original formal deliveries",
+      "size": 9084,
+      "sha256": "e598ec272fc85cfbf787cb01e6ee5f6d58d872036511aea3867f3b155371da52"
+    },
+    {
+      "path": "scoring/old-gpt-S-HA/programmatic-goal-state.json",
+      "purpose": "Original GoalSpec result and captured file states, separate from LLM scores",
+      "size": 49267,
+      "sha256": "e0bc99f6840423a2778f796a05769319060f496e1d58f440e0487a052b062b90"
+    },
+    {
+      "path": "calibration/core/response_success/prepared.json",
+      "purpose": "Separate calibration evidence; never included as experimental scores",
+      "size": 8951,
+      "sha256": "346d6884a84927103e4601d2087f1f4b8d4ab160c90319b5d2663568fe165e1b"
+    },
+    {
+      "path": "calibration/core/response_success/result.json",
+      "purpose": "Separate calibration evidence; never included as experimental scores",
+      "size": 1189,
+      "sha256": "6aa2101e1a48c3bc4419b5034de822d48c8529aab144c56d6c6f192940359289"
+    },
+    {
+      "path": "calibration/core/response_success/fact-check.json",
+      "purpose": "Separate calibration evidence; never included as experimental scores",
+      "size": 98,
+      "sha256": "88e8903b7bdfbf7521552aa500f0df0101f4742f666e300a01d866950b31f13b"
+    },
+    {
+      "path": "calibration/core/response_success/fixture-source-and-oracle.json",
+      "purpose": "Fixed pre-existing calibration oracle, outside Judge evidence",
+      "size": 51560,
+      "sha256": "57cff8175566cd924525dc0c08e3447e406f01779456e99ee2d5764f43f08f95"
+    },
+    {
+      "path": "calibration/core/response_refusal/prepared.json",
+      "purpose": "Separate calibration evidence; never included as experimental scores",
+      "size": 9009,
+      "sha256": "30919e2dcf269ecc1e0b227bc04a7cebd7cf9dd2f764887b243d7c7a24986d63"
+    },
+    {
+      "path": "calibration/core/response_refusal/result.json",
+      "purpose": "Separate calibration evidence; never included as experimental scores",
+      "size": 1193,
+      "sha256": "99bc31aacbc3e9a62cca11223ee213bc5c97f8988aa181064ad2126174f95779"
+    },
+    {
+      "path": "calibration/core/response_refusal/fact-check.json",
+      "purpose": "Separate calibration evidence; never included as experimental scores",
+      "size": 98,
+      "sha256": "6625cd5e4515e84ff48e29915270fd45989d9e6902350cf81fe37ab430b91d85"
+    },
+    {
+      "path": "calibration/core/response_refusal/fixture-source-and-oracle.json",
+      "purpose": "Fixed pre-existing calibration oracle, outside Judge evidence",
+      "size": 51735,
+      "sha256": "e3c01ab18195f2e2206949f67dd5f7f1f9b0cda2b62b502ac3fd41880c89b77f"
+    },
+    {
+      "path": "calibration/core/direct_failed_attempt/prepared.json",
+      "purpose": "Separate calibration evidence; never included as experimental scores",
+      "size": 38669,
+      "sha256": "4d4b357e26f6a1bb89f7fe0b4c13159c2bed155c81ad298026f14e6c3e296794"
+    },
+    {
+      "path": "calibration/core/direct_failed_attempt/result.json",
+      "purpose": "Separate calibration evidence; never included as experimental scores",
+      "size": 1606,
+      "sha256": "10abcf3c99e75f2b67c2d287911c9b3979a3be8b5aa411b0659b0ffead95fa27"
+    },
+    {
+      "path": "calibration/core/direct_failed_attempt/fact-check.json",
+      "purpose": "Separate calibration evidence; never included as experimental scores",
+      "size": 95,
+      "sha256": "e9692a69b89054c9702c1b2e2c3bb622b8db4a7e7a45d9c6a8f4126bb2ae64ca"
+    },
+    {
+      "path": "calibration/core/direct_failed_attempt/fixture-source-and-oracle.json",
+      "purpose": "Fixed pre-existing calibration oracle, outside Judge evidence",
+      "size": 77570,
+      "sha256": "87591ded07ad3d70e09e3fef8b09784f95ec393b390e12bcaf5893bde6d8e717"
+    },
+    {
+      "path": "calibration/extended/summary.json",
+      "purpose": "Bounded extension validation only",
+      "size": 3305,
+      "sha256": "1a04ae52be70222cb0ac54bfa8d943be7d04950cb763fb65ee0cd670197f0705"
+    },
+    {
+      "path": "calibration/extended/direct_failed_attempt/fact-check.json",
+      "purpose": "Bounded extension fixture evidence",
+      "size": 21196,
+      "sha256": "803e00b60af1d8f801fe7364a317e43a64d7376f56dd4a27e794db50ffe05812"
+    },
+    {
+      "path": "calibration/extended/direct_failed_attempt/result.json",
+      "purpose": "Bounded extension fixture evidence",
+      "size": 19486,
+      "sha256": "b506cea0b08b229c1ed358f162e336bbd1d4e4f5ff8398819850e9a9b0b6a51b"
+    },
+    {
+      "path": "calibration/extended/direct_failed_attempt/prepared.json",
+      "purpose": "Bounded extension fixture evidence",
+      "size": 89226,
+      "sha256": "36c16cdc67b48bcb018f448b69dd55e2d91039fbdad62c95106eb6aa2733d129"
+    },
+    {
+      "path": "behavior-results.csv",
+      "purpose": "Four primary behavior cells only",
+      "size": 869,
+      "sha256": "6394e6a16c3475db79005615e3aa7161373d249ae877cecfcebb241dfbdd245c"
+    },
+    {
+      "path": "core-metrics.csv",
+      "purpose": "Eight independent result sets; complete/partial/unknown/null and diagnostic subsets distinguished",
+      "size": 73385,
+      "sha256": "b1e0355f27d773aaf57ad2232728ddbe15499ae96ba7b8ca33e4b04016f0ee3f"
+    },
+    {
+      "path": "extended-metrics.csv",
+      "purpose": "Calibration reliability and deferred extension state",
+      "size": 1304,
+      "sha256": "105ea4360a024e2fa9381c8d5d96c0ea38352c03ae3d2cbda2a42b43bc20951f"
+    },
+    {
+      "path": "costs.csv",
+      "purpose": "All actual round request rows including failures and unknown-charge holds",
+      "size": 223930,
+      "sha256": "823e979cb41e904a0458c35d96f3567f5f800a619599242065050dc97f6c6926"
+    },
+    {
+      "path": "accounting.json",
+      "purpose": "Original-ledger baseline-ID difference and actual journal cross-check",
+      "size": 2223,
+      "sha256": "f88dabb0b73b333ca83886567b5c8717b724bf6335771288c0bf974efb4c1c58"
+    },
+    {
+      "path": "plan.json",
+      "purpose": "Frozen plans and explicit budget authorization",
+      "size": 5612,
+      "sha256": "efe1fd66259507d5fb8c2d2c542ba0435ce56ddfc4c0ed65725c5c3d2fc0bd76"
+    },
+    {
+      "path": "calibration/core/summary.json",
+      "purpose": "Independent response/trajectory gate outcomes, unchanged factual failure retained",
+      "size": 5959,
+      "sha256": "76d6cc5beb9f68c981c5362e31ccf799aa0b72f5de0ed762c26710e39cab067e"
+    },
+    {
+      "path": "judge-failures.jsonl",
+      "purpose": "Meaningful actual Judge failures only",
+      "size": 196,
+      "sha256": "2be2e608ac94e2390e7bb58d575e65cfd26bbe5dae94b220e8f4ad7a1359665f"
+    },
+    {
+      "path": "diagnostics/engineering-attempts.json",
+      "purpose": "Retained failed preparation/partial network attempts, separate from primary samples",
+      "size": 7347,
+      "sha256": "aacb1c264c9758f0641efdf767990d10cf0c88026ff74b1783ab043263f0e763"
+    },
+    {
+      "path": "diagnostics/decisions.json",
+      "purpose": "Concrete fault and scope decisions",
+      "size": 1156,
+      "sha256": "5fe8b7705123ad3cb5d658b18d07d7c5dccf34f42ba0c6eeb332e81efe916fc7"
+    },
+    {
+      "path": "validation/collection-process.json",
+      "purpose": "Actual retained receipt; no claim of additional regression",
+      "size": 408,
+      "sha256": "a98eabaa7e48aec96f8f3a16db21adb041004c9e852c8c209ec5745213db4c00"
+    },
+    {
+      "path": "validation/core-process.json",
+      "purpose": "Actual retained receipt; no claim of additional regression",
+      "size": 259,
+      "sha256": "465b6c8f1cbae1de2c3f09014d76b9b21ce8f68b0a8b471c1a8a572e15f25167"
+    },
+    {
+      "path": "validation/core-request-equivalence.json",
+      "purpose": "Actual retained receipt; no claim of additional regression",
+      "size": 976,
+      "sha256": "c233840a91c612390a941d03d50ab91a6632310deee4781b17ecf2b6e2c53dcc"
+    },
+    {
+      "path": "validation/collection-offline-tests.json",
+      "purpose": "Actual retained receipt; no claim of additional regression",
+      "size": 355,
+      "sha256": "628d8ee5b5d880740207655ae04d887a542eed3b2764deec1f6759ee0c4e5ad2"
+    },
+    {
+      "path": "validation/scoring-offline-tests.json",
+      "purpose": "Actual retained receipt; no claim of additional regression",
+      "size": 837,
+      "sha256": "03c41df35f30bb9a4b1e035d0d30fe6944ec811749cf9a22e22b4170a07e5772"
+    },
+    {
+      "path": "validation/README.md",
+      "purpose": "Concise honest verification index",
+      "size": 469,
+      "sha256": "0125443da22920f28a12c1d4f373f655294e15ecf800e3fbe0a4c52acb81ce76"
+    },
+    {
+      "path": "source-index.json",
+      "purpose": "Traceability without uploading redundant streaming logs",
+      "size": 7608,
+      "sha256": "292f6b8b63edaa1bb69ccd8580de44c0d761f0de8233ebc24ed80a89d4edf8d5"
+    },
+    {
+      "path": "README.md",
+      "purpose": "Logical entry point and evidence navigation",
+      "size": 2147,
+      "sha256": "f856dbd8216361123b847ff5cdca379911b9aec67fae753de48d673a3b31dcb9"
+    },
+    {
+      "path": ".gitattributes",
+      "purpose": "Preserve stored evidence byte hashes across platforms",
+      "size": 8,
+      "sha256": "705fd4d6451a31d36b3df7de96f83f30ac976c9b4a6d1e51671d8e2f33e2d0da"
+    },
+    {
+      "path": "scoring/new-S-HP/judge-requests.jsonl",
+      "purpose": "Complete actual Judge wire request/reply, reasoning/finish/usage, including the one bounded correction; necessary score audit evidence",
+      "size": 353772,
+      "sha256": "4a2c974fee93ad6f24d522865f5a6610c18036b2770931268dc5cb16ac5682aa"
+    },
+    {
+      "path": "scoring/new-S-HA/judge-requests.jsonl",
+      "purpose": "Complete actual Judge wire request/reply, reasoning/finish/usage, including the one bounded correction; necessary score audit evidence",
+      "size": 290943,
+      "sha256": "cc3c2711d0e272b90d084b5b1f52782a0bfdc46d6fb2311da33e07a55f865466"
+    },
+    {
+      "path": "scoring/new-F-HA/judge-requests.jsonl",
+      "purpose": "Complete actual Judge wire request/reply, reasoning/finish/usage, including the one bounded correction; necessary score audit evidence",
+      "size": 606002,
+      "sha256": "4cf47f9f649f822a06ac26ecc3499286b7630ea332e4c03fdb06feb37ec6cce2"
+    },
+    {
+      "path": "scoring/old-gpt-S-HP/judge-requests.jsonl",
+      "purpose": "Complete actual Judge wire request/reply, reasoning/finish/usage, including the one bounded correction; necessary score audit evidence",
+      "size": 21747,
+      "sha256": "297ee94a0a27d613b29ed4d76e837990263b851626ae0e3907e565b0db8afbcd"
+    },
+    {
+      "path": "scoring/old-gpt-F-HA/judge-requests.jsonl",
+      "purpose": "Complete actual Judge wire request/reply, reasoning/finish/usage, including the one bounded correction; necessary score audit evidence",
+      "size": 29958,
+      "sha256": "05ab149366443b63decc44f6c1b18f3fd162517972e52d14be8ec6d2869ec7ba"
+    },
+    {
+      "path": "scoring/new-F-HP/judge-requests.jsonl",
+      "purpose": "Complete actual Judge wire request/reply, reasoning/finish/usage, including the one bounded correction; necessary score audit evidence",
+      "size": 180199,
+      "sha256": "35ce004336479e38cd563f8a0b76c2775a067e93ab26d6c99641cf3c2c2ba55f"
+    },
+    {
+      "path": "scoring/old-gpt-S-HA/judge-requests.jsonl",
+      "purpose": "Complete actual Judge wire request/reply, reasoning/finish/usage, including the one bounded correction; necessary score audit evidence",
+      "size": 29898,
+      "sha256": "1704f9b724b8e737dbdbf4439d606cfef5889ffe28e0ca75ec074615d9638390"
+    },
+    {
+      "path": "calibration/core/response_success/judge-requests.jsonl",
+      "purpose": "Complete actual Judge wire request/reply, reasoning/finish/usage, including the one bounded correction; necessary score audit evidence",
+      "size": 16415,
+      "sha256": "cef62778248c03aefbfd4daca671b632c485222179bc19d8e1bdfb0101feecc0"
+    },
+    {
+      "path": "calibration/core/response_refusal/judge-requests.jsonl",
+      "purpose": "Complete actual Judge wire request/reply, reasoning/finish/usage, including the one bounded correction; necessary score audit evidence",
+      "size": 17085,
+      "sha256": "a5111e8e99f65d3e3e7d35fcfefe3bf1e298e5f9747e3a4ce216109a3e2d025e"
+    },
+    {
+      "path": "calibration/core/direct_failed_attempt/judge-requests.jsonl",
+      "purpose": "Complete actual Judge wire request/reply, reasoning/finish/usage, including the one bounded correction; necessary score audit evidence",
+      "size": 99825,
+      "sha256": "0bf19757c4717eeea9a20e07e0b362c0f0d5f8b17061b8571934e9b7312ecb05"
+    },
+    {
+      "path": "calibration/extended/direct_failed_attempt/judge-requests.jsonl",
+      "purpose": "Complete actual Judge wire request/reply, reasoning/finish/usage, including the one bounded correction; necessary score audit evidence",
+      "size": 797779,
+      "sha256": "d24170d1ee456ed2fe732eb395bfb0b61cced79c74592e7356f0142b5c628c8c"
+    },
+    {
+      "path": "calibration/extended/direct_failed_attempt/judge-structure-repairs.jsonl",
+      "purpose": "Complete actual Judge wire request/reply, reasoning/finish/usage, including the one bounded correction; necessary score audit evidence",
+      "size": 287729,
+      "sha256": "db6afcf599edbeafe83c782d189b3a52a9a08e7aa4cbb74f0c0af17f4a11552b"
+    },
+    {
+      "path": "validation/recompute-core.md",
+      "purpose": "Minimal offline recomputation recipe; no extra framework",
+      "size": 1135,
+      "sha256": "b19af053b07154a55e7b4c0dff9b1ec893309482cc9b1759257ff0f3f4c731a1"
+    }
+  ],
+  "stored_bytes": 38343956,
+  "selection": "User requested useful evidence only; full raw logs retained locally",
+  "core_scoring_code_sha": "9181b88047f43864ebf4af401015f728f8b78b83",
+  "source_index": "source-index.json"
+}

@@ -1,0 +1,7 @@
+{
+  "checks": {
+    "exact_deliveries": true,
+    "response_refusal": true
+  },
+  "passed": true
+}

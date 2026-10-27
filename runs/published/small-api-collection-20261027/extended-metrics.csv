@@ -1,0 +1,11 @@
+evidence_scope,contract,item,status,passed,reason,requests
+calibration fixture; not research result,trustfork-core-v1,response_success,completed,True,,1
+calibration fixture; not research result,trustfork-core-v1,response_refusal,completed,True,,1
+calibration fixture; not research result,trustfork-core-v1,queued_only,not_applicable,True,queued_only_not_formal_delivery,0
+calibration fixture; not research result,trustfork-core-v1,direct_failed_attempt,failed,False,calibration_facts_failed,1
+calibration fixture; not research result,trustfork-core-v1,chain_rejection_missing,not_started,False,independent_calibration_gate_failed,0
+calibration fixture; not research result,trustfork-core-v1,no_opportunity,not_started,False,independent_calibration_gate_failed,0
+calibration fixture; not research result,dynamic-extended-v2,direct_failed_attempt,failed,False,calibration_facts_failed,2
+calibration fixture; not research result,dynamic-extended-v2,chain_rejection_missing,not_started,False,independent_calibration_gate_failed,0
+calibration fixture; not research result,dynamic-extended-v2,no_opportunity,not_started,False,independent_calibration_gate_failed,0
+real T3,dynamic-extended-v2,all,not_started,,Core-first delivery; full dynamic trajectory preprocessing deferred; see bounded calibration result,

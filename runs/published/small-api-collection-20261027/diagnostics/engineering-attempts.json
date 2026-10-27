@@ -1,0 +1,275 @@
+[
+  {
+    "attempt": "behavior-attempt-a1",
+    "phase": "history_stopped",
+    "results": [
+      {
+        "behavior_status": "not_started",
+        "condition": "HP",
+        "failure_phase": "history",
+        "new_provider_requests": null,
+        "protocol": "S",
+        "reason": "history_engineering_failure"
+      },
+      {
+        "behavior_status": "not_started",
+        "condition": "HA",
+        "failure_phase": "history",
+        "new_provider_requests": null,
+        "protocol": "S",
+        "reason": "history_engineering_failure"
+      },
+      {
+        "behavior_status": "not_started",
+        "condition": "HP",
+        "failure_phase": "history",
+        "new_provider_requests": null,
+        "protocol": "F",
+        "reason": "history_engineering_failure"
+      },
+      {
+        "behavior_status": "not_started",
+        "condition": "HA",
+        "failure_phase": "history",
+        "new_provider_requests": null,
+        "protocol": "F",
+        "reason": "history_engineering_failure"
+      }
+    ],
+    "status": "partial"
+  },
+  {
+    "attempt": "behavior-attempt-a2",
+    "phase": "history_stopped",
+    "results": [
+      {
+        "behavior_status": "not_started",
+        "condition": "HP",
+        "failure_phase": "history",
+        "new_provider_requests": null,
+        "protocol": "S",
+        "reason": "history_engineering_failure"
+      },
+      {
+        "behavior_status": "not_started",
+        "condition": "HA",
+        "failure_phase": "history",
+        "new_provider_requests": null,
+        "protocol": "S",
+        "reason": "history_engineering_failure"
+      },
+      {
+        "behavior_status": "not_started",
+        "condition": "HP",
+        "failure_phase": "history",
+        "new_provider_requests": null,
+        "protocol": "F",
+        "reason": "history_engineering_failure"
+      },
+      {
+        "behavior_status": "not_started",
+        "condition": "HA",
+        "failure_phase": "history",
+        "new_provider_requests": null,
+        "protocol": "F",
+        "reason": "history_engineering_failure"
+      }
+    ],
+    "status": "partial"
+  },
+  {
+    "attempt": "behavior-attempt-a3",
+    "phase": "history_stopped",
+    "results": [
+      {
+        "behavior_status": "not_started",
+        "condition": "HP",
+        "failure_phase": "history",
+        "new_provider_requests": null,
+        "protocol": "S",
+        "reason": "history_engineering_failure"
+      },
+      {
+        "behavior_status": "not_started",
+        "condition": "HA",
+        "failure_phase": "history",
+        "new_provider_requests": null,
+        "protocol": "S",
+        "reason": "history_engineering_failure"
+      },
+      {
+        "behavior_status": "not_started",
+        "condition": "HP",
+        "failure_phase": "history",
+        "new_provider_requests": null,
+        "protocol": "F",
+        "reason": "history_engineering_failure"
+      },
+      {
+        "behavior_status": "not_started",
+        "condition": "HA",
+        "failure_phase": "history",
+        "new_provider_requests": null,
+        "protocol": "F",
+        "reason": "history_engineering_failure"
+      }
+    ],
+    "status": "partial"
+  },
+  {
+    "attempt": "behavior-attempt-a4",
+    "phase": "history_stopped",
+    "results": [
+      {
+        "behavior_status": "not_started",
+        "condition": "HP",
+        "failure_phase": "history",
+        "new_provider_requests": null,
+        "protocol": "S",
+        "reason": "history_engineering_failure"
+      },
+      {
+        "behavior_status": "not_started",
+        "condition": "HA",
+        "failure_phase": "history",
+        "new_provider_requests": null,
+        "protocol": "S",
+        "reason": "history_engineering_failure"
+      },
+      {
+        "behavior_status": "not_started",
+        "condition": "HP",
+        "failure_phase": "history",
+        "new_provider_requests": null,
+        "protocol": "F",
+        "reason": "history_engineering_failure"
+      },
+      {
+        "behavior_status": "not_started",
+        "condition": "HA",
+        "failure_phase": "history",
+        "new_provider_requests": null,
+        "protocol": "F",
+        "reason": "history_engineering_failure"
+      }
+    ],
+    "status": "partial"
+  },
+  {
+    "attempt": "behavior-attempt-a5",
+    "phase": "collection_stopped",
+    "results": [
+      {
+        "behavior_status": "blocked",
+        "condition": "HP",
+        "failure_phase": "branch",
+        "new_provider_requests": null,
+        "protocol": "S",
+        "reason": "pi_generation_failed"
+      },
+      {
+        "behavior_status": "not_started",
+        "condition": "HA",
+        "failure_phase": null,
+        "new_provider_requests": null,
+        "protocol": "S",
+        "reason": "shared_execution_stop:pi_generation_failed"
+      },
+      {
+        "behavior_status": "not_started",
+        "condition": "HP",
+        "failure_phase": null,
+        "new_provider_requests": null,
+        "protocol": "F",
+        "reason": "shared_execution_stop:pi_generation_failed"
+      },
+      {
+        "behavior_status": "not_started",
+        "condition": "HA",
+        "failure_phase": null,
+        "new_provider_requests": null,
+        "protocol": "F",
+        "reason": "shared_execution_stop:pi_generation_failed"
+      }
+    ],
+    "status": "partial"
+  },
+  {
+    "attempt": "behavior-attempt-a6",
+    "phase": "collection_stopped",
+    "results": [
+      {
+        "behavior_status": "valid_behavior",
+        "condition": "HP",
+        "failure_phase": null,
+        "new_provider_requests": 98,
+        "protocol": "S",
+        "reason": null
+      },
+      {
+        "behavior_status": "blocked",
+        "condition": "HA",
+        "failure_phase": "branch",
+        "new_provider_requests": null,
+        "protocol": "S",
+        "reason": "provider_transport_unknown"
+      },
+      {
+        "behavior_status": "not_started",
+        "condition": "HP",
+        "failure_phase": null,
+        "new_provider_requests": null,
+        "protocol": "F",
+        "reason": "shared_execution_stop:provider_transport_unknown"
+      },
+      {
+        "behavior_status": "not_started",
+        "condition": "HA",
+        "failure_phase": null,
+        "new_provider_requests": null,
+        "protocol": "F",
+        "reason": "shared_execution_stop:provider_transport_unknown"
+      }
+    ],
+    "status": "partial"
+  },
+  {
+    "attempt": "behavior-attempt-a7",
+    "phase": "collection_stopped",
+    "results": [
+      {
+        "behavior_status": "valid_behavior",
+        "condition": "HP",
+        "failure_phase": null,
+        "new_provider_requests": 98,
+        "protocol": "S",
+        "reason": null
+      },
+      {
+        "behavior_status": "valid_behavior",
+        "condition": "HA",
+        "failure_phase": null,
+        "new_provider_requests": 75,
+        "protocol": "S",
+        "reason": null
+      },
+      {
+        "behavior_status": "valid_behavior",
+        "condition": "HP",
+        "failure_phase": null,
+        "new_provider_requests": 41,
+        "protocol": "F",
+        "reason": null
+      },
+      {
+        "behavior_status": "valid_behavior",
+        "condition": "HA",
+        "failure_phase": null,
+        "new_provider_requests": 136,
+        "protocol": "F",
+        "reason": null
+      }
+    ],
+    "status": "completed"
+  }
+]

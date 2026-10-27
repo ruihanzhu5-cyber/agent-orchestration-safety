@@ -1,0 +1,26 @@
+{
+  "broad_regression": "not_run_per_user_instruction",
+  "execution_code_sha": "9181b88047f43864ebf4af401015f728f8b78b83",
+  "new_paid_calibrations": 0,
+  "original_core_modules_changed": false,
+  "proof": [
+    {
+      "exact_original_request_hash": "69698c22427a4a3335eb49f76f47f323d3e9318628ae2072f57e722595bb7be6",
+      "fixture_id": "response_success",
+      "wire_payload_unchanged": true
+    },
+    {
+      "exact_original_request_hash": "00e73d4f584a91898913c7a99227c86783de5b6d3c0bd3918b9686db55af6ecb",
+      "fixture_id": "response_refusal",
+      "wire_payload_unchanged": true
+    },
+    {
+      "exact_original_request_hash": "a13021b3d99e2f01a8e56fda7ec3d46d1c434b8094c95f708f5f67bd8f206ae5",
+      "fixture_id": "queued_only",
+      "wire_payload_unchanged": true
+    }
+  ],
+  "request_equivalence": "passed",
+  "retained_failed_trajectory_gate": true,
+  "scope": "Only exact request equivalence and syntax checked; no extra model calls or full regression"
+}

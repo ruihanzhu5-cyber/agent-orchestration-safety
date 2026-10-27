@@ -1,0 +1,66 @@
+{
+  "authorized_judge_ceiling_cny": 10,
+  "authorized_round_new_ceiling_cny": 50,
+  "campaign_total_settled_cny_upper": 56.157979,
+  "journal_cross_check": {
+    "baseline_rows_unchanged": true,
+    "duplicate_submission_receipts": 0,
+    "finish_reason_counts": {
+      "UNKNOWN": 1,
+      "stop": 67,
+      "tool_calls": 443
+    },
+    "journal_unique_submitted": 515,
+    "kinds": {
+      "judge": 12,
+      "model": 503
+    },
+    "ledger_submitted": 515,
+    "reconciliation": "supplier invoice UNKNOWN; this audit is request/usage evidence, never a claim that streamed reasoning exposes internal model psychology",
+    "response_models": {
+      "deepseek-flash": 511
+    },
+    "responses_missing_or_usage_unknown": [
+      "small-api-collection-20261027-a4.e336f9ccd6c5.model.request_000072_e3b02a07.attempt0",
+      "small-api-collection-20261027-a6.430a41793f59.model.request_000044_b29f1277.attempt0",
+      "small-api-collection-20261027-a6.430a41793f59.model.request_000043_a66c8399.attempt0",
+      "small-api-collection-20261027-a6.430a41793f59.model.request_000042_7ffa13ab.attempt0",
+      "small-api-collection-20261027-a6.430a41793f59.model.request_000045_749a3e95.attempt0"
+    ]
+  },
+  "new_kind_counts": {
+    "judge": 12,
+    "model": 503
+  },
+  "new_settled_cny_upper": 45.855348,
+  "new_stage_counts": {
+    "calibration/dynamic-extended-v2/direct_failed_attempt": 2,
+    "calibration/trustfork-core-v1/direct_failed_attempt": 1,
+    "calibration/trustfork-core-v1/response_refusal": 1,
+    "calibration/trustfork-core-v1/response_success": 1,
+    "core-response/new-F-HA": 1,
+    "core-response/new-F-HP": 1,
+    "core-response/new-S-HA": 1,
+    "core-response/new-S-HP": 1,
+    "core-response/old-gpt-F-HA": 1,
+    "core-response/old-gpt-S-HA": 1,
+    "core-response/old-gpt-S-HP": 1,
+    "history/H1": 27,
+    "history/H2": 74,
+    "prefix/F": 1,
+    "prefix/S": 1,
+    "t3/F/HA": 136,
+    "t3/F/HP": 41,
+    "t3/S/HA": 120,
+    "t3/S/HP": 103
+  },
+  "new_status_counts": {
+    "charge_unknown": 5,
+    "settled": 510
+  },
+  "new_submitted": 515,
+  "new_unknown_reserved_cny": 1.068668,
+  "original_campaign_ceiling_cny": 100,
+  "original_rows_unchanged": true,
+  "supplier_invoice": "UNKNOWN"
+}

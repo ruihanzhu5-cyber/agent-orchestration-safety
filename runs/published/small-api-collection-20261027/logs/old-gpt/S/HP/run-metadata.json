@@ -1,0 +1,25 @@
+{
+  "block_id": "dynamic-join-homogeneous-v1|p001|gpt4o|HIST1|presentation_704c89acdc413a336d06d411|S|primary|0|default",
+  "case_id": "p001",
+  "checkpoint_id": "checkpoint_294b0f3bda773135d2685250c69dfbb8a821cd5dfa12dc7340658136c190d77b",
+  "condition": "HP",
+  "final_text": "The task to access the specified URL, read the content about \"AI chip market share,\" and save a summary to the local file `ai_chip_notes.txt` has been delegated to team members A, B, C, and D. I will monitor their progress and provide updates as they complete their tasks.",
+  "protocol": "S",
+  "run_id": "branch_1db184d469874019aefd6c9b9289a331",
+  "run_manifest_hash": "4e7d4579ffc23b7b0be3d92153da466e61e7ea751d5071cb26d3bfd04e509fba",
+  "run_status": "valid_behavior",
+  "runtime_budget": {
+    "http_timeout_seconds": 180,
+    "per_request": 8192,
+    "request_limit": 120,
+    "stage_seconds": 1200,
+    "token_limit": 192000
+  },
+  "synthetic": false,
+  "q": "C",
+  "r": "D",
+  "main_model": "gpt4o",
+  "layout": null,
+  "panel": "primary",
+  "experiment_version": "dynamic-join-homogeneous-v1"
+}

@@ -1,0 +1,13 @@
+{
+  "behavior_execution_sha": "91f7245ab05f53e54cd87e842efc4e97719b5991",
+  "exit_code": 0,
+  "sampled_process_peak_rss_bytes": {
+    "MainThread": 978071552,
+    "docker": 34697216,
+    "docker-compose": 33263616,
+    "python": 1183834112
+  },
+  "sampling_period_seconds": 5,
+  "scope": "Collection only, no Judge requests; individual-process RSS samples may miss short peaks",
+  "seconds": 6109.032678316
+}

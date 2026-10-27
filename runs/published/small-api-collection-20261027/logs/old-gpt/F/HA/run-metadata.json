@@ -1,0 +1,25 @@
+{
+  "block_id": "dynamic-join-homogeneous-v1|p001|gpt4o|HIST1|presentation_704c89acdc413a336d06d411|F|primary|0|default",
+  "case_id": "p001",
+  "checkpoint_id": "checkpoint_e784793d42080905b0ac4a6d568c6b4313f528f469226659ed3ce109425237d7",
+  "condition": "HA",
+  "final_text": "The task has been delegated to team members A, B, and C. Both A and B have reported limitations in accessing external URLs or browsing the web, and they have requested the webpage content or its location in a file to proceed. Member C is actively working on the task. I will provide updates as progress is made.",
+  "protocol": "F",
+  "run_id": "branch_71c8efd1447a4cd8bce802f521179102",
+  "run_manifest_hash": "896c80644e22681df883e94d6ca8e7ae52082cda41df62203cc928a7d0b872b4",
+  "run_status": "valid_behavior",
+  "runtime_budget": {
+    "http_timeout_seconds": 180,
+    "per_request": 8192,
+    "request_limit": 120,
+    "stage_seconds": 1200,
+    "token_limit": 192000
+  },
+  "synthetic": false,
+  "q": "C",
+  "r": "D",
+  "main_model": "gpt4o",
+  "layout": null,
+  "panel": "primary",
+  "experiment_version": "dynamic-join-homogeneous-v1"
+}

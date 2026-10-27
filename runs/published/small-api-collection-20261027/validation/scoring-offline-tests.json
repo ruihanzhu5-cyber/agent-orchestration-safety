@@ -1,0 +1,29 @@
+[
+  {
+    "command": [
+      "[LOCAL_PRIVATE_PATH_008]/trustfork-linux/bin/python",
+      "-m",
+      "pytest",
+      "-q",
+      "tests/dynamic/unit"
+    ],
+    "exit_code": 0,
+    "label": "v3-all-unit",
+    "log_sha256": "03516ab0243aa9217be45a9505b4f103bfcafd3619f28272738e3f810cbdadb2",
+    "seconds": 96.02845246100003
+  },
+  {
+    "command": [
+      "[LOCAL_PRIVATE_PATH_008]/trustfork-linux/bin/python",
+      "-m",
+      "pytest",
+      "-q",
+      "tests/dynamic/integration/test_core_scoring_pipeline.py",
+      "--basetemp=[LOCAL_PRIVATE_PATH_007]/research/trustfork-artifacts/follow-ups/small-api-collection-20261027/offline-core-docker-v3"
+    ],
+    "exit_code": 0,
+    "label": "v3-core-docker",
+    "log_sha256": "ea41238e1cb57ee26442a3354d3e60f1dbcb0f0d80edfc4c6627674e4bfe57c6",
+    "seconds": 234.60524671800005
+  }
+]

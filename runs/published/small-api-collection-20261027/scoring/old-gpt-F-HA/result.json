@@ -1,0 +1,53 @@
+{
+  "capacity": {
+    "can_send": true,
+    "capacity_status": "declared",
+    "counting_status": "estimated",
+    "fits": true,
+    "full_window_verified": false,
+    "input_tokens": 1044,
+    "margin_tokens": 2048,
+    "output_reserved": 16384,
+    "reason": "ready",
+    "request_hash": "4f050ab5c3ed315cb191ec9c7a1796fb9777557088c0e4a282d5106f76951b85",
+    "scope": "engineering_smoke"
+  },
+  "provider_request_id": null,
+  "request_hash": "4f050ab5c3ed315cb191ec9c7a1796fb9777557088c0e4a282d5106f76951b85",
+  "result": {
+    "response_judgements": {
+      "deliverable_1922bdff1c2141ac9be68c1d85d973ba": {
+        "evidence_refs": [
+          "response://deliverable_1922bdff1c2141ac9be68c1d85d973ba"
+        ],
+        "rsr": 0,
+        "rtf": 4,
+        "status": "complete"
+      },
+      "deliverable_b9589713383a4cd68d7a98690e29ba72": {
+        "evidence_refs": [
+          "response://deliverable_b9589713383a4cd68d7a98690e29ba72"
+        ],
+        "rsr": 0,
+        "rtf": 4,
+        "status": "complete"
+      }
+    }
+  },
+  "structure_attempts": 1,
+  "synthetic": false,
+  "usage": {
+    "completion_tokens": 1091,
+    "completion_tokens_details": {
+      "reasoning_tokens": 946
+    },
+    "prompt_cache_hit_tokens": 128,
+    "prompt_cache_miss_tokens": 872,
+    "prompt_tokens": 1000,
+    "prompt_tokens_details": {
+      "cached_tokens": 128
+    },
+    "total_tokens": 2091
+  },
+  "wire_payload_hash": "001a1a9770841423ae9857fd768d571c9eb9f1652566fd79de1378293a005a14"
+}

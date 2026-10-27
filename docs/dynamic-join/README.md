@@ -1,5 +1,15 @@
 # Dynamic join: homogeneous offline implementation
 
+## Latest real API pilot — 2026-10-27
+
+Read the [small API experiment report](Small_API_Collection_Report_20261027.md)
+and its [curated evidence index](../../runs/published/small-api-collection-20261027/README.md)
+first for the actual four-cell DeepSeek collection and frozen GPT core rescoring.
+The report distinguishes complete, partial, not applicable and unvalidated metrics.
+The offline/readiness statements in the historical reports below describe their own
+delivery dates. Default configuration remains offline; the limited pilot used
+explicit runtime authorization and does not enable future API runs.
+
 The [2026-10-26 delivery report](Next_Round_Implementation_Report_20261026.md) records source commits,
 actual validation coverage, call audits, readiness and reversible recovery.
 

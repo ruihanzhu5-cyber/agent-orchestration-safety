@@ -1,0 +1,14 @@
+[
+  {
+    "exit_code": 0,
+    "label": "network-unit",
+    "log_sha256": "907551ca11d0105c1c88afef04730180a59b1ca8160a7acd9aa5bf006012ae17",
+    "seconds": 131.608285761
+  },
+  {
+    "exit_code": 0,
+    "label": "network-docker",
+    "log_sha256": "11fb967bcca134237d91f3ad406729ae72a8c9d7838aaa8819bcabb77f6bc74d",
+    "seconds": 225.69691902099999
+  }
+]
