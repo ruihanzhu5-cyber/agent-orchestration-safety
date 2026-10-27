@@ -18,7 +18,7 @@ def test_four_behaviors_are_frozen_before_failed_judge_and_fork_isolated(tmp_pat
  budget=CampaignBudget(tmp_path/'money.sqlite3',campaign_id='first-api-20261026',segment_id='plan-judge-followup-20261026',segment_cny=20,segment_identity={'identity_hash':'synthetic-old'})
  budget.reserve('old-paid',phase='engineering_smoke',reserved_cost_cny=1,metadata={});budget.submitted('old-paid');budget.settle('old-paid',settled_cost_cny=.5,usage={})
  migrate_attempts(budget.path,apply=True,backup=tmp_path/'before.sqlite3')
- attempt=ExecutionAttempt(budget,tmp_path/'attempt',attempt_id='collection-mock',parent_attempt='old',identity={'execution_code_sha':'synthetic-offline'})
+ attempt=ExecutionAttempt(budget,tmp_path/'attempt',attempt_id='collection-mock',parent_attempt='old',identity={'execution_code_sha':'synthetic-offline','t3_budget_override':{'request_limit':240,'token_limit':384000,'stage_seconds':3600}})
  cfg=configured(budget.path);cfg['judge_binding']='deepseekflash';cfg['campaign_budget'].update(segment_id=budget.segment_id,segment_cny=20,segment_identity={'identity_hash':'synthetic-old'},must_exist=True)
  for b in cfg['logical_bindings'].values():b['capability']['tokenizer'].update(id='o200k_base',version=importlib.metadata.version('tiktoken'),count_method='local-message-content-and-schema-bpe-estimate')
  mock=MockHistory();runner=CollectionRunner(tmp_path/'parent',attempt,cfg,mode='mock',http_factory=lambda stage:mock)
@@ -39,6 +39,7 @@ def test_four_behaviors_are_frozen_before_failed_judge_and_fork_isolated(tmp_pat
   assert pair[0]['checkpoint_id']==pair[1]['checkpoint_id']
   for row in pair:
    raw=read_json(Path(row['path']))
+   assert all(raw['runtime_budget'][k]==v for k,v in {'request_limit':240,'token_limit':384000,'stage_seconds':3600,'per_request':16384}.items())
    with tarfile.open(raw['frozen_export']['workspace_tar']) as tar:assert any(n.endswith('offline-hp-only.txt') for n in tar.getnames())==(row['condition']=='HP')
    if protocol=='F':assert row['admitted_new_members']==[]
    else:assert row['admitted_new_members']==['C','D']

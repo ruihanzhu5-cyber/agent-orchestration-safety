@@ -43,6 +43,13 @@ def verified_h2_serialization_retry(budget,parent_attempt):
   return retry
 
 class CollectionRunner(ReviewRunner):
+ def apply_t3_budget(self,runtime):
+  override=self.attempt.identity.get('t3_budget_override')
+  if override:
+   from dataclasses import replace
+   from trustfork.runtime.dynamic.experiment_config import resolve_runtime_budget
+   runtime.runtime_budget=resolve_runtime_budget(runtime.main_model,{**runtime.runtime_budget,**override})
+   runtime.experiment=replace(runtime.experiment,runtime_budget=runtime.runtime_budget)
  def transport(self,stage,out,*,kind='model',limit=120,formal=False):
   t=super().transport(stage,out,kind=kind,limit=limit,formal=False)
   retry=self.attempt.identity.get('history_serialization_retry')
@@ -51,7 +58,7 @@ class CollectionRunner(ReviewRunner):
   return t
  def freeze_collection_plan(self):
   from trustfork.runtime.dynamic.case_loader import load_case
-  plan={'version':PLAN_VERSION,'round_id':ROUND_ID,'behavior_execution_sha':self.code,'config_hash':digest(self.config),'matrix':fixed_matrix(),'history_tasks':['p002','p007'],'collection_order':['S/HP','S/HA','F/HP','F/HA'],'source_asset_hashes':{c:load_case(c)['deployed_asset_hash'] for c in ('p001','p002','p007')},'collection_depends_on_judge':False,'original_campaign_cny':100,'original_segment_cny':20,'authorized_segment_cny':self.config['campaign_budget']['segment_cny'],'round_new_cost_ceiling_cny':50,'new_judge_cost_ceiling_cny':10,'new_judge_request_limit':48,'per_scoring_item_max_requests':2,'planned_core_contract':'trustfork-core-v1','planned_extended_representation':'trajectory-lossless-v2','team_runtime_budgets':self.config.get('runtime_budgets'),'source_parent_seal':digest(self.seal)}
+  plan={'version':PLAN_VERSION,'round_id':ROUND_ID,'behavior_execution_sha':self.code,'config_hash':digest(self.config),'matrix':fixed_matrix(),'history_tasks':['p002','p007'],'collection_order':['S/HP','S/HA','F/HP','F/HA'],'source_asset_hashes':{c:load_case(c)['deployed_asset_hash'] for c in ('p001','p002','p007')},'collection_depends_on_judge':False,'original_campaign_cny':100,'original_segment_cny':20,'authorized_segment_cny':self.config['campaign_budget']['segment_cny'],'round_new_cost_ceiling_cny':50,'new_judge_cost_ceiling_cny':10,'new_judge_request_limit':48,'per_scoring_item_max_requests':2,'planned_core_contract':'trustfork-core-v1','planned_extended_representation':'trajectory-lossless-v2','team_runtime_budgets':self.config.get('runtime_budgets'),'t3_budget_override':self.attempt.identity.get('t3_budget_override'),'retained_deadline_history':self.attempt.identity.get('history_deadline_continuation'),'source_parent_seal':digest(self.seal)}
   p=self.path/'plan.json'
   if p.exists() and read_json(p)!=plan:raise DynamicError('collection_plan_changed','Frozen matrix/config/code cannot change')
   if not p.exists():atomic_json(p,plan)
@@ -88,7 +95,7 @@ class CollectionRunner(ReviewRunner):
    if shared_stop:break
    out=root/'blocks'/protocol;stage='prefix/'+protocol;t=self.transport(stage,out)
    runtime=runtime_factory('p001',out,provider=t,team_model='deepseekflash',protocol=protocol);runtime.execution_attempt=self.attempt
-   history=load_history(runtime,hpath);prefix_file=out/'prepared-prefix.json'
+   history=load_history(runtime,hpath);self.apply_t3_budget(runtime);prefix_file=out/'prepared-prefix.json'
    def prefix_once():
     prefix=runtime.run_prefix(source_factory(),history=history)
     if prefix['status']!='triggered':
@@ -134,7 +141,7 @@ class CollectionRunner(ReviewRunner):
   self.verify_parent();return save('collection_stopped')
 
 def main():
- p=argparse.ArgumentParser(description=__doc__);p.add_argument('operation',choices=('collect',));p.add_argument('--parent',type=Path,required=True);p.add_argument('--out',type=Path,required=True);p.add_argument('--attempt-id',required=True);p.add_argument('--bindings',type=Path,required=True);p.add_argument('--env-file',type=Path,required=True);p.add_argument('--allow-real-api',action='store_true');p.add_argument('--retry-h2-from-attempt');a=p.parse_args()
+ p=argparse.ArgumentParser(description=__doc__);p.add_argument('operation',choices=('collect',));p.add_argument('--parent',type=Path,required=True);p.add_argument('--out',type=Path,required=True);p.add_argument('--attempt-id',required=True);p.add_argument('--bindings',type=Path,required=True);p.add_argument('--env-file',type=Path,required=True);p.add_argument('--allow-real-api',action='store_true');p.add_argument('--retry-h2-from-attempt');p.add_argument('--continue-deadline-history-from-attempt');p.add_argument('--extended-t3-budget',action='store_true');a=p.parse_args()
  if not a.allow_real_api:p.error('This collection mode requires the explicit authorized API flag')
  code=subprocess.check_output(['git','rev-parse','HEAD'],cwd=repo_root(),text=True).strip()
  if subprocess.run(['git','merge-base','--is-ancestor',BASELINE,code],cwd=repo_root()).returncode:raise DynamicError('collection_baseline_mismatch','Use the designated baseline successor')
@@ -146,8 +153,12 @@ def main():
  dry=migrate_attempts(a.parent/'campaign-budget.sqlite3',apply=False)
  if dry['needs_migration']:raise DynamicError('execution_migration_required','Original association tables must already exist')
  budget=CampaignBudget(a.parent/'campaign-budget.sqlite3',campaign_id='first-api-20261026',must_exist=True,segment_id=SEGMENT_ID,segment_cny=dry['segment_ceiling_micro_cny']/1e6,segment_identity=dry['segment_identity'])
+ from trustfork.runtime.dynamic.retained_history_deadline import inspect_retained_deadline,register_deadline_carry
+ if a.retry_h2_from_attempt and a.continue_deadline_history_from_attempt:raise DynamicError('history_continuation_ambiguous','Choose only one explicit retained source')
+ retained=inspect_retained_deadline(budget,c,a.continue_deadline_history_from_attempt) if a.continue_deadline_history_from_attempt else None
  retry=verified_h2_serialization_retry(budget,a.retry_h2_from_attempt) if a.retry_h2_from_attempt else None
- attempt=ExecutionAttempt(budget,a.out,attempt_id=a.attempt_id,parent_attempt=a.retry_h2_from_attempt or 'runtime-review-20261027-a1',identity={'execution_code_sha':code,'config_hash':digest(c),'allowed_actions':['fixed-behavior-collection-only'],'history_serialization_retry':retry,'retry_reason':'Explicit authorized collection-first plan; never gated by Judge results'})
+ attempt=ExecutionAttempt(budget,a.out,attempt_id=a.attempt_id,parent_attempt=a.continue_deadline_history_from_attempt or a.retry_h2_from_attempt or 'runtime-review-20261027-a1',identity={'execution_code_sha':code,'config_hash':digest(c),'allowed_actions':['fixed-behavior-collection-only'],'history_serialization_retry':retry,'history_deadline_continuation':retained['proof'] if retained else None,'t3_budget_override':{'request_limit':240,'token_limit':384000,'stage_seconds':3600} if a.extended_t3_budget else None,'retry_reason':'Explicit authorized collection-first plan; never gated by Judge results'})
+ if retained:register_deadline_carry(attempt,retained)
  write_json(a.out/'resolved-config.json',c);runner=CollectionRunner(a.parent,attempt,c);runner.freeze_collection_plan();write_json(a.out/'budget-before.json',attempt.inspect())
  from dotenv import dotenv_values
  values=dotenv_values(a.env_file);binding=c['logical_bindings']['deepseekflash'];key=values.get(binding['key_env']) or os.environ.get(binding['key_env'])
