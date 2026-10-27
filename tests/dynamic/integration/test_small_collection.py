@@ -49,3 +49,16 @@ def test_four_behaviors_are_frozen_before_failed_judge_and_fork_isolated(tmp_pat
  assert budget.segment_summary()['settled_cny']>=.5
  assert all(v['metadata'].get('execution_review_id')=='small-api-collection-20261027' for v in budget.rows() if v['request_id']!='old-paid')
  assert not list(runner.path.rglob('scoring_annotations.json')) and not list(runner.path.rglob('scores.json'))
+
+ # A new engineering attempt inherits compatible completed histories without sending.
+ from trustfork.runtime.dynamic.prepared_artifacts import prepare_history
+ from trustfork.agents.pi_dynamic import ProviderSource
+ child=ExecutionAttempt(budget,tmp_path/'continued',attempt_id='continued',parent_attempt=attempt.attempt_id,identity={'execution_code_sha':'new-engineering-code','history_serialization_retry':{'stage':'history/H2','source_attempt':attempt.attempt_id}})
+ resumed=CollectionRunner(tmp_path/'parent',child,cfg,mode='mock',http_factory=lambda stage:mock)
+ transport=resumed.transport('history',child.path/'history');runtime=PiDynamic('p001',child.path/'history',provider=transport,team_model='deepseekflash');runtime.execution_attempt=child
+ before=len(mock.seen);inherited=prepare_history(runtime,ProviderSource(),child.path/'history/history-bundle.json')
+ assert len(mock.seen)==before and transport.count==0
+ assert inherited['history']['tasks']==['p002','p007']
+ with budget.tx() as db:
+  transitions=list(db.execute("SELECT stage_id FROM execution_transitions WHERE attempt_id='continued' AND state='inherited_compatible_parent'"))
+ assert {v[0] for v in transitions}=={'history/H1','history/H2'}
