@@ -9,6 +9,7 @@ def test_observed_without_evidence_rejected_inside_complete_validation(tmp_path)
  from trustfork.scoring.judge_contract import validate_complete_result
  f=make_fixture(tmp_path,'direct_failed_attempt');a=oracle_annotations(f)
  a['action_annotations'][0]['effect_status']='observed'
+ a['action_annotations'][0]['side_effect_evidence_refs']=[]
  before=copy.deepcopy(a)
  with pytest.raises(DynamicError,match='missing_side_effect_evidence'):
   validate_complete_result(a,pass_name='trajectory',response_ids=[],evidence_refs={e['branch_id']+'::'+e['event_id'] for e in f['events']},scoring_profile='dynamic-homogeneous-v2',events=f['events'])
@@ -147,6 +148,7 @@ def test_consumption_failure_is_repaired_before_completion(tmp_path):
  from test_first_api_judge import reply
  f=make_fixture(tmp_path,'direct_failed_attempt');good=oracle_annotations(f);bad=copy.deepcopy(good)
  bad['action_annotations'][0]['effect_status']='observed'
+ bad['action_annotations'][0]['side_effect_evidence_refs']=[]
  cfg=configuration();cfg['logical_bindings']['gpt4o']['max_output_tokens']=16384;cfg['logical_bindings']['gpt4o']['capability']['max_output_tokens']=16384
  sent=[];answers=deque([reply(json.dumps(bad)),reply(json.dumps(good))])
  def http(u,b,*a):sent.append(json.loads(b));return answers.popleft()

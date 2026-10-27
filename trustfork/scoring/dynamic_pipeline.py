@@ -294,7 +294,6 @@ def _score_run(path,*,mode='formal',output_override=None,rescore=None,frozen_ide
     bound=manifest.get('resolved_api_bindings') or {}
     judge_alias=bound.get('judge_binding',run.get('judge_binding','gpt4o'))
     judge_binding=bound.get('logical_bindings',{}).get(judge_alias,{})
-    capability=binding_capability(judge_binding)
     bundle=build_judge_bundle(response_input,trajectory_input,scoring_profile=profile,
         goal_spec=case['goal_spec'] if profile=='dynamic-homogeneous-v2' else None,
         annotation_schema=read_json(repo_root()/'trustfork/config/dynamic/annotation.schema.json') if profile=='dynamic-homogeneous-v2' else None)
@@ -310,15 +309,12 @@ def _score_run(path,*,mode='formal',output_override=None,rescore=None,frozen_ide
         if digest(expected['request'])!=stored['request_hash'] or digest(expected['wire_payload'])!=stored['wire_payload_hash']:
             raise DynamicError('annotation_judge_request_mismatch','Sidecar does not bind frozen view/profile/representation/parameters')
         prepared[key]=expected
-    capacities={key:capacity_report(value,capability) for key,value in prepared.items()}
+    capacities=judge_pass_capacities(prepared,annotations.get('judge_passes',{}),judge_binding)
     for key,value in prepared.items():_artifact(output,'prepared_'+key+'.json',value)
     _artifact(output,'capacity_reports.json',capacities)
     _artifact(output,'trajectory_lossless.json',packed)
     if mode=='formal':
-        for metric,record in scores['scores'].items():
-            if record['status']=='not_applicable':continue
-            report=capacities['response' if metric in ('RTF','RSR') else 'trajectory']
-            if report['fits'] is not True:record.update(value=None,status='judge_error',reason=report['reason'],eligible_for_primary=False)
+        apply_formal_capacity_policy(scores['scores'],capacities,goal=goal,actors=actors)
     input_refs={'response':_artifact(output,'response_input.json',response_input),
         'trajectory':_artifact(output,'trajectory_input.json',trajectory_input),
         'prompts':_artifact(output,'judge_prompts.json',prompts)}
@@ -372,6 +368,38 @@ def _score_run(path,*,mode='formal',output_override=None,rescore=None,frozen_ide
     if rescore:identity['rescore']=rescore
     freeze_scoring_version(output,identity)
     return summary
+
+
+def judge_pass_capacities(prepared,pass_metadata,original_binding):
+    """Capacity follows each actual scoring route, not the frozen team origin."""
+    return {key:capacity_report(value,binding_capability(judge_pass_binding(pass_metadata.get(key,{}),original_binding)))
+            for key,value in prepared.items()}
+
+
+def apply_formal_capacity_policy(scores,capacities,*,goal=None,actors=()):
+    """Invalidate only scores that depend on an unverified/blocked Judge pass."""
+    for metric,record in scores.items():
+        if record['status']=='not_applicable':continue
+        state=(goal or {}).get(metric)
+        if state is not None:
+            # New goal observations declare their source. Legacy source-less
+            # semantic records retain the trajectory requirement, never a waiver.
+            dependencies=state.get('judge_dependencies',['trajectory'])
+            record['assessment_source']=state.get('assessment_source','unknown')
+        else:dependencies=['response' if metric in ('RTF','RSR') else 'trajectory']
+        if not isinstance(dependencies,list) or any(dep not in ('response','trajectory') for dep in dependencies):
+            raise DynamicError('invalid_metric_judge_dependency',metric)
+        record['judge_dependencies']=list(dependencies)
+        failed=next((capacities[dep] for dep in dependencies if capacities[dep]['fits'] is not True),None)
+        if failed:record.update(value=None,status='judge_error',reason=failed['reason'],eligible_for_primary=False)
+    if capacities['response']['fits'] is not True:
+        for actor in actors:
+            if not isinstance(actor.get('score_status'),dict):continue
+            for metric in ('RTF','RSR'):
+                if actor['score_status'].get(metric)=='not_applicable':continue
+                actor[metric]=None
+                actor['score_status'][metric]='judge_error'
+            actor['score_reason']=capacities['response']['reason']
 
 
 def judge_pass_binding(metadata,original_binding):

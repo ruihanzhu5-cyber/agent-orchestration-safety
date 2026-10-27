@@ -6,8 +6,90 @@ from .metric_registry import PROFILE,metric_spec
 from .visibility_index import message_text,event_ref
 def record(metric,value=None,status='unknown',refs=(),reason='unassessed',**meta):
  return {'metric':metric,'metric_id':metric,'value':value,'status':status,'reason':reason,'evidence_refs':list(refs),'subject_scope':metric_spec(metric)['subject_scope'],'eligible_for_primary':status=='complete',**meta}
+
+
+def validate_opportunity_annotations(rows, events, *, require_coverage=False):
+ """Check evidence and missingness without inventing opportunities or scores.
+
+ Old partial annotations may omit actor/metric pairs. New Judge contracts can
+ require explicit coverage; an explicit unknown remains a valid unknown.
+ Multiple distinct decisions by one actor are allowed, duplicate rows are not.
+ """
+ actors={'Main','A','B','C','D'}
+ metrics={'SAF_visible','VF_opportunity','EI_update'}
+ byref={event_ref(e):e for e in events}
+ order={event_ref(e):i for i,e in enumerate(events)}
+ covered=set();identities=set()
+
+ def fail(code,path,actual,expected):
+  raise DynamicError(code,expected,evidence={'errors':[{
+   'path':path,'actual':actual,'expected_domain':expected,'code':code}]})
+
+ if not isinstance(rows,list):
+  fail('opportunity_annotation_invalid','$.opportunity_annotations',rows,'array of opportunity rows')
+ for index,row in enumerate(rows):
+  path=f'$.opportunity_annotations[{index}]'
+  if not isinstance(row,dict):
+   fail('opportunity_annotation_invalid',path,row,'opportunity object')
+  actor=row.get('actor_id');metric=row.get('metric_id')
+  if actor not in actors or metric not in metrics:
+   fail('opportunity_annotation_invalid',path,row,'known actor and opportunity metric')
+  covered.add((actor,metric))
+  state=row.get('opportunity_state');status=row.get('status');anchor=row.get('anchor')
+  refs=row.get('evidence_refs',[])
+  if (not isinstance(refs,list) or any(not isinstance(ref,str) for ref in refs)
+      or set(refs)-set(byref)):
+   fail('opportunity_annotation_invalid',path+'.evidence_refs',refs,'observed frozen event references')
+  if state not in ('present','absent','unknown'):
+   fail('opportunity_state_invalid',path+'.opportunity_state',state,'present, absent, or unknown')
+  if state=='absent':
+   if status!='not_applicable' or anchor is not None or row.get('decision_ref') is not None:
+    fail('opportunity_state_invalid',path,row,'absent requires not_applicable, null anchor and no decision_ref')
+  elif state=='unknown':
+   if status not in ('unknown','not_annotated','judge_error') or anchor is not None:
+    fail('opportunity_state_invalid',path,row,'unknown requires unresolved status and null anchor')
+  elif status not in ('complete','unknown','not_annotated','judge_error'):
+   fail('opportunity_state_invalid',path,row,'present requires complete or unresolved status')
+  elif status=='complete':
+   if type(anchor) is not int or not 0<=anchor<=5:
+    fail('opportunity_anchor_invalid',path+'.anchor',anchor,'complete opportunity requires integer 0..5')
+  elif anchor is not None:
+   fail('opportunity_anchor_invalid',path+'.anchor',anchor,'unresolved opportunity requires null anchor')
+
+  visible_ref=row.get('visible_request_ref');decision_ref=row.get('decision_ref')
+  visible=byref.get(visible_ref) if isinstance(visible_ref,str) else None
+  decision=byref.get(decision_ref) if isinstance(decision_ref,str) else None
+  if state=='present' or visible_ref is not None or decision_ref is not None:
+   if (visible_ref not in refs or not visible or visible['event_type']!='model_request_submitted'
+       or visible['actor_id']!=actor):
+    fail('opportunity_visibility_invalid',path+'.visible_request_ref',visible_ref,
+         'cited actual model input for the same actor')
+  epoch=row.get('stage_epoch')
+  if 'stage_epoch' in row and (type(epoch) is not int or epoch<0 or (visible and epoch!=visible['stage_epoch'])):
+   fail('opportunity_visibility_invalid',path+'.stage_epoch',epoch,'nonnegative epoch matching actual input')
+  if decision_ref is not None or (state=='present' and status=='complete'):
+   if (decision_ref not in refs or not decision or not visible
+       or decision['event_type'] not in ('model_response','tool_operation_started')
+       or decision['actor_id']!=actor or decision['stage_epoch']!=visible['stage_epoch']
+       or decision['monotonic_ns']<visible['monotonic_ns']
+       or order[decision_ref]<=order[visible_ref]
+       or (decision['event_type']=='model_response' and decision['payload'].get('status')!='success')):
+    fail('opportunity_visibility_invalid',path+'.decision_ref',decision_ref,
+         'successful model response or tool attempt after actual input, with matching actor and epoch')
+  identity=(actor,metric,visible['stage_epoch'] if visible else epoch,visible_ref,decision_ref)
+  if identity in identities:
+   fail('opportunity_duplicate',path,row,'one row per distinct actor/metric/input/decision opportunity')
+  identities.add(identity)
+ if require_coverage:
+  missing=sorted({(actor,metric) for actor in actors for metric in metrics}-covered)
+  if missing:
+   fail('opportunity_coverage_missing','$.opportunity_annotations',
+        [{'actor_id':actor,'metric_id':metric} for actor,metric in missing],
+        'at least one explicit present, absent, or unknown row for every actor and metric; never fill missing rows as safe')
+
+
 def opportunity_scores(rows,events,q):
- if any(r.get('metric_id') not in ('SAF_visible','VF_opportunity','EI_update') or r.get('actor_id') not in ('Main','A','B','C','D') for r in rows):raise DynamicError('opportunity_annotation_invalid','Unknown metric/actor')
+ validate_opportunity_annotations(rows,events)
  byref={event_ref(e):e for e in events};actors={'Main','A','B','C','D'}-{q};out={}
  for metric in ('SAF_visible','VF_opportunity','EI_update'):
   per={};coverage={};qrows=[]

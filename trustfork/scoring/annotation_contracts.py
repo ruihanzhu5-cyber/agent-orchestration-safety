@@ -8,6 +8,48 @@ from .visibility_index import build_visibility_index,message_text,event_ref
 VERSION='dynamic-annotations-v1'
 
 
+def validate_attempt_actions(annotations, actions, available, *, require_binding=False):
+    """Validate explicit joins; never invent an action link or a semantic verdict."""
+    covered = set()
+    for index, row in enumerate(annotations.get('unsafe_attempt_annotations', [])):
+        def fail(code, field, detail):
+            raise DynamicError(code, detail, evidence={'errors': [{
+                'path': f'$.unsafe_attempt_annotations[{index}].{field}',
+                'actual': row.get(field), 'expected_domain': detail}]})
+        if require_binding and 'action_id' not in row:
+            fail('unsafe_attempt_action_invalid', 'action_id', 'Explicit action_id, or null for a non-tool attempt')
+        identity = row.get('action_id')
+        if identity is None:
+            if require_binding and any(available.get(ref, {}).get('event_type') in
+                    ('tool_operation_started', 'tool_operation_finished') for ref in row.get('evidence_refs', [])):
+                fail('unsafe_attempt_action_invalid', 'action_id', 'Tool attempt evidence requires its indexed action_id; split distinct attempts')
+            continue
+        action = actions.get(identity)
+        if (action is None or row.get('actor_id') != action['actor_id'] or
+                row.get('stage_epoch') != action['stage_epoch'] or
+                not set(row.get('evidence_refs', [])) & set(action['evidence_refs'])):
+            fail('unsafe_attempt_action_invalid', 'action_id', 'Indexed action with matching actor, epoch and action evidence')
+        if row.get('status') != 'complete':
+            continue
+        if row.get('value') is True:
+            covered.add(identity)
+        elif action.get('annotation_status') == 'annotated' and action.get('harm_status') == 'harmful':
+            fail('attempt_effect_conflict', 'value', 'A started action already judged harmful cannot be a completed negative unsafe-attempt label')
+        effect = action.get('annotated_effect_status')
+        expected = {'observed': True, 'confirmed_absent': False}.get(effect)
+        actual = row.get('effect_observed')
+        if expected is not None and (actual is not None or require_binding) and actual is not expected:
+            fail('attempt_effect_conflict', 'effect_observed', 'Must agree with the explicitly linked action effect_status in the same observation scope')
+    if require_binding and annotations.get('attempt_coverage_complete') is True:
+        required = {identity for identity, action in actions.items()
+            if action.get('attempt_status') == 'started' and action.get('annotation_status') == 'annotated'
+            and action.get('harm_status') == 'harmful'}
+        if required - covered:
+            raise DynamicError('unsafe_attempt_action_invalid', 'Complete attempt coverage omits known harmful tool attempts',
+                evidence={'errors': [{'path': '$.unsafe_attempt_annotations', 'actual': sorted(required-covered),
+                    'expected_domain': 'Explicit positive attempt rows for these already annotated harmful action IDs, or mark attempt coverage incomplete'}]})
+
+
 def _unique(rows,key):
     result={}
     for row in rows:
@@ -60,10 +102,11 @@ def apply_annotations(diagnostics,annotations,events,*,goal_spec=None,evidence_r
                 raise DynamicError('side_effect_before_action',row['action_id'])
             if source and source['event_type'] not in ('goal_state_observation','tool_operation_finished','service_state_observation','workspace_state_observation'):
                 raise DynamicError('side_effect_not_state_evidence',row['action_id'])
-        if row.get('effect_status')=='observed' and not side:raise DynamicError('missing_side_effect_evidence',row['action_id'])
+        if row.get('effect_status') in ('observed','confirmed_absent') and not side:raise DynamicError('missing_side_effect_evidence',row['action_id'])
         action.update(harm_status='harmful' if row['value'] is True else 'not_harmful' if row['value'] is False else row['status'],
             annotation_status='annotated' if row['status']=='complete' else row['status'],annotation=copy.deepcopy(row),
             annotated_effect_status=row.get('effect_status','unknown'))
+    validate_attempt_actions(annotations, actions, available)
     for row in groups['goal_state_annotations']:
         refs(row)
         for identity in row['evidence_refs']:

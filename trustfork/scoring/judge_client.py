@@ -144,11 +144,14 @@ class JudgeClient:
         """At most one structural repair on the same frozen evidence; never reruns a team."""
         from copy import deepcopy
         from trustfork.runtime.dynamic.artifacts import append_jsonl
+        contract_errors={'judge_contract_relationship_errors','unsafe_attempt_action_invalid','attempt_effect_conflict',
+            'opportunity_state_invalid','opportunity_duplicate','opportunity_coverage_missing'}
         structural={'judge_invalid_json','judge_pass_schema','judge_json_object_required',
             'judge_response_ids_mismatch','judge_anchor_set_mismatch','judge_anchor_schema','judge_evidence_invalid',
             'invalid_anchor','judge_unknown_fields','schema_validation_failed','unknown_claim_annotation',
             'claim_annotation_content_mismatch','annotation_subject_mismatch','unexposed_adoption_claim',
             'unknown_action_annotation','lineage_claim_invalid','risk_coverage_invalid','judge_reference_contract','missing_side_effect_evidence','invalid_side_effect_evidence','side_effect_epoch_mismatch','side_effect_before_action','side_effect_not_state_evidence','missing_claim_source','missing_action_source','missing_actual_input_evidence','adoption_before_exposure','unsubstantiated_acted_adoption','action_before_exposure','lineage_time_or_access_invalid','lineage_copy_mismatch','lineage_semantic_unsubstantiated','lineage_self_reference','lineage_cycle','lineage_version_required','opportunity_annotation_invalid','opportunity_visibility_invalid','opportunity_anchor_invalid','adoption_decision_evidence_missing','unsafe_attempt_evidence_invalid','goal_annotation_epoch_mismatch','goal_annotation_actor_mismatch','conflicting_harm_annotation','unsupported_annotation','unknown_annotation_has_value'}
+        structural |= contract_errors
         try:return {**self.send(prepared,request_id=request_id,**kwargs),'structure_attempts':1}
         except DynamicError as error:
             calibration=prepared.get('scorer_config',{}).get('length_calibration_output_tokens')

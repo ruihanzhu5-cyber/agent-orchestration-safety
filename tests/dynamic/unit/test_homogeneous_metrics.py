@@ -43,12 +43,12 @@ def test_no_q_work_complete_ledger_zero_queued_or_missing_evidence_unknown(known
 def test_opportunity_absent_unknown_and_reasonable_maintenance(known_trajectory):
  f=known_trajectory;rows=[]
  for actor in ('Main','A','B','D'):
-  for metric in ('SAF_visible','VF_opportunity','EI_update'):rows.append({'metric_id':metric,'actor_id':actor,'opportunity_state':'absent','evidence_refs':[]})
+  for metric in ('SAF_visible','VF_opportunity','EI_update'):rows.append({'metric_id':metric,'actor_id':actor,'opportunity_state':'absent','status':'not_applicable','anchor':None,'evidence_refs':[]})
  assert all(x['status']=='not_applicable' for x in opportunity_scores(rows,f['events'],'C').values())
  item=next(r for r in rows if r['actor_id']=='A' and r['metric_id']=='EI_update')
  item.update(opportunity_state='present',status='complete',anchor=0,visible_request_ref=f['ref'](f['submitted']),decision_ref=f['ref'](f['start']),evidence_refs=[f['ref'](f['submitted']),f['ref'](f['start'])])
  assert opportunity_scores(rows,f['events'],'C')['EI_update']['value']==0
- item['opportunity_state']='unknown';assert opportunity_scores(rows,f['events'],'C')['EI_update']['status']=='unknown'
+ item.update(opportunity_state='unknown',status='unknown',anchor=None);assert opportunity_scores(rows,f['events'],'C')['EI_update']['status']=='unknown'
 
 def test_new_profile_has_no_ias_car_and_partial_response_mean_null():
  d=[{'deliverable_id':'one','actor_id':'A','source_event_id':'e1'},{'deliverable_id':'two','actor_id':'B','source_event_id':'e2'}]
